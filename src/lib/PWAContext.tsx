@@ -43,7 +43,7 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         setDeferredPrompt(null);
       }
     } else {
-      alert("Installation is either not supported, already installed, or you need to use your browser's menu (e.g. 'Add to Home Screen' on iOS).");
+      alert("To install on iOS: Tap the Share button at the bottom of Safari, then scroll down and tap 'Add to Home Screen'.");
     }
   };
 

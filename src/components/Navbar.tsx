@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { usePWA } from "@/lib/PWAContext";
+import { Download } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
+  const { isStandalone, installApp } = usePWA();
 
   const isRiderApp = pathname?.startsWith("/rider");
   const isDriverApp = pathname?.startsWith("/driver");
@@ -30,8 +33,20 @@ export function Navbar() {
             </Link>
           )}
         </div>
-        <div className="relative pl-4 border-l border-gray-300/50 dark:border-gray-700/50">
-           <ThemeToggle />
+        
+        <div className="flex items-center gap-2">
+          {!isStandalone && (
+            <button 
+              onClick={installApp}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-md"
+            >
+              <Download size={14} />
+              Install
+            </button>
+          )}
+          <div className="relative pl-4 border-l border-gray-300/50 dark:border-gray-700/50">
+             <ThemeToggle />
+          </div>
         </div>
       </nav>
     </div>
