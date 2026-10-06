@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react'
 import { LocateFixed, Clock } from 'lucide-react'
 import { saveTrip, type MockTrip } from '@/lib/mockBackend'
-import { SearchBox } from '@mapbox/search-js-react'
+import dynamic from 'next/dynamic'
+
+const SearchBox = dynamic(
+  () => import('@mapbox/search-js-react').then((mod) => mod.SearchBox),
+  { ssr: false }
+)
 
 interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
