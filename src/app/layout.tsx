@@ -4,7 +4,6 @@ import "./globals.css";
 import InstallPrompt from "@/components/InstallPrompt";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/Navbar";
-import Link from "next/link";
 
 const inter = Inter({ subsets: ["latin"] });
 

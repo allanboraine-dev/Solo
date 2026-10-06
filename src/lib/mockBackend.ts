@@ -167,7 +167,7 @@ export const saveTrip = async (trip: MockTrip) => {
       scheduled_time: trip.scheduled_time ? new Date(trip.scheduled_time).toISOString() : null,
     };
 
-    const { data, error } = await supabase.from('trips').upsert(dbPayload).select().single();
+    const { error } = await supabase.from('trips').upsert(dbPayload).select().single();
     if (error) throw error;
   } catch (e) {
     console.error('Error saving trip to Supabase:', e);
@@ -198,7 +198,7 @@ export const saveMessage = (msg: MockMessage) => {
 // ----------------------------------------
 type EventType = 'trip_updated' | 'new_message' | 'driver_location';
 
-export const broadcastEvent = (type: EventType, payload: any) => {
+export const broadcastEvent = (type: EventType, payload: unknown) => {
   if (typeof window === 'undefined') return;
   // Send via Supabase Broadcast (bypasses DB, very fast for GPS)
   const channel = supabase.channel('solo_events');
@@ -213,7 +213,7 @@ export const broadcastEvent = (type: EventType, payload: any) => {
   });
 };
 
-export const subscribeToEvents = (callback: (type: EventType, payload: any) => void) => {
+export const subscribeToEvents = (callback: (type: EventType, payload: unknown) => void) => {
   if (typeof window === 'undefined') return () => {};
 
   // 1. Listen for Database Changes (Trips)

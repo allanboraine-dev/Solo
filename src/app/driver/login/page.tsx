@@ -84,7 +84,7 @@ export default function DriverLogin() {
         </form>
 
         <p className="text-center mt-6 text-gray-500 font-medium">
-          Don't have an account? <Link href="/driver/register" className="text-blue-600 dark:text-blue-400">Register</Link>
+          Don&apos;t have an account? <Link href="/driver/register" className="text-blue-600 dark:text-blue-400">Register</Link>
         </p>
       </div>
     </div>

@@ -34,8 +34,8 @@ export async function POST(req: Request) {
     // Return the Paystack hosted checkout URL to the frontend
     return NextResponse.json({ url: data.data.authorization_url })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Paystack error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

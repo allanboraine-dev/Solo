@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { MapPin, LocateFixed, Clock } from 'lucide-react'
+import { LocateFixed, Clock } from 'lucide-react'
 import { saveTrip, type MockTrip } from '@/lib/mockBackend'
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
 
