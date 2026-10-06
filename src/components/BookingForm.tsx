@@ -80,20 +80,39 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
 
   const handleGetCurrentLocation = () => {
     if ('geolocation' in navigator) {
+      setPickup('Locating...');
+      if (pickupInputRef.current) pickupInputRef.current.value = 'Locating...';
+      
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const coords = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           }
-          setPickup('Current Location')
-          if (pickupInputRef.current) pickupInputRef.current.value = 'Current Location'
+          
+          let address = 'Current Location';
+          if (window.google) {
+            const geocoder = new google.maps.Geocoder();
+            try {
+              const response = await geocoder.geocode({ location: coords });
+              if (response.results[0]) {
+                address = response.results[0].formatted_address;
+              }
+            } catch (e) {
+              console.error("Geocoder failed", e);
+            }
+          }
+          
+          setPickup(address)
+          if (pickupInputRef.current) pickupInputRef.current.value = address
           setRealPickupCoords(coords)
           onLocationSelect('pickup', coords.lat, coords.lng)
         },
         (error) => {
           alert('Could not fetch location. Please ensure location services are enabled.')
           console.error(error)
+          setPickup('')
+          if (pickupInputRef.current) pickupInputRef.current.value = ''
         }
       )
     }
