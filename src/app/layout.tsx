@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import InstallPrompt from "@/components/InstallPrompt";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/Navbar";
 
@@ -49,7 +48,6 @@ export default function RootLayout({
               <main className="min-h-screen pt-24">
                 {children}
               </main>
-              <InstallPrompt />
             </GoogleMapsProvider>
           </PWAProvider>
         </ThemeProvider>
