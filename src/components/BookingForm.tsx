@@ -6,7 +6,7 @@ import { saveTrip, type MockTrip } from '@/lib/mockBackend'
 import dynamic from 'next/dynamic'
 
 const SearchBox = dynamic(
-  () => import('@mapbox/search-js-react').then((mod) => mod.SearchBox),
+  () => import('@mapbox/search-js-react').then((mod) => ({ default: mod.SearchBox })),
   { ssr: false }
 )
 
