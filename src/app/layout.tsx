@@ -26,7 +26,6 @@ export const viewport: Viewport = {
 };
 
 import { PWAProvider } from "@/lib/PWAContext";
-import GoogleMapsProvider from "@/components/GoogleMapsProvider";
 
 export default function RootLayout({
   children,
@@ -43,12 +42,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <PWAProvider>
-            <GoogleMapsProvider>
-              <Navbar />
-              <main className="min-h-screen pt-24">
-                {children}
-              </main>
-            </GoogleMapsProvider>
+            <Navbar />
+            <main className="min-h-screen pt-24">
+              {children}
+            </main>
           </PWAProvider>
         </ThemeProvider>
       </body>

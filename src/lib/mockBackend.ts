@@ -200,27 +200,29 @@ type EventType = 'trip_updated' | 'new_message' | 'driver_location';
 
 export const broadcastEvent = (type: EventType, payload: unknown) => {
   if (typeof window === 'undefined') return;
-  // Send via Supabase Broadcast (bypasses DB, very fast for GPS)
-  const channel = supabase.channel('solo_events');
-  channel.subscribe((status) => {
-    if (status === 'SUBSCRIBED') {
-      channel.send({
-        type: 'broadcast',
-        event: type,
-        payload: payload,
-      });
-    }
-  });
+  initGlobalChannels();
+  if (globalBroadcastChannel) {
+    globalBroadcastChannel.send({
+      type: 'broadcast',
+      event: type,
+      payload: payload,
+    });
+  }
 };
 
-export const subscribeToEvents = (callback: (type: EventType, payload: unknown) => void) => {
-  if (typeof window === 'undefined') return () => {};
+let globalTripsChannel: any = null;
+let globalBroadcastChannel: any = null;
+const listeners = new Set<(type: EventType, payload: unknown) => void>();
 
-  // 1. Listen for Database Changes (Trips)
-  const dbChannel = supabase.channel('public:trips')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload) => {
-      // Convert DB payload back to frontend camelCase model
+const initGlobalChannels = () => {
+  if (typeof window === 'undefined') return;
+  if (globalTripsChannel) return;
+
+  globalTripsChannel = supabase.channel('public:trips');
+  globalTripsChannel
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, (payload: any) => {
       const dbTrip = payload.new as any;
+      if (!dbTrip) return;
       const trip: MockTrip = {
         id: dbTrip.id,
         rider_id: dbTrip.rider_id,
@@ -235,31 +237,33 @@ export const subscribeToEvents = (callback: (type: EventType, payload: unknown) 
         status: dbTrip.status,
         scheduled_time: dbTrip.scheduled_time,
       };
-
-      if (payload.eventType === 'INSERT') {
-        callback('trip_updated', trip); // Treat inserts as updates for the UI to pick up
-      } else if (payload.eventType === 'UPDATE') {
-        callback('trip_updated', trip);
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        listeners.forEach(cb => cb('trip_updated', trip));
       }
     })
     .subscribe();
 
-  // 2. Listen for Broadcasts (GPS, Messages)
-  const broadcastChannel = supabase.channel('solo_events')
-    .on('broadcast', { event: 'driver_location' }, (payload) => {
-      callback('driver_location', payload.payload);
+  globalBroadcastChannel = supabase.channel('solo_events');
+  globalBroadcastChannel
+    .on('broadcast', { event: 'driver_location' }, (payload: any) => {
+      listeners.forEach(cb => cb('driver_location', payload.payload));
     })
-    .on('broadcast', { event: 'new_message' }, (payload) => {
-      callback('new_message', payload.payload);
+    .on('broadcast', { event: 'new_message' }, (payload: any) => {
+      listeners.forEach(cb => cb('new_message', payload.payload));
     })
-    .on('broadcast', { event: 'trip_updated' }, (payload) => {
-      // Fallback for local optimism
-      callback('trip_updated', payload.payload);
+    .on('broadcast', { event: 'trip_updated' }, (payload: any) => {
+      listeners.forEach(cb => cb('trip_updated', payload.payload));
     })
     .subscribe();
+};
+
+export const subscribeToEvents = (callback: (type: EventType, payload: unknown) => void) => {
+  if (typeof window === 'undefined') return () => {};
+  
+  initGlobalChannels();
+  listeners.add(callback);
 
   return () => {
-    supabase.removeChannel(dbChannel);
-    supabase.removeChannel(broadcastChannel);
+    listeners.delete(callback);
   };
 };
