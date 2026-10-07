@@ -9,7 +9,7 @@ interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
 }
 
-const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''; // Keep it here but unused, or remove it entirely. Let's just remove it.
 
 export default function BookingForm({ onLocationSelect }: BookingFormProps) {
   const [pickup, setPickup] = useState('')
@@ -35,17 +35,15 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
           }
           
           let address = 'Current Location';
-          if (mapboxToken) {
-            try {
-              const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${mapboxToken}`;
-              const res = await fetch(url);
-              const data = await res.json();
-              if (data.features && data.features.length > 0) {
-                address = data.features[0].place_name;
-              }
-            } catch (e) {
-              console.error("Geocoder failed", e);
+          try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data && data.display_name) {
+              address = data.name || data.display_name.split(',')[0];
             }
+          } catch (e) {
+            console.error("Geocoder failed", e);
           }
           
           setPickup(address)
@@ -61,9 +59,9 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
     }
   }
 
-  // Calculate Route & Fare using Mapbox Directions API
+  // Calculate Route & Fare using OSRM Directions API
   useEffect(() => {
-    if (!mapboxToken || !realPickupCoords || !realDropoffCoords) return;
+    if (!realPickupCoords || !realDropoffCoords) return;
 
     const getDirections = async () => {
       try {
