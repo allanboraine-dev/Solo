@@ -75,7 +75,7 @@ export default function RiderPage() {
   }
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900 -mt-24">
+    <div className="h-[calc(100vh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Map Background layer */}
       <div className="absolute inset-0 z-0">
         <MapComponent 
@@ -88,10 +88,29 @@ export default function RiderPage() {
         />
       </div>
 
+      <button 
+        onClick={() => {
+          if (activeTrip) {
+            // Cancel the active trip in backend so it doesn't reload on refresh
+            const updated = { ...activeTrip, status: 'completed' as const };
+            saveTrip(updated);
+          }
+          localStorage.removeItem('mock_trips');
+          setActiveTrip(null);
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
+        }}
+        className="absolute top-4 right-4 z-50 bg-white/90 dark:bg-black/90 backdrop-blur text-red-500 hover:text-red-600 px-4 py-2 rounded-2xl shadow-lg border border-red-100 dark:border-red-900/30 text-sm font-bold transition-all active:scale-95"
+      >
+        Reset App / Logout
+      </button>
+
       {/* Floating UI Panel */}
-      <div className="absolute top-28 left-4 md:left-8 w-[calc(100vw-32px)] md:w-96 max-h-[calc(100vh-140px)] flex flex-col z-10">
-        <div className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col max-h-full">
-          <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+      <div className="absolute bottom-0 left-0 w-full md:bottom-auto md:top-28 md:left-8 md:w-96 flex flex-col z-10 md:max-h-[calc(100vh-140px)]">
+        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border border-white/40 dark:border-white/10 flex flex-col max-h-[85vh] md:max-h-full">
+          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-1 md:hidden"></div>
+          <div className={`p-6 pt-2 md:pt-6 flex-1 flex flex-col ${!activeTrip ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 <div className="mb-6 flex items-center gap-4">

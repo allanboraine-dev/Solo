@@ -3,12 +3,7 @@
 import { useState, useEffect } from 'react'
 import { LocateFixed, Clock } from 'lucide-react'
 import { saveTrip, type MockTrip } from '@/lib/mockBackend'
-import dynamic from 'next/dynamic'
-
-const SearchBox = dynamic(
-  () => import('@mapbox/search-js-react').then((mod) => ({ default: mod.SearchBox })),
-  { ssr: false }
-)
+import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
@@ -136,122 +131,88 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
   }
 
   return (
-    <div className="bg-white/80 dark:bg-black/40 backdrop-blur-3xl rounded-[32px] p-6 md:p-8 shadow-2xl border border-white/20 dark:border-white/5 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="space-y-6 relative">
-        <div className="absolute left-6 top-8 bottom-[140px] w-0.5 bg-gray-200 dark:bg-zinc-800 z-0"></div>
+    <div className="space-y-6 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-4">
+      <div className="absolute left-6 top-8 bottom-[140px] w-0.5 bg-gray-200 dark:bg-zinc-800 z-0"></div>
 
-        <div className="space-y-4 relative z-10">
-          <div className="relative flex items-center bg-white dark:bg-black border border-transparent focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
-            <div className="w-full">
-              <SearchBox 
-                accessToken={mapboxToken}
-                options={{ 
-                  language: 'en', 
-                  country: 'ZA',
-                  proximity: [24.7623, -28.7282] 
-                }}
-                value={pickup}
-                onChange={(v) => setPickup(v)}
-                onRetrieve={(res) => {
-                  const feature = res.features[0];
-                  if (feature) {
-                    const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
-                    setRealPickupCoords(coords);
-                    setPickup(feature.properties.name || feature.properties.full_address || '');
-                    onLocationSelect('pickup', coords.lat, coords.lng);
-                  }
-                }}
-                theme={{
-                  variables: {
-                    fontFamily: 'inherit',
-                    unit: '16px',
-                    padding: '1em',
-                    borderRadius: '1rem',
-                    boxShadow: 'none'
-                  }
-                }}
-              />
-            </div>
-            <button 
-              onClick={() => handleGetCurrentLocation()} 
-              className="absolute right-4 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
-              title="Use Current Location"
-            >
-              <LocateFixed size={18} />
-            </button>
+      <div className="space-y-4 relative z-10">
+        <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
+          <div className="w-full">
+            <CustomSearchInput 
+              mapboxToken={mapboxToken}
+              placeholder="Search pickup location"
+              value={pickup}
+              onChange={setPickup}
+              onSelect={(feature) => {
+                const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
+                setRealPickupCoords(coords);
+                setPickup(feature.place_name || '');
+                onLocationSelect('pickup', coords.lat, coords.lng);
+              }}
+            />
           </div>
-          
-          <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
-            <div className="w-full">
-              <SearchBox 
-                accessToken={mapboxToken}
-                options={{ 
-                  language: 'en', 
-                  country: 'ZA',
-                  proximity: [24.7623, -28.7282] 
-                }}
-                value={dropoff}
-                onChange={(v) => setDropoff(v)}
-                onRetrieve={(res) => {
-                  const feature = res.features[0];
-                  if (feature) {
-                    const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
-                    setRealDropoffCoords(coords);
-                    setDropoff(feature.properties.name || feature.properties.full_address || '');
-                    onLocationSelect('dropoff', coords.lat, coords.lng);
-                  }
-                }}
-                theme={{
-                  variables: {
-                    fontFamily: 'inherit',
-                    unit: '16px',
-                    padding: '1em',
-                    borderRadius: '1rem',
-                    boxShadow: 'none'
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="relative flex items-center">
-          <input 
-            type="datetime-local" 
-            value={pickupTime}
-            onChange={(e) => setPickupTime(e.target.value)}
-            className="w-full p-4 pl-12 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all outline-none font-medium text-[15px] shadow-sm text-gray-700 dark:text-gray-300" 
-          />
-          <Clock className="absolute left-4 text-blue-500" size={18} />
-          {!pickupTime && <span className="absolute left-12 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-[15px] font-medium">Leave Now</span>}
+          <button 
+            onClick={() => handleGetCurrentLocation()} 
+            className="absolute right-4 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
+            title="Use Current Location"
+          >
+            <LocateFixed size={18} />
+          </button>
         </div>
         
-        {fare !== null && distanceKm !== null && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 flex justify-between items-center animate-in fade-in zoom-in-95">
-            <div>
-              <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-0.5">Estimated Fare</p>
-              <p className="text-xs text-blue-600 dark:text-blue-300 font-medium">
-                {distanceKm.toFixed(1)} km &middot; R20 base + R10/km
-              </p>
-            </div>
-            <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
-              R{fare}
-            </div>
+        <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
+          <div className="w-full">
+            <CustomSearchInput 
+              mapboxToken={mapboxToken}
+              placeholder="Search destination"
+              value={dropoff}
+              onChange={setDropoff}
+              onSelect={(feature) => {
+                const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
+                setRealDropoffCoords(coords);
+                setDropoff(feature.place_name || '');
+                onLocationSelect('dropoff', coords.lat, coords.lng);
+              }}
+            />
           </div>
-        )}
-
-        <button 
-          onClick={handleBook}
-          disabled={isBooking || fare === null}
-          className="w-full bg-black dark:bg-white text-white dark:text-black font-bold p-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-black/10 dark:shadow-white/5 flex justify-center items-center gap-2"
-        >
-          {isBooking ? (
-            <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
-          ) : (
-            'Request Ride'
-          )}
-        </button>
+        </div>
       </div>
+
+      <div className="relative flex items-center">
+        <input 
+          type="datetime-local" 
+          value={pickupTime}
+          onChange={(e) => setPickupTime(e.target.value)}
+          className={`w-full p-4 pl-12 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all outline-none font-medium text-[15px] shadow-sm ${!pickupTime ? 'text-transparent' : 'text-gray-700 dark:text-gray-300'}`} 
+        />
+        <Clock className="absolute left-4 text-blue-500" size={18} />
+        {!pickupTime && <span className="absolute left-12 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-[15px] font-medium">Leave Now</span>}
+      </div>
+      
+      {fare !== null && distanceKm !== null && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 flex justify-between items-center animate-in fade-in zoom-in-95">
+          <div>
+            <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-0.5">Estimated Fare</p>
+            <p className="text-xs text-blue-600 dark:text-blue-300 font-medium">
+              {distanceKm.toFixed(1)} km &middot; R20 base + R10/km
+            </p>
+          </div>
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
+            R{fare}
+          </div>
+        </div>
+      )}
+
+      <button 
+        onClick={handleBook}
+        disabled={isBooking || fare === null}
+        className="w-full bg-black dark:bg-white text-white dark:text-black font-bold p-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-black/10 dark:shadow-white/5 flex justify-center items-center gap-2"
+      >
+        {isBooking ? (
+          <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
+        ) : (
+          'Request Ride'
+        )}
+      </button>
     </div>
   )
 }

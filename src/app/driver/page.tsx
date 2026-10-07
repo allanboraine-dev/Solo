@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen } from 'lucide-react'
 import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, type MockTrip, type MockDriverProfile } from '@/lib/mockBackend'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
@@ -21,7 +21,7 @@ const MapComponent = dynamic(() => import('@/components/MapComponent'), {
 export default function DriverPage() {
   const router = useRouter()
   const [isOnline, setIsOnline] = useState(false)
-  const [activeTab, setActiveTab] = useState<'home' | 'earnings' | 'profile'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'earnings' | 'profile' | 'help'>('home')
   
   const [request, setRequest] = useState<MockTrip | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
@@ -432,6 +432,39 @@ export default function DriverPage() {
                 )}
               </div>
             )}
+
+            {activeTab === 'help' && (
+              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="mb-6 flex justify-center">
+                  <div className="p-4 rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
+                    <BookOpen size={32} />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold mb-4 tracking-tight text-center">Driver Manual</h2>
+                
+                <div className="space-y-4 text-left">
+                  <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">1. Going Online</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Tap the Power button top right to go online and receive requests. You'll see a green radar when active.</p>
+                  </div>
+                  
+                  <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">2. Managing Trips</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">When a request pops up, tap <b>Accept</b>. Drive to the location and tap <b>Confirm Pickup</b>. You can chat with the rider if needed.</p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">3. Collecting Fare</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Tap <b>Confirm Dropoff</b>. Choose to receive cash or your own card machine, or request the rider to pay via the app.</p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">4. Your Subscription</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">You keep 100% of all fares. Just pay a flat R999/month fee via the <b>Profile</b> tab after your 7-day trial ends.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -458,6 +491,13 @@ export default function DriverPage() {
         >
           <User size={24} />
           <span className="text-[10px] mt-1 uppercase tracking-wider">Profile</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('help')}
+          className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'help' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+        >
+          <BookOpen size={24} />
+          <span className="text-[10px] mt-1 uppercase tracking-wider">Help</span>
         </button>
       </div>
 
