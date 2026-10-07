@@ -226,7 +226,7 @@ export default function DriverPage() {
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900 -mt-24">
+    <div className="h-[calc(100vh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Real Map Background */}
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
@@ -243,7 +243,7 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Header */}
-      <div className="absolute top-28 left-4 right-4 md:left-8 md:right-auto md:w-96 z-10">
+      <div className="absolute top-4 left-4 right-4 md:left-8 md:right-auto md:w-96 z-10">
         <div className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 p-5 flex justify-between items-center transition-all">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
@@ -272,9 +272,9 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Main Content Panel */}
-      <div className="absolute top-52 left-4 md:left-8 w-[calc(100vw-32px)] md:w-96 max-h-[calc(100vh-250px)] flex flex-col z-10">
-        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col max-h-full">
-          <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+      <div className="absolute top-28 bottom-4 left-4 right-4 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
+        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto">
+          <div className="p-6 overflow-y-auto custom-scrollbar flex-1 flex flex-col">
             {activeTab === 'home' && (
               activeTrip ? (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500 flex flex-col h-full">
@@ -308,11 +308,11 @@ export default function DriverPage() {
                   )}
 
                   {/* Chat Section */}
-                  <div className="mt-6 flex-1 min-h-[250px] border border-gray-200/50 dark:border-white/5 rounded-2xl overflow-hidden bg-white/50 dark:bg-black/50">
+                  <div className="mt-6 flex-1 min-h-[250px] flex flex-col border border-gray-200/50 dark:border-white/5 rounded-2xl overflow-hidden bg-white/50 dark:bg-black/50">
                     <div className="p-3 font-bold border-b border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-900/50 text-sm flex items-center justify-center text-gray-500">
                       Chat with Rider
                     </div>
-                    <div className="h-[calc(100%-45px)]">
+                    <div className="flex-1 min-h-0">
                       <Chat tripId={activeTrip.id} role="driver" />
                     </div>
                   </div>
