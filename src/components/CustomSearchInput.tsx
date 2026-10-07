@@ -7,15 +7,13 @@ interface CustomSearchInputProps {
   onChange: (val: string) => void;
   onSelect: (feature: any) => void;
   placeholder: string;
-  mapboxToken: string;
 }
 
 export default function CustomSearchInput({
   value,
   onChange,
   onSelect,
-  placeholder,
-  mapboxToken
+  placeholder
 }: CustomSearchInputProps) {
   const [results, setResults] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -27,17 +25,18 @@ export default function CustomSearchInput({
       return;
     }
     const delayDebounceFn = setTimeout(() => {
-      fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(value)}.json?access_token=${mapboxToken}&country=ZA&types=poi,address,place&autocomplete=true`)
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&countrycodes=za&addressdetails=1&limit=5`)
         .then(res => res.json())
         .then(data => {
-          if (data.features) {
-            setResults(data.features);
+          if (Array.isArray(data)) {
+            setResults(data);
             setIsOpen(true);
           }
-        });
-    }, 300);
+        })
+        .catch(err => console.error("Geocoding error", err));
+    }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [value, mapboxToken]);
+  }, [value]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -69,7 +68,7 @@ export default function CustomSearchInput({
         <div className="absolute top-full mt-2 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto custom-scrollbar flex flex-col">
           {results.map((feature: any) => (
             <div 
-              key={feature.id}
+              key={feature.place_id}
               className="p-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 cursor-pointer border-b border-gray-50 dark:border-zinc-800/50 last:border-0 flex flex-col transition-colors"
               onClick={() => {
                 onSelect(feature);
@@ -77,8 +76,8 @@ export default function CustomSearchInput({
                 setResults([]);
               }}
             >
-              <span className="font-bold text-[15px] text-gray-900 dark:text-gray-100 leading-tight mb-1">{feature.text}</span>
-              <span className="text-[13px] text-gray-500 dark:text-gray-400 leading-tight">{feature.place_name}</span>
+              <span className="font-bold text-[15px] text-gray-900 dark:text-gray-100 leading-tight mb-1">{feature.name || feature.display_name.split(',')[0]}</span>
+              <span className="text-[13px] text-gray-500 dark:text-gray-400 leading-tight">{feature.display_name}</span>
             </div>
           ))}
         </div>

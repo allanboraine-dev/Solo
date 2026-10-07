@@ -1,8 +1,9 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
-import Map, { Marker, Source, Layer } from 'react-map-gl/mapbox';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import React, { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface MapProps {
   pickupLat?: number;
@@ -13,43 +14,60 @@ interface MapProps {
   driverLng?: number;
 }
 
-const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '';
+// Create custom DivIcons for markers
+const createCustomIcon = (text: string, bgColor: string, textColor: string) => {
+  return L.divIcon({
+    html: `<div style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 8px; border-radius: 999px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 2px solid white; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; width: max-content;">${text}</div>`,
+    className: '',
+    iconAnchor: [15, 15] // roughly center
+  });
+};
+
+const pickupIcon = createCustomIcon('A', '#000000', '#ffffff');
+const dropoffIcon = createCustomIcon('B', '#2563eb', '#ffffff');
+const driverIcon = createCustomIcon('dYs-', '#ffffff', '#000000');
+
+// Component to handle map bounds and routing
+const MapUpdater = ({ pickupLat, pickupLng, dropoffLat, dropoffLng, routeData }: any) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+      const bounds = L.latLngBounds(
+        [pickupLat, pickupLng],
+        [dropoffLat, dropoffLng]
+      );
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else if (pickupLat && pickupLng) {
+      map.setView([pickupLat, pickupLng], 15);
+    } else if (dropoffLat && dropoffLng) {
+      map.setView([dropoffLat, dropoffLng], 15);
+    }
+  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng]);
+
+  return null;
+};
 
 const MapComponent = (props: MapProps) => {
   const { pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng } = props;
   
-  const [routeData, setRouteData] = useState<GeoJSON.Feature | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
 
-  const center = pickupLat && pickupLng 
-    ? { lat: pickupLat, lng: pickupLng } 
-    : driverLat && driverLng
-      ? { lat: driverLat, lng: driverLng }
-      : { lat: -28.7282, lng: 24.7623 }; // Default Kimberley, SA
+  const centerLat = pickupLat || driverLat || -28.7282;
+  const centerLng = pickupLng || driverLng || 24.7623;
 
-  const [viewState, setViewState] = useState({
-    longitude: center.lng,
-    latitude: center.lat,
-    zoom: 14
-  });
-
-  // Fetch route if we have both points
+  // Fetch route if we have both points using OSRM
   useEffect(() => {
     if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
       const getRoute = async () => {
         try {
-          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?geometries=geojson&access_token=${mapboxToken}`;
+          const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?overview=full&geometries=geojson`;
           const res = await fetch(url);
           const data = await res.json();
           if (data.routes && data.routes.length > 0) {
-            setRouteData({
-              type: 'Feature',
-              properties: {},
-              geometry: data.routes[0].geometry
-            });
-            // Also adjust viewState roughly to fit bounds, but for simplicity we pan to middle
-            const midLng = (pickupLng + dropoffLng) / 2;
-            const midLat = (pickupLat + dropoffLat) / 2;
-            setViewState(prev => ({ ...prev, longitude: midLng, latitude: midLat, zoom: 12 }));
+            // GeoJSON returns [lng, lat], Leaflet Polyline expects [lat, lng]
+            const coords = data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
+            setRouteCoordinates(coords);
           }
         } catch (e) {
           console.error('Directions request failed', e);
@@ -57,71 +75,44 @@ const MapComponent = (props: MapProps) => {
       };
       getRoute();
     } else {
-      setRouteData(null);
+      setRouteCoordinates([]);
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
 
-  useEffect(() => {
-    if (pickupLat && pickupLng && !dropoffLat) {
-      setViewState(prev => ({ ...prev, longitude: pickupLng, latitude: pickupLat, zoom: 15 }));
-    }
-  }, [pickupLat, pickupLng, dropoffLat]);
-
-  if (!mapboxToken) {
-    return <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">Mapbox Token Missing</div>;
-  }
-
   return (
-    <div className="w-full h-full relative">
-      <Map
-        {...viewState}
-        onMove={evt => setViewState(evt.viewState)}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
-        mapboxAccessToken={mapboxToken}
-        attributionControl={false}
+    <div className="w-full h-full relative z-0">
+      <MapContainer 
+        center={[centerLat, centerLng]} 
+        zoom={14} 
+        style={{ width: '100%', height: '100%' }}
+        zoomControl={false}
       >
-        {routeData && (
-          <Source id="route" type="geojson" data={routeData}>
-            <Layer
-              id="route"
-              type="line"
-              source="route"
-              layout={{
-                'line-join': 'round',
-                'line-cap': 'round'
-              }}
-              paint={{
-                'line-color': '#3b82f6',
-                'line-width': 5
-              }}
-            />
-          </Source>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        />
+        
+        <MapUpdater 
+          pickupLat={pickupLat} pickupLng={pickupLng} 
+          dropoffLat={dropoffLat} dropoffLng={dropoffLng} 
+        />
+
+        {routeCoordinates.length > 0 && (
+          <Polyline positions={routeCoordinates} color="#3b82f6" weight={5} lineCap="round" lineJoin="round" />
         )}
 
         {pickupLat && pickupLng && (
-          <Marker longitude={pickupLng} latitude={pickupLat}>
-             <div className="bg-black text-white p-2 rounded-full shadow-lg border-2 border-white text-xs font-bold">
-               A
-             </div>
-          </Marker>
+          <Marker position={[pickupLat, pickupLng]} icon={pickupIcon} />
         )}
 
         {dropoffLat && dropoffLng && (
-          <Marker longitude={dropoffLng} latitude={dropoffLat}>
-             <div className="bg-blue-600 text-white p-2 rounded-full shadow-lg border-2 border-white text-xs font-bold">
-               B
-             </div>
-          </Marker>
+          <Marker position={[dropoffLat, dropoffLng]} icon={dropoffIcon} />
         )}
 
         {driverLat && driverLng && (
-          <Marker longitude={driverLng} latitude={driverLat} style={{ zIndex: 1000 }}>
-             <div className="bg-white text-black p-2 rounded-full shadow-lg border-2 border-black text-xs font-bold flex items-center justify-center">
-               🚗
-             </div>
-          </Marker>
+          <Marker position={[driverLat, driverLng]} icon={driverIcon} zIndexOffset={1000} />
         )}
-      </Map>
+      </MapContainer>
     </div>
   );
 };

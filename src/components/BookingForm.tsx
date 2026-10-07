@@ -67,7 +67,7 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
 
     const getDirections = async () => {
       try {
-        const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${realPickupCoords.lng},${realPickupCoords.lat};${realDropoffCoords.lng},${realDropoffCoords.lat}?access_token=${mapboxToken}`;
+        const url = `https://router.project-osrm.org/route/v1/driving/${realPickupCoords.lng},${realPickupCoords.lat};${realDropoffCoords.lng},${realDropoffCoords.lat}?overview=false`;
         const response = await fetch(url);
         const data = await response.json();
         if (data.routes && data.routes[0]) {
@@ -138,14 +138,13 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
         <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
           <div className="w-full">
             <CustomSearchInput 
-              mapboxToken={mapboxToken}
               placeholder="Search pickup location"
               value={pickup}
               onChange={setPickup}
               onSelect={(feature) => {
-                const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
+                const coords = { lat: parseFloat(feature.lat), lng: parseFloat(feature.lon) };
                 setRealPickupCoords(coords);
-                setPickup(feature.place_name || '');
+                setPickup(feature.name || feature.display_name.split(',')[0]);
                 onLocationSelect('pickup', coords.lat, coords.lng);
               }}
             />
@@ -162,14 +161,13 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
         <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
           <div className="w-full">
             <CustomSearchInput 
-              mapboxToken={mapboxToken}
               placeholder="Search destination"
               value={dropoff}
               onChange={setDropoff}
               onSelect={(feature) => {
-                const coords = { lat: feature.geometry.coordinates[1], lng: feature.geometry.coordinates[0] };
+                const coords = { lat: parseFloat(feature.lat), lng: parseFloat(feature.lon) };
                 setRealDropoffCoords(coords);
-                setDropoff(feature.place_name || '');
+                setDropoff(feature.name || feature.display_name.split(',')[0]);
                 onLocationSelect('dropoff', coords.lat, coords.lng);
               }}
             />
