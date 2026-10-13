@@ -193,6 +193,188 @@ export const saveMessage = (msg: MockMessage) => {
   broadcastEvent('new_message', msg);
 };
 
+export type LiveDriver = {
+  id: string;
+  fullName: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  licensePlate?: string;
+  lat: number;
+  lng: number;
+  isOnline: boolean;
+  tripId?: string;
+  updatedAt: number;
+};
+
+// Default registered drivers in Kimberley area for instant test visibility if no real drivers online
+const DEFAULT_DEMO_DRIVERS: LiveDriver[] = [
+  {
+    id: 'demo-driver-1',
+    fullName: 'Sipho Ndlovu',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'Corolla Quest',
+    licensePlate: 'NC 482-910',
+    lat: -28.7320,
+    lng: 24.7660,
+    isOnline: true,
+    updatedAt: Date.now(),
+  },
+  {
+    id: 'demo-driver-2',
+    fullName: 'Johan Van Der Merwe',
+    vehicleMake: 'Volkswagen',
+    vehicleModel: 'Polo Vivo',
+    licensePlate: 'NC 193-448',
+    lat: -28.7245,
+    lng: 24.7580,
+    isOnline: true,
+    updatedAt: Date.now(),
+  },
+  {
+    id: 'demo-driver-3',
+    fullName: 'Thabo Mokoena',
+    vehicleMake: 'Hyundai',
+    vehicleModel: 'Grand i10',
+    licensePlate: 'NC 774-209',
+    lat: -28.7390,
+    lng: 24.7530,
+    isOnline: true,
+    updatedAt: Date.now(),
+  }
+];
+
+export const getActiveDrivers = async (): Promise<LiveDriver[]> => {
+  if (typeof window === 'undefined') return [];
+
+  const driversMap = new Map<string, LiveDriver>();
+
+  // 1. Fetch from Supabase driver_profiles if online
+  try {
+    const { data, error } = await supabase
+      .from('driver_profiles')
+      .select('id, full_name, vehicle_make, vehicle_model, license_plate, current_lat, current_lng, is_online, updated_at')
+      .eq('is_online', true);
+
+    if (data && !error && data.length > 0) {
+      data.forEach((d: any) => {
+        if (d.current_lat && d.current_lng) {
+          driversMap.set(d.id, {
+            id: d.id,
+            fullName: d.full_name || 'Registered Driver',
+            vehicleMake: d.vehicle_make || 'Vehicle',
+            vehicleModel: d.vehicle_model || '',
+            licensePlate: d.license_plate || '',
+            lat: d.current_lat,
+            lng: d.current_lng,
+            isOnline: true,
+            updatedAt: d.updated_at ? new Date(d.updated_at).getTime() : Date.now(),
+          });
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Error fetching online drivers from Supabase:', e);
+  }
+
+  // 2. Read local cache
+  try {
+    const raw = localStorage.getItem('solo_live_drivers');
+    if (raw) {
+      const cached = JSON.parse(raw) as LiveDriver[];
+      cached.forEach(d => {
+        if (d.isOnline) {
+          driversMap.set(d.id, d);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Error parsing cached live drivers:', e);
+  }
+
+  // 3. Fallback demo drivers if no live drivers yet
+  if (driversMap.size === 0) {
+    DEFAULT_DEMO_DRIVERS.forEach(d => driversMap.set(d.id, d));
+  }
+
+  return Array.from(driversMap.values());
+};
+
+export const updateDriverLocation = async (
+  driverId: string,
+  lat: number,
+  lng: number,
+  isOnline: boolean,
+  metadata?: {
+    fullName?: string;
+    vehicleMake?: string;
+    vehicleModel?: string;
+    licensePlate?: string;
+    tripId?: string;
+  }
+) => {
+  if (typeof window === 'undefined') return;
+
+  const now = Date.now();
+  const driverData: LiveDriver = {
+    id: driverId,
+    fullName: metadata?.fullName || 'Driver',
+    vehicleMake: metadata?.vehicleMake,
+    vehicleModel: metadata?.vehicleModel,
+    licensePlate: metadata?.licensePlate,
+    lat,
+    lng,
+    isOnline,
+    tripId: metadata?.tripId,
+    updatedAt: now,
+  };
+
+  // Update local cache
+  try {
+    const raw = localStorage.getItem('solo_live_drivers');
+    let cached: LiveDriver[] = raw ? JSON.parse(raw) : [];
+    const idx = cached.findIndex(d => d.id === driverId);
+    if (idx >= 0) {
+      if (!isOnline) {
+        cached.splice(idx, 1);
+      } else {
+        cached[idx] = driverData;
+      }
+    } else if (isOnline) {
+      cached.push(driverData);
+    }
+    localStorage.setItem('solo_live_drivers', JSON.stringify(cached));
+  } catch (e) {
+    console.error('Error saving live driver to localStorage:', e);
+  }
+
+  // Update Supabase in background
+  try {
+    await supabase.from('driver_profiles').upsert({
+      id: driverId,
+      full_name: metadata?.fullName,
+      vehicle_make: metadata?.vehicleMake,
+      vehicle_model: metadata?.vehicleModel,
+      license_plate: metadata?.licensePlate,
+      current_lat: isOnline ? lat : null,
+      current_lng: isOnline ? lng : null,
+      is_online: isOnline,
+      updated_at: new Date(now).toISOString()
+    });
+  } catch (e) {
+    console.error('Error updating driver location in Supabase:', e);
+  }
+
+  // Broadcast realtime event
+  broadcastEvent('driver_location', driverData);
+
+  // Cross-tab local notification
+  try {
+    window.dispatchEvent(new CustomEvent('solo_driver_location_update', { detail: driverData }));
+  } catch (e) {
+    // Ignore in non-browser environments
+  }
+};
+
 // ----------------------------------------
 // REAL-TIME BROADCASTS (Supabase Channels)
 // ----------------------------------------

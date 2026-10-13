@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, type MockTrip } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, getActiveDrivers, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 
 // Dynamically import Map component to disable SSR
@@ -22,7 +22,15 @@ export default function RiderPage() {
   const [dropoffCoords, setDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
+  const [availableDrivers, setAvailableDrivers] = useState<LiveDriver[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+
+  // Fetch active registered drivers on mount
+  useEffect(() => {
+    getActiveDrivers().then(drivers => {
+      setAvailableDrivers(drivers);
+    });
+  }, []);
 
   useEffect(() => {
     // Check if there is an active trip on mount
@@ -35,7 +43,42 @@ export default function RiderPage() {
     };
     loadTrips();
 
-    const unsubscribeTrip = subscribeToEvents((type, payload) => {
+    const handleDriverLocationUpdate = (data: any) => {
+      if (!data?.id && !data?.driverId) return;
+      const driverId = data.id || data.driverId;
+
+      // Update assigned driver coords if this driver is assigned to current trip
+      if (activeTrip && (data.tripId === activeTrip.id || driverId === activeTrip.driver_id)) {
+        setDriverCoords({ lat: data.lat, lng: data.lng });
+      }
+
+      setAvailableDrivers(prev => {
+        if (data.isOnline === false) {
+          return prev.filter(d => d.id !== driverId);
+        }
+        const existingIdx = prev.findIndex(d => d.id === driverId);
+        const updated: LiveDriver = {
+          id: driverId,
+          fullName: data.fullName || 'Registered Driver',
+          vehicleMake: data.vehicleMake,
+          vehicleModel: data.vehicleModel,
+          licensePlate: data.licensePlate,
+          lat: data.lat,
+          lng: data.lng,
+          isOnline: true,
+          tripId: data.tripId,
+          updatedAt: data.updatedAt || Date.now(),
+        };
+        if (existingIdx >= 0) {
+          const copy = [...prev];
+          copy[existingIdx] = updated;
+          return copy;
+        }
+        return [...prev, updated];
+      });
+    };
+
+    const unsubscribeEvents = subscribeToEvents((type, payload) => {
       if (type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (trip.status === 'completed') {
@@ -46,16 +89,22 @@ export default function RiderPage() {
           setActiveTrip(trip);
         }
       } else if (type === 'driver_location') {
-        if (payload.tripId === activeTrip?.id) {
-          setDriverCoords({ lat: payload.lat, lng: payload.lng });
-        }
+        handleDriverLocationUpdate(payload);
       }
     });
 
+    const handleLocalEvent = (e: any) => {
+      if (e.detail) {
+        handleDriverLocationUpdate(e.detail);
+      }
+    };
+    window.addEventListener('solo_driver_location_update', handleLocalEvent);
+
     return () => {
-      unsubscribeTrip();
+      unsubscribeEvents();
+      window.removeEventListener('solo_driver_location_update', handleLocalEvent);
     }
-  }, [activeTrip?.id]);
+  }, [activeTrip]);
 
   const handlePayDriver = async () => {
     if (!activeTrip) return;
@@ -83,6 +132,20 @@ export default function RiderPage() {
           pickupLng={activeTrip ? activeTrip.pickup_lng : pickupCoords?.lng}
           dropoffLat={activeTrip ? activeTrip.dropoff_lat : dropoffCoords?.lat}
           dropoffLng={activeTrip ? activeTrip.dropoff_lng : dropoffCoords?.lng}
+          availableDrivers={availableDrivers.map(d => ({
+            id: d.id,
+            lat: d.lat,
+            lng: d.lng,
+            name: d.fullName,
+            vehicle: [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '),
+            licensePlate: d.licensePlate
+          }))}
+          assignedDriver={activeTrip && driverCoords ? {
+            lat: driverCoords.lat,
+            lng: driverCoords.lng,
+            name: 'Your Driver',
+            vehicle: 'En route'
+          } : undefined}
           driverLat={driverCoords?.lat}
           driverLng={driverCoords?.lng}
         />
@@ -119,7 +182,12 @@ export default function RiderPage() {
                   </div>
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight">Where to?</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Request a ride in South Africa</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                      <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+                        {availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <BookingForm onLocationSelect={handleLocationSelect} />

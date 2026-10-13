@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen } from 'lucide-react'
-import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, type MockTrip, type MockDriverProfile } from '@/lib/mockBackend'
+import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, type MockTrip, type MockDriverProfile } from '@/lib/mockBackend'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
@@ -112,37 +112,65 @@ export default function DriverPage() {
 
   // Real-time GPS Tracking
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      if (profile?.id) {
+        updateDriverLocation(profile.id, 0, 0, false);
+      }
+      return;
+    }
 
     if (!('geolocation' in navigator)) {
       console.warn("Geolocation is not supported by your browser");
       return;
     }
 
+    const broadcastCurrentLocation = (latitude: number, longitude: number) => {
+      setDriverCoords({ lat: latitude, lng: longitude });
+
+      if (profile?.id) {
+        updateDriverLocation(profile.id, latitude, longitude, true, {
+          fullName: profile.fullName,
+          vehicleMake: profile.vehicleMake,
+          vehicleModel: profile.vehicleModel,
+          licensePlate: profile.licensePlate,
+          tripId: activeTrip?.id,
+        });
+      }
+    };
+
+    // Immediate initial location fetch
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        broadcastCurrentLocation(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        console.warn("Could not get initial driver GPS location:", error);
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+
+    // Continuous watch position
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        setDriverCoords({ lat: latitude, lng: longitude });
-
-        // Broadcast driver location to rider if on an active trip
-        if (activeTrip) {
-          broadcastEvent('driver_location', { tripId: activeTrip.id, lat: latitude, lng: longitude });
-        }
+        broadcastCurrentLocation(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
         console.error("Error watching position:", error);
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000
+        maximumAge: 3000,
+        timeout: 10000
       }
     );
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
+      if (profile?.id) {
+        updateDriverLocation(profile.id, 0, 0, false);
+      }
     };
-  }, [isOnline, activeTrip]);
+  }, [isOnline, activeTrip, profile]);
 
   const handleSubscribe = async () => {
     if (!profile) return;
