@@ -3,8 +3,9 @@
 import dynamic from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, getActiveDrivers, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
+import RatingModal from '@/components/RatingModal'
 
 // Dynamically import Map component to disable SSR
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
@@ -24,6 +25,10 @@ export default function RiderPage() {
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
   const [availableDrivers, setAvailableDrivers] = useState<LiveDriver[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+  
+  // Rating Modal state
+  const [ratingTrip, setRatingTrip] = useState<MockTrip | null>(null)
+  const [showRatingModal, setShowRatingModal] = useState(false)
 
   // Fetch active registered drivers on mount
   useEffect(() => {
@@ -82,9 +87,10 @@ export default function RiderPage() {
       if (type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (trip.status === 'completed') {
+          setRatingTrip(trip);
+          setShowRatingModal(true);
           setActiveTrip(null);
           setDriverCoords(null);
-          alert("Your trip has ended. Thank you for riding with SOLO!");
         } else {
           setActiveTrip(trip);
         }
@@ -114,8 +120,33 @@ export default function RiderPage() {
     
     const updated = { ...activeTrip, status: 'completed' as const };
     saveTrip(updated);
-    // The event listener will catch the 'completed' status and clear the active trip.
     setIsProcessingPayment(false);
+    setRatingTrip(updated);
+    setShowRatingModal(true);
+    setActiveTrip(null);
+    setDriverCoords(null);
+  }
+
+  const handleRatingSubmit = async (data: { stars: number; tags: string[]; comment: string }) => {
+    if (ratingTrip) {
+      await saveTripRating({
+        id: crypto.randomUUID(),
+        trip_id: ratingTrip.id,
+        driver_id: ratingTrip.driver_id || '00000000-0000-0000-0000-000000000000',
+        rider_id: ratingTrip.rider_id,
+        stars: data.stars,
+        tags: data.tags,
+        comment: data.comment,
+        created_at: new Date().toISOString()
+      });
+    }
+    setShowRatingModal(false);
+    setRatingTrip(null);
+  }
+
+  const handleRatingSkip = () => {
+    setShowRatingModal(false);
+    setRatingTrip(null);
   }
 
   const handleLocationSelect = (type: 'pickup' | 'dropoff', lat: number, lng: number) => {
@@ -138,13 +169,15 @@ export default function RiderPage() {
             lng: d.lng,
             name: d.fullName,
             vehicle: [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '),
-            licensePlate: d.licensePlate
+            licensePlate: d.licensePlate,
+            rating: 5.0
           }))}
           assignedDriver={activeTrip && driverCoords ? {
             lat: driverCoords.lat,
             lng: driverCoords.lng,
             name: 'Your Driver',
-            vehicle: 'En route'
+            vehicle: 'En route',
+            rating: 5.0
           } : undefined}
           driverLat={driverCoords?.lat}
           driverLng={driverCoords?.lng}
@@ -264,6 +297,21 @@ export default function RiderPage() {
           </div>
         </div>
       )}
+
+      {/* Trip Rating & Review Modal */}
+      {(() => {
+        const ratedDriver = ratingTrip ? availableDrivers.find(d => d.id === ratingTrip.driver_id) : null;
+        return (
+          <RatingModal
+            isOpen={showRatingModal}
+            trip={ratingTrip}
+            driverName={ratedDriver?.fullName || "Your Driver"}
+            driverVehicle={ratedDriver ? [ratedDriver.vehicleMake, ratedDriver.vehicleModel].filter(Boolean).join(' ') : undefined}
+            onSubmit={handleRatingSubmit}
+            onSkip={handleRatingSkip}
+          />
+        );
+      })()}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen } from 'lucide-react'
-import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, type MockTrip, type MockDriverProfile } from '@/lib/mockBackend'
+import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
@@ -33,6 +33,40 @@ export default function DriverPage() {
   const [showFareCollection, setShowFareCollection] = useState(false)
   const [isWaitingForPayment, setIsWaitingForPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
+
+  // Driver Ratings Summary
+  const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
+    average: 5.0, 
+    count: 0, 
+    reviews: [] 
+  })
+
+  useEffect(() => {
+    const loadRatings = () => {
+      if (profile?.id) {
+        const summary = getDriverRatingSummary(profile.id);
+        setRatingSummary(summary);
+      }
+    };
+    loadRatings();
+
+    const unsubscribe = subscribeToEvents((type, payload) => {
+      if (type === 'new_rating') {
+        const rating = payload as TripRating;
+        if (!profile?.id || rating.driver_id === profile.id) {
+          loadRatings();
+        }
+      }
+    });
+
+    const onLocalRating = () => loadRatings();
+    window.addEventListener('solo_new_rating', onLocalRating);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('solo_new_rating', onLocalRating);
+    };
+  }, [profile?.id]);
 
   useEffect(() => {
     if (activeTab === 'earnings') {
@@ -276,6 +310,11 @@ export default function DriverPage() {
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black tracking-tight">Driver Portal</h1>
+              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-400 font-bold text-[11px] shadow-sm">
+                <span>★</span>
+                <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
+                {ratingSummary.count > 0 && <span className="text-[10px] text-gray-400 font-normal">({ratingSummary.count})</span>}
+              </div>
               {profile?.subscriptionPlan === 'paid' ? (
                 <span className="bg-blue-100/80 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider">Premium SaaS</span>
               ) : (
@@ -404,8 +443,19 @@ export default function DriverPage() {
                     <User size={48} />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold mb-2 tracking-tight">{profile?.fullName}</h2>
-                <p className="text-gray-500 mb-6">{profile?.email}</p>
+                <h2 className="text-2xl font-bold mb-1 tracking-tight">{profile?.fullName}</h2>
+                <p className="text-gray-500 text-sm mb-3">{profile?.email}</p>
+
+                <div className="flex justify-center items-center gap-1.5 mb-6">
+                  <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-3.5 py-1 rounded-full text-amber-600 dark:text-amber-400 font-bold text-sm shadow-sm">
+                    <span className="text-amber-500">★</span>
+                    <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      ({ratingSummary.count} {ratingSummary.count === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
+                </div>
+
                 <div className="space-y-3 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
                   <div className="flex justify-between items-center py-2 border-b border-gray-200/50 dark:border-white/5">
                     <span className="text-gray-500 text-sm font-medium">Vehicle</span>
@@ -421,6 +471,63 @@ export default function DriverPage() {
                       {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R999/mo)' : 'Active (7-Day Trial)'}
                     </span>
                   </div>
+                </div>
+
+                {/* Rider Reviews & Compliments */}
+                <div className="mt-5 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">Rider Reviews & Feedback</h3>
+                    <span className="text-xs font-bold text-amber-500">
+                      ★ {ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}
+                    </span>
+                  </div>
+
+                  {ratingSummary.reviews.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                      No rider reviews yet. Complete trips to receive 5-star ratings and compliment badges from your passengers!
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Top Compliments */}
+                      {(() => {
+                        const allTags = ratingSummary.reviews.flatMap(r => r.tags || []);
+                        const tagCounts = allTags.reduce((acc, tag) => { acc[tag] = (acc[tag] || 0) + 1; return acc; }, {} as Record<string, number>);
+                        const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+                        if (topTags.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1.5 pb-2.5 border-b border-gray-200/50 dark:border-white/5">
+                            {topTags.map(([tag, count]) => (
+                              <span key={tag} className="text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full">
+                                {tag} ×{count}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Recent Comments */}
+                      <div className="space-y-2 max-h-44 overflow-y-auto custom-scrollbar">
+                        {ratingSummary.reviews.slice(0, 6).map(rev => (
+                          <div key={rev.id} className="p-2.5 bg-white dark:bg-black/40 rounded-xl border border-gray-100 dark:border-white/5 text-xs">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-amber-500 font-bold tracking-widest">
+                                {'★'.repeat(rev.stars)}
+                              </span>
+                              <span className="text-[10px] text-gray-400">
+                                {new Date(rev.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                            {rev.comment && (
+                              <p className="text-gray-700 dark:text-gray-300 italic">"{rev.comment}"</p>
+                            )}
+                            {rev.tags?.length > 0 && !rev.comment && (
+                              <p className="text-gray-500">{rev.tags.join(' • ')}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <button 

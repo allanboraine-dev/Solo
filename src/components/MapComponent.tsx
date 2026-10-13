@@ -12,6 +12,7 @@ export interface DriverMarkerData {
   name?: string;
   vehicle?: string;
   licensePlate?: string;
+  rating?: number;
 }
 
 interface MapProps {
@@ -27,6 +28,7 @@ interface MapProps {
     lng: number;
     name?: string;
     vehicle?: string;
+    rating?: number;
   };
 }
 
@@ -213,7 +215,13 @@ const MapComponent = (props: MapProps) => {
             >
               <Popup>
                 <div className="p-1 font-sans text-xs">
-                  <div className="font-bold text-gray-900">{driver.name || 'Registered Driver'}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-bold text-gray-900">{driver.name || 'Registered Driver'}</div>
+                    <div className="text-amber-500 font-bold flex items-center gap-0.5 text-[11px] whitespace-nowrap">
+                      <span>★</span>
+                      <span>{driver.rating ? driver.rating.toFixed(1) : '5.0'}</span>
+                    </div>
+                  </div>
                   {driver.vehicle && <div className="text-gray-500 mt-0.5">{driver.vehicle}</div>}
                   {driver.licensePlate && <div className="text-gray-400 text-[10px] uppercase font-mono">{driver.licensePlate}</div>}
                   <div className="text-green-600 font-bold mt-1 flex items-center gap-1">
@@ -235,7 +243,13 @@ const MapComponent = (props: MapProps) => {
           >
             <Popup>
               <div className="p-1 font-sans text-xs">
-                <div className="font-bold text-blue-600">{assignedDriver?.name || 'Your Assigned Driver'}</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-bold text-blue-600">{assignedDriver?.name || 'Your Assigned Driver'}</div>
+                  <div className="text-amber-500 font-bold flex items-center gap-0.5 text-[11px] whitespace-nowrap">
+                    <span>★</span>
+                    <span>{assignedDriver?.rating ? assignedDriver.rating.toFixed(1) : '5.0'}</span>
+                  </div>
+                </div>
                 {assignedDriver?.vehicle && <div className="text-gray-600 mt-0.5">{assignedDriver.vehicle}</div>}
                 <div className="text-blue-500 font-semibold mt-1">En route to your location</div>
               </div>

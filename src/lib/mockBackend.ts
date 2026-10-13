@@ -376,9 +376,69 @@ export const updateDriverLocation = async (
 };
 
 // ----------------------------------------
+// TRIP RATINGS & REVIEWS
+// ----------------------------------------
+export type TripRating = {
+  id: string;
+  trip_id: string;
+  driver_id: string;
+  rider_id?: string;
+  stars: number; // 1 to 5
+  tags: string[];
+  comment?: string;
+  created_at: string;
+};
+
+export const saveTripRating = async (rating: TripRating) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const raw = localStorage.getItem('solo_trip_ratings');
+    const ratings: TripRating[] = raw ? JSON.parse(raw) : [];
+    ratings.unshift(rating);
+    localStorage.setItem('solo_trip_ratings', JSON.stringify(ratings));
+  } catch (e) {
+    console.error('Error saving trip rating to localStorage:', e);
+  }
+
+  // Also broadcast rating event
+  broadcastEvent('new_rating', rating);
+
+  try {
+    window.dispatchEvent(new CustomEvent('solo_new_rating', { detail: rating }));
+  } catch (e) {
+    // Ignore in non-browser environments
+  }
+};
+
+export const getDriverRatingSummary = (driverId?: string): { average: number; count: number; reviews: TripRating[] } => {
+  if (typeof window === 'undefined') return { average: 5.0, count: 0, reviews: [] };
+
+  try {
+    const raw = localStorage.getItem('solo_trip_ratings');
+    const allRatings: TripRating[] = raw ? JSON.parse(raw) : [];
+    const driverRatings = driverId ? allRatings.filter(r => r.driver_id === driverId) : allRatings;
+    
+    if (driverRatings.length === 0) {
+      return { average: 5.0, count: 0, reviews: [] };
+    }
+
+    const sum = driverRatings.reduce((acc, curr) => acc + curr.stars, 0);
+    const avg = Math.round((sum / driverRatings.length) * 10) / 10;
+    return {
+      average: avg,
+      count: driverRatings.length,
+      reviews: driverRatings
+    };
+  } catch (e) {
+    return { average: 5.0, count: 0, reviews: [] };
+  }
+};
+
+// ----------------------------------------
 // REAL-TIME BROADCASTS (Supabase Channels)
 // ----------------------------------------
-type EventType = 'trip_updated' | 'new_message' | 'driver_location';
+type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating';
 
 export const broadcastEvent = (type: EventType, payload: unknown) => {
   if (typeof window === 'undefined') return;
@@ -435,6 +495,9 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'trip_updated' }, (payload: any) => {
       listeners.forEach(cb => cb('trip_updated', payload.payload));
+    })
+    .on('broadcast', { event: 'new_rating' }, (payload: any) => {
+      listeners.forEach(cb => cb('new_rating', payload.payload));
     })
     .subscribe();
 };
