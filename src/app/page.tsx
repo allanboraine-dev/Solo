@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link";
-import { Car, User, Map, Navigation, ShieldCheck, Download } from "lucide-react";
+import { Car, User, Map, Navigation, ShieldCheck, Download, UserPlus, ArrowRight } from "lucide-react";
 import { usePWA } from "@/lib/PWAContext";
 import { useRouter } from "next/navigation";
 
@@ -58,30 +58,74 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 text-left max-w-5xl mx-auto">
+          {/* Rider App Card */}
           <div className="group relative flex flex-col p-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl shadow-2xl dark:shadow-none border border-white/40 dark:border-white/10 rounded-[2.5rem] hover:border-blue-500/50 hover:shadow-blue-500/20 hover:-translate-y-2 transition-all duration-300">
-            <Link href="/rider" className="block mb-8 flex-1">
-              <div className="p-5 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/20 text-blue-600 rounded-3xl w-fit mb-8 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+            <Link href="/rider" className="block mb-6 flex-1">
+              <div className="p-5 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/20 text-blue-600 rounded-3xl w-fit mb-6 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
                 <User size={36} />
               </div>
-              <h2 className="text-3xl font-bold mb-4 tracking-tight">Rider App</h2>
-              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed font-light">Book a ride instantly anywhere in SA. Pay fairly with zero platform commissions baked into your fare.</p>
+              <h2 className="text-3xl font-bold mb-3 tracking-tight">Rider App</h2>
+              <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
+                Book a ride instantly anywhere in South Africa. Pay fair metered rates with 0% platform commissions added to your fare.
+              </p>
             </Link>
-            <button onClick={() => installApp('rider')} className="mt-auto flex items-center justify-center gap-3 w-full py-4 bg-white dark:bg-black text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all">
-              <Download size={20} /> Install Rider App
-            </button>
+            
+            <div className="mt-auto space-y-3">
+              <Link 
+                href="/rider" 
+                className="flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm"
+              >
+                <User size={18} /> Book a Ride Now
+              </Link>
+              <button 
+                onClick={() => installApp('rider')} 
+                className="flex items-center justify-center gap-2 w-full py-3 bg-white dark:bg-zinc-800/80 text-blue-600 dark:text-blue-400 font-semibold rounded-2xl shadow-sm hover:shadow border border-gray-100 dark:border-zinc-700 hover:border-blue-200 dark:hover:border-blue-800 transition-all text-xs"
+              >
+                <Download size={16} /> Install Rider App (PWA)
+              </button>
+            </div>
           </div>
 
+          {/* Driver Portal Card */}
           <div className="group relative flex flex-col p-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl shadow-2xl dark:shadow-none border border-white/40 dark:border-white/10 rounded-[2.5rem] hover:border-green-500/50 hover:shadow-green-500/20 hover:-translate-y-2 transition-all duration-300">
-            <Link href="/driver" className="block mb-8 flex-1">
-              <div className="p-5 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/40 dark:to-green-800/20 text-green-600 rounded-3xl w-fit mb-8 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
-                <Car size={36} />
+            <div className="block mb-6 flex-1">
+              <div className="flex items-center justify-between mb-6">
+                <div className="p-5 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/40 dark:to-green-800/20 text-green-600 rounded-3xl w-fit group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                  <Car size={36} />
+                </div>
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 rounded-full">
+                  7 Days Free Trial
+                </span>
               </div>
-              <h2 className="text-3xl font-bold mb-4 tracking-tight">Driver Portal</h2>
-              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed font-light">Get your first 7 days free, then a flat R300/pm. Accept rides, keep 100% of your earnings, and take control of your transport business.</p>
-            </Link>
-            <button onClick={handleDriverInstall} className="mt-auto flex items-center justify-center gap-3 w-full py-4 bg-white dark:bg-black text-green-600 dark:text-green-400 font-bold rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-zinc-800 hover:border-green-200 dark:hover:border-green-900 transition-all">
-              <Download size={20} /> Install Driver App
-            </button>
+              <h2 className="text-3xl font-bold mb-3 tracking-tight">Driver Portal</h2>
+              <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
+                Keep 100% of your rider fares. Enjoy a 7-day free trial, then a flat R300/pm SaaS fee. Take full control of your transport business.
+              </p>
+            </div>
+
+            <div className="mt-auto space-y-3">
+              <Link 
+                href="/driver/register" 
+                className="flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold rounded-2xl shadow-lg shadow-green-600/20 active:scale-95 transition-all text-sm"
+              >
+                <UserPlus size={18} /> Register as New Driver
+              </Link>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Link
+                  href="/driver"
+                  className="flex items-center justify-center gap-2 py-3 bg-white dark:bg-zinc-800/80 text-gray-800 dark:text-gray-200 font-semibold rounded-2xl shadow-sm hover:shadow border border-gray-100 dark:border-zinc-700 hover:border-green-200 dark:hover:border-green-800 transition-all text-xs"
+                >
+                  <Car size={16} className="text-green-500" /> Driver Sign In
+                </Link>
+                <button 
+                  onClick={handleDriverInstall} 
+                  className="flex items-center justify-center gap-2 py-3 bg-white dark:bg-zinc-800/80 text-gray-800 dark:text-gray-200 font-semibold rounded-2xl shadow-sm hover:shadow border border-gray-100 dark:border-zinc-700 hover:border-green-200 dark:hover:border-green-800 transition-all text-xs"
+                >
+                  <Download size={16} /> Install App
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </main>
