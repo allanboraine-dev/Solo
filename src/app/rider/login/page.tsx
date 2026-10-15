@@ -1,0 +1,303 @@
+"use client"
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client'
+import { formatPhoneNumber, isValidSAPhone } from '@/utils/phone'
+import { Smartphone, ShieldCheck, ArrowRight, AlertCircle, RefreshCw, Navigation } from 'lucide-react'
+import Link from 'next/link'
+
+export default function RiderLoginPage() {
+  const router = useRouter()
+  const [step, setStep] = useState<'phone' | 'otp'>('phone')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+  const [formattedPhone, setFormattedPhone] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const [smsNotice, setSmsNotice] = useState<string | null>(null)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    // If already logged in as rider, redirect to /rider
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.push('/rider')
+      }
+    })
+  }, [router, supabase])
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(c => c - 1), 1000)
+    }
+    return () => clearTimeout(timer)
+  }, [countdown])
+
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setError(null)
+    setSmsNotice(null)
+
+    if (!fullName.trim()) {
+      setError('Please enter your full name')
+      return
+    }
+
+    if (!isValidSAPhone(phone)) {
+      setError('Please enter a valid 10-digit South African mobile number (e.g. 082 123 4567)')
+      return
+    }
+
+    const e164 = formatPhoneNumber(phone)
+    setFormattedPhone(e164)
+    setIsLoading(true)
+
+    try {
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone: e164,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            user_type: 'rider',
+          },
+        },
+      })
+
+      if (otpError) {
+        const msg = otpError.message.toLowerCase()
+        if (msg.includes('sms') || msg.includes('provider') || msg.includes('twilio') || msg.includes('gateway') || msg.includes('unsupported')) {
+          setSmsNotice(
+            'Notice: Your Supabase project does not have an SMS provider (Twilio / MessageBird) enabled yet. You can sign in using a demo session below for testing.'
+          )
+        }
+        throw otpError
+      }
+
+      setStep('otp')
+      setCountdown(45)
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send verification code. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!otp || otp.trim().length < 6) {
+      setError('Please enter the 6-digit verification code')
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: otp.trim(),
+        type: 'sms',
+      })
+
+      if (verifyError || !data.user) {
+        throw verifyError || new Error('Invalid verification code')
+      }
+
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        full_name: fullName.trim(),
+        phone: formattedPhone,
+        user_type: 'rider',
+      })
+
+      router.push('/rider')
+    } catch (err: any) {
+      setError(err?.message || 'Invalid or expired verification code.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDevBypass = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const demoEmail = `rider_${formattedPhone.replace(/[^\d]/g, '')}@solorides.co.za`
+      const demoPassword = 'SoloRiderTestPass2026!'
+
+      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: demoPassword,
+      })
+
+      if (signInError) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: demoEmail,
+          password: demoPassword,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              phone: formattedPhone,
+              user_type: 'rider',
+            },
+          },
+        })
+        if (signUpError) throw signUpError
+        signInData = signUpData as any
+      }
+
+      if (signInData?.user) {
+        await supabase.from('profiles').upsert({
+          id: signInData.user.id,
+          full_name: fullName.trim(),
+          phone: formattedPhone,
+          user_type: 'rider',
+        })
+        router.push('/rider')
+      }
+    } catch (err: any) {
+      setError('Dev login failed: ' + (err?.message || 'Unknown error'))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4">
+      <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-zinc-800 relative">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/30">
+            {step === 'phone' ? <Smartphone size={32} /> : <ShieldCheck size={32} />}
+          </div>
+          <h1 className="text-3xl font-black mb-2 text-gray-900 dark:text-white">
+            {step === 'phone' ? 'Rider Sign In' : 'Verify Phone'}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            {step === 'phone' ? 'Sign in with your South African mobile number.' : `We sent an SMS code to ${formattedPhone}`}
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 rounded-2xl mb-6 text-xs font-semibold flex items-start gap-2">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {smsNotice && (
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 rounded-2xl mb-6 text-xs">
+            <p className="font-bold mb-1">Developer / Testing Notice:</p>
+            <p className="leading-relaxed mb-3">{smsNotice}</p>
+            <button
+              onClick={handleDevBypass}
+              disabled={isLoading}
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-xl font-bold transition text-xs shadow-sm flex items-center justify-center gap-1.5"
+            >
+              {isLoading ? 'Connecting...' : 'Sign In with Demo Session (Bypass SMS)'}
+            </button>
+          </div>
+        )}
+
+        {step === 'phone' ? (
+          <form onSubmit={handleSendOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Full Name</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Nelson Mandela"
+                className="w-full p-4 bg-gray-100 dark:bg-zinc-800 rounded-2xl outline-none font-medium text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Mobile Number</label>
+              <div className="flex border border-gray-200 dark:border-zinc-800 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                <div className="bg-gray-200 dark:bg-zinc-800 px-4 py-4 text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 border-r border-gray-300 dark:border-zinc-700">
+                  <span>🇿🇦</span>
+                  <span>+27</span>
+                </div>
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="082 123 4567"
+                  className="w-full p-4 bg-gray-100 dark:bg-zinc-800 outline-none font-medium text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition"
+            >
+              {isLoading ? 'Sending Code...' : 'Continue'}
+              <ArrowRight size={18} />
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Enter 6-Digit Code</label>
+              <input
+                type="text"
+                maxLength={6}
+                required
+                autoFocus
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="• • • • • •"
+                className="w-full p-4 tracking-[0.5em] text-center text-2xl font-bold bg-gray-100 dark:bg-zinc-800 rounded-2xl outline-none text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || otp.length < 6}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold p-4 rounded-2xl mt-6 transition active:scale-95"
+            >
+              {isLoading ? 'Verifying...' : 'Verify & Sign In'}
+            </button>
+
+            <div className="flex items-center justify-between pt-2 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setStep('phone')}
+                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
+              >
+                Change Number
+              </button>
+
+              {countdown > 0 ? (
+                <span className="text-gray-400">Resend in {countdown}s</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSendOtp()}
+                  className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  <RefreshCw size={12} />
+                  Resend Code
+                </button>
+              )}
+            </div>
+          </form>
+        )}
+
+        <div className="mt-8 text-center text-sm text-gray-500">
+          Are you a driver? <Link href="/driver/login" className="text-green-600 font-bold hover:underline">Driver Portal</Link>
+        </div>
+      </div>
+    </div>
+  )
+}

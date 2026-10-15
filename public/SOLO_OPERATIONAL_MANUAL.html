@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOLO Platform — Master Operational Manual (SOP)</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --driver-green: #16a34a;
+      --driver-dark: #15803d;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --accent: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    /* Top Sticky Action Bar */
+    .top-action-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-badge {
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+    }
+
+    .btn-primary {
+      background: #16a34a;
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: #15803d;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: #ffffff;
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    /* Container */
+    .container {
+      max-width: 960px;
+      margin: 30px auto;
+      background: #ffffff;
+      padding: 48px 56px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 10px 25px -5px rgba(0,0,0,0.08);
+    }
+
+    /* Document Header */
+    .doc-header {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+    }
+
+    .doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .doc-meta span strong {
+      color: #0f172a;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -1px;
+      margin-bottom: 6px;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: #334155;
+    }
+
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Callout Alert Boxes */
+    .alert {
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      font-size: 14px;
+      border-left: 4px solid;
+    }
+
+    .alert-info {
+      background-color: #f0f9ff;
+      border-color: #0284c7;
+      color: #0369a1;
+    }
+
+    .alert-success {
+      background-color: #f0fdf4;
+      border-color: #16a34a;
+      color: #15803d;
+    }
+
+    .alert-warning {
+      background-color: #fffbeb;
+      border-color: #f59e0b;
+      color: #b45309;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      border-color: #ef4444;
+      color: #b91c1c;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    /* Code blocks & ASCII diagram */
+    pre {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      margin: 16px 0;
+      line-height: 1.5;
+    }
+
+    code {
+      background: #f1f5f9;
+      color: #0369a1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .toc {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 32px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .toc a {
+      color: #0284c7;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 13.5px;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    .badge-section {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-right: 6px;
+    }
+
+    .badge-rider { background: #e0f2fe; color: #0369a1; }
+    .badge-driver { background: #dcfce7; color: #15803d; }
+    .badge-admin { background: #fef3c7; color: #b45309; }
+
+    /* Print Specific Styling */
+    @media print {
+      body {
+        background: #ffffff;
+        color: #000000;
+        font-size: 12pt;
+      }
+
+      .top-action-bar {
+        display: none !important;
+      }
+
+      .container {
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+      }
+
+      .page-break {
+        page-break-before: always;
+      }
+
+      table, pre, blockquote, .alert {
+        page-break-inside: avoid;
+      }
+
+      a {
+        color: #000000;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Header Action Bar -->
+  <div class="top-action-bar">
+    <div class="brand-title">
+      <span>SOLO</span>
+      <span class="brand-badge">SOP Manual v1.0</span>
+      <span style="font-size: 13px; font-weight: 400; color: #94a3b8; margin-left: 8px;">Republic of South Africa</span>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="window.print()">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
+          <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/>
+        </svg>
+        Print / Download as PDF
+      </button>
+      <a class="btn btn-secondary" href="/SOLO_OPERATIONAL_MANUAL.md" download="SOLO_OPERATIONAL_MANUAL.md">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+          <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+        </svg>
+        Raw Markdown (.md)
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="doc-header">
+      <h1>SOLO Platform Operational Manual</h1>
+      <p style="font-size: 17px; color: #475569; font-weight: 500;">
+        Standard Operating Procedures (SOP) & Platform Guidelines
+      </p>
+      <div class="doc-meta">
+        <span><strong>Jurisdiction:</strong> Republic of South Africa</span>
+        <span><strong>Release Version:</strong> 1.0 (Production Master)</span>
+        <span><strong>Regulatory Acts:</strong> NLTA (Act 5 of 2009), POPIA (Act 4 of 2013), SARS Sec 11(2)</span>
+        <span><strong>Classification:</strong> Official Operational Standard</span>
+      </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <section>
+      <h2>Executive Summary & Platform Philosophy</h2>
+      <p>
+        <strong>SOLO</strong> is an enterprise-grade, peer-to-peer digital e-hailing platform engineered specifically for the South African transport ecosystem. Unlike traditional legacy aggregator platforms that deduct between 20% and 30% commission from driver earnings, SOLO operates on a <strong>Pure Zero-Commission Model (0.0% Take-Rate)</strong>.
+      </p>
+
+      <div class="alert alert-success">
+        <strong>The SOLO Economic Formula:</strong> Drivers retain 100% of all rider fares. The platform charges no percentage cut, replacing it with a flat-rate R300.00/month SaaS subscription after an initial 7-day unrestricted trial.
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Platform Model</th>
+            <th>Rider Pays</th>
+            <th>Platform Deduction</th>
+            <th>Driver Net Payout</th>
+            <th>Monthly Driver Take-Home (at R20,000 gross)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Legacy Aggregators (Uber/Bolt)</strong></td>
+            <td>R100.00</td>
+            <td>-R25.00 to -R30.00 (25-30%)</td>
+            <td>R70.00 - R75.00</td>
+            <td>R14,000.00 - R15,000.00</td>
+          </tr>
+          <tr style="background-color: #ecfdf5; font-weight: bold; color: #166534;">
+            <td><strong>SOLO Zero-Commission Platform</strong></td>
+            <td>R100.00</td>
+            <td>R0.00 (0.0%)</td>
+            <td>R100.00</td>
+            <td>R19,700.00 (after flat R300 SaaS fee)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Table of Contents -->
+    <div class="toc">
+      <h3>Table of Contents</h3>
+      <div class="toc-grid">
+        <div>
+          <span class="badge-section badge-rider">Section A</span>
+          <strong>Rider Operations</strong>
+          <ul style="margin: 8px 0 0 16px; font-size: 13px;">
+            <li><a href="#rider-auth">1.1 Phone Auth (+27 E.164)</a></li>
+            <li><a href="#rider-pwa">1.2 PWA Mobile Installation</a></li>
+            <li><a href="#rider-booking">1.3 Booking & Commercial Routing</a></li>
+            <li><a href="#rider-matching">1.4 15km PostGIS Driver Matching</a></li>
+            <li><a href="#rider-pin">1.5 4-Digit Security PIN Safety</a></li>
+            <li><a href="#rider-settlement">1.6 Paystack Settlement & Receipts</a></li>
+            <li><a href="#rider-sos">1.7 Offline Dead Zones & SOS Hotlines</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="badge-section badge-driver">Section B</span>
+          <strong>Driver Operations</strong>
+          <ul style="margin: 8px 0 0 16px; font-size: 13px;">
+            <li><a href="#driver-nlta">2.1 Statutory NLTA Compliance</a></li>
+            <li><a href="#driver-kyc">2.2 KYC Document Submission</a></li>
+            <li><a href="#driver-saas">2.3 7-Day Trial & R300/mo SaaS</a></li>
+            <li><a href="#driver-bank">2.4 SA Universal Branch Codes</a></li>
+            <li><a href="#driver-routine">2.5 Online Dispatch & Navigation</a></li>
+            <li><a href="#driver-pin">2.6 Arrival & PIN Verification</a></li>
+            <li><a href="#driver-sars">2.7 Driver SARS Tax Guidance</a></li>
+          </ul>
+        </div>
+        <div>
+          <span class="badge-section badge-admin">Section C</span>
+          <strong>Admin Governance</strong>
+          <ul style="margin: 8px 0 0 16px; font-size: 13px;">
+            <li><a href="#admin-compliance">3.1 KYC Review Engine (/admin)</a></li>
+            <li><a href="#admin-storage">3.2 1-Hour Ephemeral Signed URLs</a></li>
+            <li><a href="#admin-simulator">3.3 Dual-Window Simulator</a></li>
+            <li><a href="#admin-webhooks">3.4 Paystack HMAC SHA512 Webhooks</a></li>
+            <li><a href="#admin-postgis">3.5 PostGIS Proximity Algorithms</a></li>
+            <li><a href="#admin-push">3.6 Web Push VAPID Protocols</a></li>
+            <li><a href="#admin-disputes">3.7 Dispute Resolution & Audit Trails</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section A: Rider Operations -->
+    <div class="page-break"></div>
+    <section id="section-rider">
+      <h2>
+        <span class="badge-section badge-rider">Section A</span>
+        Rider Operations & User Guide
+      </h2>
+
+      <h3 id="rider-auth">1.1 Account Registration & Phone Verification</h3>
+      <p>
+        SOLO utilizes passwordless authentication anchored directly to the South African E.164 telecommunications standard. Riders register or sign in with their mobile telephone number:
+      </p>
+      <ul>
+        <li><strong>Accepted Formats:</strong> <code>082 123 4567</code>, <code>27821234567</code>, or <code>+27 82 123 4567</code>.</li>
+        <li><strong>Verification Flow:</strong> The mobile number is formatted into international E.164. A 6-digit One-Time PIN (OTP) is sent via SMS. Once verified, a persistent authenticated session token is stored.</li>
+      </ul>
+
+      <h3 id="rider-pwa">1.2 PWA Mobile Installation (Android & iOS)</h3>
+      <p>
+        SOLO is delivered as a Progressive Web Application (PWA). It requires no app store downloads and works in areas with constrained mobile bandwidth.
+      </p>
+      <ul>
+        <li><strong>Android Devices:</strong> Open the platform in Google Chrome. An automatic banner prompts <em>"Install SOLO App — Add to Home Screen"</em>. Tapping "Install Now" installs the app in standalone mode.</li>
+        <li><strong>Apple iOS Devices:</strong> Open in Safari, tap the <strong>Share</strong> button (square with arrow up), scroll down and tap <strong>"Add to Home Screen"</strong>, then tap <strong>"Add"</strong>.</li>
+      </ul>
+
+      <h3 id="rider-booking">1.3 Booking a Ride & Commercial Map Routing</h3>
+      <p>
+        SOLO uses high-resolution Mapbox Commercial Geocoding and Matrix Routing. When setting pickup and dropoff points, the system calculates the optimal route and guarantees an upfront fixed price:
+      </p>
+      <pre>Fare (ZAR) = Maximum(R30.00, R20.00 + [Distance in km * R10.00])</pre>
+      <p>
+        <em>Example:</em> A 6.2 km trip between Camps Bay and the V&A Waterfront costs exactly <strong>R82.00</strong>. There are no surprise surge pricing multipliers or booking surcharges.
+      </p>
+
+      <h3 id="rider-matching">1.4 Driver Matching & The 15km PostGIS Radius</h3>
+      <p>
+        When you tap <strong>"Request SOLO Ride"</strong>, the PostGIS spatial engine scans for online, verified drivers within a <strong>15-kilometer radius</strong>. As soon as a driver accepts, you receive their name, vehicle model, color, registration number, and live tracking location on your map.
+      </p>
+
+      <h3 id="rider-pin">1.5 Boarding Safety & The Mandatory 4-Digit PIN</h3>
+      <div class="alert alert-danger">
+        <strong>CRITICAL SAFETY PROTOCOL:</strong> Every trip generates an anti-impersonation 4-digit PIN (e.g. <code>4892</code>). When the vehicle arrives, check the registration plate, enter the vehicle, and give your 4-digit PIN to the driver. The driver cannot start the meter without this PIN. Never enter an unverified vehicle.
+      </div>
+
+      <h3 id="rider-settlement">1.6 Payment Settlement & Tax Receipts</h3>
+      <p>
+        Payment is authorized via Paystack using 3D-Secure South African bank cards. When the driver completes the trip, the payment is captured automatically. Riders immediately receive a link to their SARS-compliant tax invoice at <code>/receipt/[tripId]</code> with itemized fare lines and 1-click PDF download for expense claims.
+      </p>
+
+      <h3 id="rider-sos">1.7 Offline Dead Zones & SOS Emergency Hotlines</h3>
+      <p>
+        If cellular network fails during a journey (e.g., mountain passes or underground parking), the SOLO PWA automatically engages offline mode. The active trip safety screen allows 1-tap emergency calling to official South African emergency numbers:
+      </p>
+      <ul>
+        <li><strong>SAPS (Police Flying Squad):</strong> <code>10111</code></li>
+        <li><strong>National Ambulance & Fire:</strong> <code>10177</code></li>
+        <li><strong>Universal Cellular Emergency:</strong> <code>112</code></li>
+      </ul>
+    </section>
+
+    <!-- Section B: Driver Operations -->
+    <div class="page-break"></div>
+    <section id="section-driver">
+      <h2>
+        <span class="badge-section badge-driver">Section B</span>
+        Driver Operations & Partner Guide
+      </h2>
+
+      <h3 id="driver-nlta">2.1 Statutory NLTA Compliance & Requirements</h3>
+      <p>
+        In accordance with the <strong>National Land Transport Act (Act No. 5 of 2009)</strong>, all drivers operating on the SOLO platform must register as independent micro-enterprises and provide proof of statutory compliance:
+      </p>
+      <ol>
+        <li><strong>South African Driving Licence (Front & Back):</strong> Valid Code B, EB, or C1 licence card.</li>
+        <li><strong>Professional Driving Permit (PrDP - Category P):</strong> Mandatory passenger transport permit.</li>
+        <li><strong>Certificate of Roadworthiness (CoR):</strong> Issued by an accredited testing station within the last 6 months.</li>
+        <li><strong>Vehicle Registration (RC1) & Commercial Insurance:</strong> Proving the vehicle is legally registered and insured.</li>
+      </ol>
+
+      <h3 id="driver-kyc">2.2 KYC Document Submission Protocol</h3>
+      <p>
+        Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code>. Documents are stored in an encrypted, private storage bucket with strict access controls.
+      </p>
+
+      <h3 id="driver-saas">2.3 SaaS Subscription Model (7-Day Trial & R300/mo)</h3>
+      <p>
+        SOLO does not take 25% of your earnings. Instead:
+      </p>
+      <ul>
+        <li><strong>7-Day Free Trial:</strong> Once approved, you enjoy 7 full days of unlimited dispatches with zero platform fees.</li>
+        <li><strong>R300.00 / month Flat SaaS Fee:</strong> After the trial, maintain full platform access for a flat R300/month billed through Paystack. You keep 100% of every ride fare you generate.</li>
+      </ul>
+
+      <h3 id="driver-bank">2.4 South African Banking Setup & Direct Settlement</h3>
+      <p>
+        Driver earnings settle directly to your verified South African bank account. SOLO supports all primary South African clearing institutions with standard 6-digit universal branch codes:
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Bank Name</th>
+            <th>Universal Branch Code</th>
+            <th>Account Digits</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Standard Bank</td><td><code>051001</code></td><td>9-11 digits</td></tr>
+          <tr><td>First National Bank (FNB)</td><td><code>250655</code></td><td>10-11 digits</td></tr>
+          <tr><td>Capitec Bank</td><td><code>470010</code></td><td>10 digits</td></tr>
+          <tr><td>Nedbank</td><td><code>198765</code></td><td>10 digits</td></tr>
+          <tr><td>ABSA Bank</td><td><code>632005</code></td><td>10 digits</td></tr>
+          <tr><td>Investec Bank</td><td><code>580105</code></td><td>11 digits</td></tr>
+          <tr><td>TymeBank</td><td><code>678910</code></td><td>10 digits</td></tr>
+          <tr><td>African Bank</td><td><code>430000</code></td><td>10-11 digits</td></tr>
+          <tr><td>Discovery Bank</td><td><code>679000</code></td><td>10 digits</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="driver-routine">2.5 Daily Operating Routine: Going Online & Navigation</h3>
+      <p>
+        Open the SOLO Driver app and toggle <strong>"Go Online"</strong>. When a ride is booked within 15 km, your device will ring with an audio dispatch chime. You will see the pickup address, destination, route distance, and guaranteed gross Rand fare. Tap <strong>"Accept Trip"</strong> to receive navigation routing.
+      </p>
+
+      <h3 id="driver-pin">2.6 Arrival & PIN Verification</h3>
+      <p>
+        When you arrive at the pickup point, tap <strong>"I Have Arrived"</strong> to alert the passenger. When the passenger enters your vehicle, ask for their 4-digit SOLO safety PIN and input it into your terminal. Once confirmed, tap <strong>"Start Trip"</strong>. At the destination, tap <strong>"Complete Trip"</strong> to immediately trigger payment settlement.
+      </p>
+
+      <h3 id="driver-sars">2.7 Driver SARS Tax Guidance</h3>
+      <div class="alert alert-info">
+        <strong>Tax Transparency for Drivers:</strong> Because SOLO drivers receive 100% gross fares, drivers operate as independent contractors for SARS purposes. Fuel, vehicle maintenance, insurance, cell data, and your R300 monthly SOLO SaaS fee are legitimate tax-deductible business expenses. Drivers can consider registering for SARS Turnover Tax if annual turnover is under R1,000,000.
+      </div>
+    </section>
+
+    <!-- Section C: Admin Governance -->
+    <div class="page-break"></div>
+    <section id="section-admin">
+      <h2>
+        <span class="badge-section badge-admin">Section C</span>
+        Administrator Operations & Governance
+      </h2>
+
+      <h3 id="admin-compliance">3.1 KYC Review Engine (`/admin/compliance`)</h3>
+      <p>
+        The central administration console at <code>/admin/compliance</code> provides real-time oversight of driver applicant queues across South Africa. The telemetry dashboard displays:
+      </p>
+      <ul>
+        <li><strong>Total Drivers:</strong> Total driver records in the platform database.</li>
+        <li><strong>Pending Review:</strong> Applications waiting for compliance officer document inspection.</li>
+        <li><strong>Verified & Active:</strong> Approved drivers eligible for real-time dispatch matching.</li>
+        <li><strong>Action Needed:</strong> Applications where documents were rejected or need re-submission.</li>
+      </ul>
+
+      <h3 id="admin-storage">3.2 1-Hour Ephemeral Signed URLs for KYC Documents</h3>
+      <p>
+        To comply with the South African Protection of Personal Information Act (POPIA Act No. 4 of 2013), driver identity documents and PrDP certificates are never exposed via public URLs. The compliance portal dynamically generates <strong>1-hour signed URLs</strong> (`createSignedUrl(path, 3600)`) directly from the private `driver-documents` bucket for inline inspection.
+      </p>
+      <div class="alert alert-warning">
+        <strong>Statutory Rejection Codes:</strong> When rejecting a document, administrators must select a preset reason (e.g. <code>EXPIRED_CARD</code>, <code>NO_PRDP_ENDORSEMENT</code>, <code>ROADWORTHY_EXPIRED</code>, <code>VIN_MISMATCH</code>). Approving all 4 statutory documents automatically sets <code>is_verified = true</code> and dispatches an approval notification to the driver.
+      </div>
+
+      <h3 id="admin-simulator">3.3 Dual-Window Simulator (`/admin/simulator`)</h3>
+      <p>
+        The interactive simulator allows compliance officers and developers to simulate full trip lifecycles in side-by-side device frames:
+      </p>
+      <ul>
+        <li><strong>Metro Route Presets:</strong> Pre-programmed routes in Cape Town, Johannesburg, Durban, and Pretoria.</li>
+        <li><strong>Speed Control:</strong> Execute journeys at 1x (real-time), 2x, or 5x speed multipliers.</li>
+        <li><strong>Interactive PIN & Chat:</strong> Test the 4-digit anti-impersonation PIN verification and real-time messaging.</li>
+        <li><strong>Live Telemetry Drawer:</strong> Inspect PostGIS 15km matching logs, Supabase WebSockets, VAPID Web Push payloads, and Paystack settlement events.</li>
+      </ul>
+
+      <h3 id="admin-webhooks">3.4 Paystack HMAC SHA512 Webhooks</h3>
+      <p>
+        All billing operations (trip fare settlement and R300/mo driver subscriptions) are validated cryptographically at <code>/api/paystack-webhook</code>. Incoming webhooks are verified against <code>PAYSTACK_SECRET_KEY</code> using HMAC-SHA512. Forged payloads or incorrect signatures are rejected with HTTP 401.
+      </p>
+
+      <h3 id="admin-postgis">3.5 PostGIS Proximity Matching Algorithms</h3>
+      <p>
+        Spatial matching runs on PostgreSQL PostGIS using geodesic distance queries (<code>ST_DWithin</code>) indexed with spatial GIST indexes. Only drivers who are online (<code>is_online = true</code>), verified (<code>is_verified = true</code>), and with active SaaS subscriptions are included in dispatch candidate pools.
+      </p>
+
+      <h3 id="admin-push">3.6 Web Push VAPID Protocol Infrastructure</h3>
+      <p>
+        Background alerts for bookings, driver arrivals, and payments follow the RFC 8291 / RFC 8292 standard. Stale subscriptions that return HTTP 404 or HTTP 410 are automatically pruned from the <code>push_subscriptions</code> table to optimize database performance.
+      </p>
+
+      <h3 id="admin-disputes">3.7 Dispute Resolution & Audit Trails</h3>
+      <p>
+        In case of passenger or driver queries, administrators can cross-reference the trip ID in Supabase logs, inspect the exact GPS breadcrumb path, check the timestamp of the 4-digit PIN confirmation, and review the Paystack transaction authorization code.
+      </p>
+    </section>
+
+    <!-- Appendix -->
+    <div class="page-break"></div>
+    <section>
+      <h2>Appendix: Regulatory Directory & Contacts</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Organisation / Agency</th>
+            <th>Contact / Hotline</th>
+            <th>Mandate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>South African Police Service (SAPS)</strong></td>
+            <td><code>10111</code> (Toll-Free Nationwide)</td>
+            <td>Criminal emergency, hijacking, physical security</td>
+          </tr>
+          <tr>
+            <td><strong>National Ambulance & Fire Emergency</strong></td>
+            <td><code>10177</code></td>
+            <td>Medical response and vehicular accidents</td>
+          </tr>
+          <tr>
+            <td><strong>Universal Cellular Emergency</strong></td>
+            <td><code>112</code> (Free from any mobile phone)</td>
+            <td>Emergency routing across all cellular networks</td>
+          </tr>
+          <tr>
+            <td><strong>Department of Transport (NLTR)</strong></td>
+            <td><code>+27 (0)12 309 3000</code></td>
+            <td>National Land Transport Act (NLTA) regulation</td>
+          </tr>
+          <tr>
+            <td><strong>South African Revenue Service (SARS)</strong></td>
+            <td><code>0800 00 7277</code></td>
+            <td>Tax compliance, turnover tax, and VAT inquiries</td>
+          </tr>
+          <tr>
+            <td><strong>Information Regulator South Africa</strong></td>
+            <td><code>inforeg@justice.gov.za</code></td>
+            <td>POPIA Act compliance and data privacy oversight</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px;">
+        SOLO Mobility Technologies (Pty) Ltd — Republic of South Africa<br>
+        Standard Operating Procedures Manual v1.0. All rights reserved.
+      </div>
+    </section>
+  </div>
+
+</body>
+</html>

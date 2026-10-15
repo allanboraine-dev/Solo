@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { getMessages, saveMessage, subscribeToEvents, type MockMessage } from '@/lib/mockBackend';
+import { getMessages, fetchTripMessages, saveMessage, subscribeToEvents, type MockMessage } from '@/lib/mockBackend';
 
 interface ChatProps {
   tripId: string;
@@ -14,8 +14,15 @@ export default function Chat({ tripId, role }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load initial messages
+    // Load initial messages from local cache first
     setMessages(getMessages(tripId));
+
+    // Fetch from Postgres database
+    fetchTripMessages(tripId).then(dbMessages => {
+      if (dbMessages && dbMessages.length > 0) {
+        setMessages(dbMessages);
+      }
+    });
 
     // Subscribe to new messages
     const unsubscribe = subscribeToEvents((type, payload) => {

@@ -1,22 +1,24 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { LocateFixed, Clock } from 'lucide-react'
+import { LocateFixed, Clock, Navigation } from 'lucide-react'
 import { saveTrip, type MockTrip } from '@/lib/mockBackend'
+import { reverseGeocode, getRouteDirections, calculateFare } from '@/utils/mapService'
 import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
+  currentUser?: { id: string; fullName?: string; phone?: string } | null
+  onRequireAuth?: () => void
 }
 
-const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || ''; // Keep it here but unused, or remove it entirely. Let's just remove it.
-
-export default function BookingForm({ onLocationSelect }: BookingFormProps) {
+export default function BookingForm({ onLocationSelect, currentUser, onRequireAuth }: BookingFormProps) {
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [fare, setFare] = useState<number | null>(null)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [isBooking, setIsBooking] = useState(false)
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
 
@@ -36,11 +38,9 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
           
           let address = 'Current Location';
           try {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data && data.display_name) {
-              address = data.name || data.display_name.split(',')[0];
+            const resolved = await reverseGeocode(coords.lat, coords.lng);
+            if (resolved) {
+              address = resolved.split(',')[0] || resolved;
             }
           } catch (e) {
             console.error("Geocoder failed", e);
@@ -59,29 +59,29 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
     }
   }
 
-  // Calculate Route & Fare using OSRM Directions API
+  // Calculate Route, Live Traffic Duration & Fare using Mapbox Directions
   useEffect(() => {
     if (!realPickupCoords || !realDropoffCoords) return;
 
     const getDirections = async () => {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${realPickupCoords.lng},${realPickupCoords.lat};${realDropoffCoords.lng},${realDropoffCoords.lat}?overview=false`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data.routes && data.routes[0]) {
-          const route = data.routes[0];
-          const distanceInMeters = route.distance || 0;
-          const km = distanceInMeters / 1000;
-          setDistanceKm(km);
-          
-          // Base fare: R20. Per KM: R10
-          const calculatedFare = Math.max(30, Math.round(20 + (km * 10)));
-          setFare(calculatedFare);
+        const details = await getRouteDirections(
+          realPickupCoords.lng,
+          realPickupCoords.lat,
+          realDropoffCoords.lng,
+          realDropoffCoords.lat
+        );
+
+        if (details) {
+          setDistanceKm(details.distanceKm);
+          setDurationMinutes(details.durationMinutes);
+          setFare(calculateFare(details.distanceKm));
         }
       } catch (err) {
-        console.error("Directions error:", err);
+        console.error("Commercial directions error:", err);
         setFare(null);
         setDistanceKm(null);
+        setDurationMinutes(null);
       }
     };
 
@@ -90,12 +90,19 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
 
   const handleBook = async () => {
     if (fare === null || !realPickupCoords || !realDropoffCoords) return
+
+    // Require authentication before requesting a ride
+    if (!currentUser && onRequireAuth) {
+      onRequireAuth();
+      return;
+    }
+
     setIsBooking(true)
     try {
-      const mockRiderId = "00000000-0000-0000-0000-000000000000" 
+      const riderId = currentUser?.id || "00000000-0000-0000-0000-000000000000" 
       const tripData: MockTrip = {
         id: crypto.randomUUID(),
-        rider_id: mockRiderId,
+        rider_id: riderId,
         pickup_location: pickup,
         pickup_lat: realPickupCoords.lat, 
         pickup_lng: realPickupCoords.lng,
@@ -140,7 +147,7 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
               value={pickup}
               onChange={setPickup}
               onSelect={(feature) => {
-                const coords = { lat: parseFloat(feature.lat), lng: parseFloat(feature.lon) };
+                const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                 setRealPickupCoords(coords);
                 setPickup(feature.name || feature.display_name.split(',')[0]);
                 onLocationSelect('pickup', coords.lat, coords.lng);
@@ -163,7 +170,7 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
               value={dropoff}
               onChange={setDropoff}
               onSelect={(feature) => {
-                const coords = { lat: parseFloat(feature.lat), lng: parseFloat(feature.lon) };
+                const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                 setRealDropoffCoords(coords);
                 setDropoff(feature.name || feature.display_name.split(',')[0]);
                 onLocationSelect('dropoff', coords.lat, coords.lng);
@@ -185,11 +192,18 @@ export default function BookingForm({ onLocationSelect }: BookingFormProps) {
       </div>
       
       {fare !== null && distanceKm !== null && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 flex justify-between items-center animate-in fade-in zoom-in-95">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
           <div>
-            <p className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-0.5">Estimated Fare</p>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Estimated Fare</p>
+              {durationMinutes && (
+                <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/60 px-1.5 py-0.5 rounded">
+                  Live Traffic
+                </span>
+              )}
+            </div>
             <p className="text-xs text-blue-600 dark:text-blue-300 font-medium">
-              {distanceKm.toFixed(1)} km &middot; R20 base + R10/km
+              {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''}
             </p>
           </div>
           <div className="text-2xl font-black text-blue-600 dark:text-blue-400">

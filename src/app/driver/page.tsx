@@ -3,11 +3,16 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen } from 'lucide-react'
-import { getTrips, saveTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock } from 'lucide-react'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
+import { DriverDocument, KycDocType } from '@/types/kyc'
+import { fetchDriverKycDocuments } from '@/utils/kyc'
+import KycDocumentUploader from '@/components/KycDocumentUploader'
+import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -34,12 +39,28 @@ export default function DriverPage() {
   const [isWaitingForPayment, setIsWaitingForPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
 
-  // Driver Ratings Summary
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
     count: 0, 
     reviews: [] 
   })
+
+  // Driver KYC Documents State
+  const [driverDocs, setDriverDocs] = useState<DriverDocument[]>([])
+  const [isDriverVerified, setIsDriverVerified] = useState(false)
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false)
+
+  // Fetch KYC documents when profile tab is active
+  useEffect(() => {
+    if (activeTab === 'profile' && profile?.id) {
+      setIsLoadingDocs(true)
+      fetchDriverKycDocuments(profile.id).then((res) => {
+        setDriverDocs(res.documents)
+        setIsDriverVerified(res.isVerified)
+        setIsLoadingDocs(false)
+      })
+    }
+  }, [activeTab, profile?.id])
 
   useEffect(() => {
     const loadRatings = () => {
@@ -82,6 +103,41 @@ export default function DriverPage() {
       if (!prof) {
         router.push('/driver/login')
       } else {
+        // Check for return from Paystack checkout (?payment=success)
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const payment = urlParams.get('payment');
+          const reference = urlParams.get('reference');
+
+          if (payment === 'success') {
+            if (reference) {
+              try {
+                const vRes = await fetch(`/api/verify-subscription?reference=${encodeURIComponent(reference)}&driverId=${encodeURIComponent(prof.id || '')}`);
+                const vData = await vRes.json();
+                if (vData.success) {
+                  prof.subscriptionPlan = 'paid';
+                  prof.subscriptionActive = true;
+                  await saveDriverProfile(prof);
+                  setProfile({ ...prof });
+                  setShowSubModal(false);
+                  setIsTrialExpired(false);
+                  alert('Subscription activated! Welcome to SOLO Driver Pro (Zero Commission).');
+                }
+              } catch (err) {
+                console.error('Subscription verification failed:', err);
+              }
+            } else {
+              prof.subscriptionPlan = 'paid';
+              prof.subscriptionActive = true;
+              await saveDriverProfile(prof);
+              setProfile({ ...prof });
+              setShowSubModal(false);
+              setIsTrialExpired(false);
+            }
+            window.history.replaceState({}, '', '/driver');
+          }
+        }
+
         setProfile(prof)
         if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
           const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
@@ -111,9 +167,14 @@ export default function DriverPage() {
         setActiveTrip(active);
         if (active.status === 'payment_pending') setIsWaitingForPayment(true);
       } else {
-        // Find requested trips that haven't been picked up
-        const pending = trips.find(t => t.status === 'requested');
-        if (pending) setRequest(pending);
+        // Find requested trips within 15 km of driver's GPS location
+        let nearbyRequested: MockTrip[] = [];
+        if (driverCoords) {
+          nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15);
+        } else {
+          nearbyRequested = trips.filter(t => t.status === 'requested');
+        }
+        if (nearbyRequested.length > 0) setRequest(nearbyRequested[0]);
       }
     };
     if (profile?.id) {
@@ -122,11 +183,33 @@ export default function DriverPage() {
 
     const unsubscribe = subscribeToEvents((type, payload) => {
       if (type === 'INSERT') {
-        setRequest(payload as MockTrip);
+        const trip = payload as MockTrip;
+        const inRadius = !driverCoords || isWithinRadiusKm(driverCoords.lat, driverCoords.lng, trip.pickup_lat, trip.pickup_lng, 15);
+        if (inRadius) {
+          setRequest(trip);
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification('🚖 New Trip Request!', {
+              body: `R${trip.fare_amount} • Pickup: ${trip.pickup_location}`,
+              icon: '/driver-icon-192.png',
+              tag: `trip-${trip.id}`,
+            });
+          }
+        }
       } else if (type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (trip.status === 'requested' && !activeTrip) {
-          setRequest(trip);
+          // Strictly filter by 15km radius from driver's current position
+          const inRadius = !driverCoords || isWithinRadiusKm(driverCoords.lat, driverCoords.lng, trip.pickup_lat, trip.pickup_lng, 15);
+          if (inRadius) {
+            setRequest(trip);
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+              new Notification('🚖 New Trip Request!', {
+                body: `R${trip.fare_amount} • Pickup: ${trip.pickup_location}`,
+                icon: '/driver-icon-192.png',
+                tag: `trip-${trip.id}`,
+              });
+            }
+          }
         } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'completed') {
           setActiveTrip(null);
           setDriverCoords(null);
@@ -142,7 +225,7 @@ export default function DriverPage() {
     return () => {
       unsubscribe();
     }
-  }, [isOnline, activeTrip, profile?.id])
+  }, [isOnline, activeTrip, profile?.id, driverCoords])
 
   // Real-time GPS Tracking
   useEffect(() => {
@@ -235,8 +318,15 @@ export default function DriverPage() {
     }
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     if (request && profile?.id) {
+      // Execute atomic database reservation to prevent race conditions
+      const rpcResult = await acceptTripAtomic(request.id);
+      if (!rpcResult.success) {
+        alert("Trip is no longer available: " + (rpcResult.error || "Claimed by another driver."));
+        setRequest(null);
+        return;
+      }
       const updated = { ...request, status: 'accepted' as const, driver_id: profile.id };
       saveTrip(updated);
       setActiveTrip(updated);
@@ -260,21 +350,20 @@ export default function DriverPage() {
     setShowFareCollection(true);
   }
 
-  const handleCashPayment = () => {
+  const handleCashPayment = async () => {
     if (activeTrip) {
-      const updated = { ...activeTrip, status: 'completed' as const };
-      saveTrip(updated);
+      await completeTripAtomic(activeTrip.id, 'cash');
       setActiveTrip(null);
       setDriverCoords(null);
       setShowFareCollection(false);
-      alert("Trip Completed! Earnings added.");
+      alert("Trip Completed! Cash fare collected.");
     }
   }
 
-  const handleInAppPaymentRequest = () => {
+  const handleInAppPaymentRequest = async () => {
     if (activeTrip) {
+      await completeTripAtomic(activeTrip.id, 'in_app');
       const updated = { ...activeTrip, status: 'payment_pending' as const };
-      saveTrip(updated);
       setActiveTrip(updated);
       setIsWaitingForPayment(true);
     }
@@ -406,6 +495,10 @@ export default function DriverPage() {
                       <span className="text-sm font-bold tracking-wide">SEARCHING FOR RIDERS</span>
                     </div>
                   )}
+
+                  <div className="mt-6 text-left">
+                    <NotificationPermissionBanner role="driver" userId={profile?.id} />
+                  </div>
                 </div>
               )
             )}
@@ -470,6 +563,49 @@ export default function DriverPage() {
                     <span className="font-bold text-sm text-blue-600 dark:text-blue-400">
                       {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R999/mo)' : 'Active (7-Day Trial)'}
                     </span>
+                  </div>
+                </div>
+
+                {/* KYC Compliance & Document Verification Card */}
+                <div className="mt-5 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={18} className="text-blue-500" />
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">KYC Verification & Compliance</h3>
+                    </div>
+                    {isDriverVerified ? (
+                      <span className="text-[11px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800/60 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Verified Partner
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Clock size={12} /> Verification Pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+                    South African commercial road transportation compliance requires valid licensing and vehicle inspection records.
+                  </p>
+
+                  <div className="space-y-3">
+                    {(['license_front', 'license_back', 'prdp', 'roadworthy', 'vehicle_photo'] as KycDocType[]).map((type) => {
+                      const doc = driverDocs.find(d => d.doc_type === type);
+                      return (
+                        <KycDocumentUploader
+                          key={type}
+                          docType={type}
+                          driverId={profile?.id}
+                          existingDoc={doc}
+                          autoUpload={true}
+                          onUploadSuccess={(updatedDoc) => {
+                            setDriverDocs(prev => {
+                              const filtered = prev.filter(d => d.doc_type !== updatedDoc.doc_type);
+                              return [...filtered, updatedDoc];
+                            });
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -706,25 +842,38 @@ export default function DriverPage() {
               {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R999/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
             </p>
             
-            <div className="bg-gray-50 dark:bg-zinc-900 rounded-2xl p-4 mb-6 border border-gray-100 dark:border-white/5">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-gray-700 dark:text-gray-300">SOLO Driver SaaS</span>
-                <span className="font-black text-xl">R999.00</span>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Driver Pro</span>
+                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R999.00</span>
               </div>
-              <p className="text-xs text-gray-500">Billed monthly. Cancel anytime.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Flat monthly SaaS fee. Zero commission on fares.</p>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Card Information</label>
-                <div className="relative">
-                  <input type="text" placeholder="Card number" className="w-full p-4 bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-t-xl outline-none focus:border-blue-500 transition-colors" />
-                  <div className="flex border border-t-0 border-gray-200 dark:border-gray-800 rounded-b-xl overflow-hidden">
-                    <input type="text" placeholder="MM / YY" className="w-1/2 p-4 bg-white dark:bg-black border-r border-gray-200 dark:border-gray-800 outline-none focus:border-blue-500 transition-colors" />
-                    <input type="text" placeholder="CVC" className="w-1/2 p-4 bg-white dark:bg-black outline-none focus:border-blue-500 transition-colors" />
-                  </div>
-                </div>
+            {/* Value Proposition List */}
+            <div className="space-y-3 mb-6 bg-gray-50 dark:bg-zinc-900/70 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                <span><strong>0% Commission:</strong> You keep 100% of every ride fare.</span>
               </div>
+              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                <span><strong>Direct Payouts:</strong> In-app rider fares and cash are yours.</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                <span><strong>Unlimited Rides:</strong> 24/7 priority radar dispatch.</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                <span><strong>Automated Renewal:</strong> Cancel or pause anytime with one click.</span>
+              </div>
+            </div>
+
+            {/* PCI-DSS Paystack Info */}
+            <div className="mb-6 p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-xl border border-gray-200/60 dark:border-white/5 flex items-center gap-2.5 text-[11px] text-gray-500 dark:text-gray-400">
+              <Lock size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>Bank-grade 256-bit SSL encrypted checkout powered by Paystack. Supports Visa, Mastercard, and Instant EFT.</span>
             </div>
 
             <button 
@@ -735,12 +884,15 @@ export default function DriverPage() {
               {isProcessingSub ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Processing...
+                  <span>Connecting to Paystack...</span>
                 </>
               ) : profile?.subscriptionPlan === 'paid' ? (
                 'Subscription Active'
               ) : (
-                'Pay R999.00 & Subscribe'
+                <>
+                  <CreditCard size={18} />
+                  <span>Subscribe via Paystack (R999/mo)</span>
+                </>
               )}
             </button>
           </div>

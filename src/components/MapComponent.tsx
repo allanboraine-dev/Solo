@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
 
 export interface DriverMarkerData {
   id: string;
@@ -135,18 +136,14 @@ const MapComponent = (props: MapProps) => {
   const centerLat = pickupLat || effectiveAssignedLat || -28.7282;
   const centerLng = pickupLng || effectiveAssignedLng || 24.7623;
 
-  // Fetch route if we have both points using OSRM
+  // Fetch route if we have both points using Mapbox Directions (with OSRM fallback)
   useEffect(() => {
     if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
       const getRoute = async () => {
         try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.routes && data.routes.length > 0) {
-            // GeoJSON returns [lng, lat], Leaflet Polyline expects [lat, lng]
-            const coords = data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
-            setRouteCoordinates(coords);
+          const details = await getRouteDirections(pickupLng, pickupLat, dropoffLng, dropoffLat);
+          if (details && details.coordinates.length > 0) {
+            setRouteCoordinates(details.coordinates);
           }
         } catch (e) {
           console.error('Directions request failed', e);
@@ -158,6 +155,8 @@ const MapComponent = (props: MapProps) => {
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
 
+  const tileConfig = getTileLayerConfig(false);
+
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer 
@@ -167,8 +166,11 @@ const MapComponent = (props: MapProps) => {
         zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={tileConfig.attribution}
+          url={tileConfig.url}
+          maxZoom={tileConfig.maxZoom}
+          tileSize={tileConfig.tileSize}
+          zoomOffset={tileConfig.zoomOffset}
         />
         
         <MapUpdater 
@@ -203,7 +205,7 @@ const MapComponent = (props: MapProps) => {
         {/* Available nearby roaming drivers */}
         {availableDrivers.map((driver) => {
           // If this driver is the currently assigned driver, skip here (rendered separately with assigned styling)
-          if (effectiveAssignedLat && Math.abs(driver.lat - effectiveAssignedLat) < 0.0001 && Math.abs(driver.lng - effectiveAssignedLng) < 0.0001) {
+          if (effectiveAssignedLat !== undefined && effectiveAssignedLng !== undefined && Math.abs(driver.lat - effectiveAssignedLat) < 0.0001 && Math.abs(driver.lng - effectiveAssignedLng) < 0.0001) {
             return null;
           }
           return (

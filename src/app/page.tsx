@@ -10,7 +10,7 @@ export default function Home() {
   const router = useRouter();
 
   const handleDriverInstall = () => {
-    router.push('/driver/register');
+    installApp('driver');
   };
 
   return (
@@ -41,11 +41,23 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-3 pt-6 text-sm font-semibold text-gray-700 dark:text-gray-300">
             <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><ShieldCheck size={18} className="text-green-500"/> Verified Drivers</div>
             <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Map size={18} className="text-blue-500"/> Real-time Tracking</div>
-            <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Car size={18} className="text-purple-500"/> 7 Days Free, then R999/pm</div>
+            <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Car size={18} className="text-purple-500"/> 7 Days Free, then R300/pm</div>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3 pt-2 text-xs">
+            <Link href="/manual" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
+              📘 Download Operational Manual (SOP)
+            </Link>
+            <Link href="/admin/simulator" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
+              🎮 Dual-Window Simulator
+            </Link>
+            <Link href="/admin/compliance" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
+              🛡️ Admin Compliance
+            </Link>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-10 text-left max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 text-left max-w-5xl mx-auto">
           <div className="group relative flex flex-col p-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl shadow-2xl dark:shadow-none border border-white/40 dark:border-white/10 rounded-[2.5rem] hover:border-blue-500/50 hover:shadow-blue-500/20 hover:-translate-y-2 transition-all duration-300">
             <Link href="/rider" className="block mb-8 flex-1">
               <div className="p-5 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/20 text-blue-600 rounded-3xl w-fit mb-8 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
@@ -54,7 +66,7 @@ export default function Home() {
               <h2 className="text-3xl font-bold mb-4 tracking-tight">Rider App</h2>
               <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed font-light">Book a ride instantly anywhere in SA. Pay fairly with zero platform commissions baked into your fare.</p>
             </Link>
-            <button onClick={installApp} className="mt-auto flex items-center justify-center gap-3 w-full py-4 bg-white dark:bg-black text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all">
+            <button onClick={() => installApp('rider')} className="mt-auto flex items-center justify-center gap-3 w-full py-4 bg-white dark:bg-black text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all">
               <Download size={20} /> Install Rider App
             </button>
           </div>
@@ -65,7 +77,7 @@ export default function Home() {
                 <Car size={36} />
               </div>
               <h2 className="text-3xl font-bold mb-4 tracking-tight">Driver Portal</h2>
-              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed font-light">Get your first 7 days free, then a flat R999/pm. Accept rides, keep 100% of your earnings, and take control of your transport business.</p>
+              <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed font-light">Get your first 7 days free, then a flat R300/pm. Accept rides, keep 100% of your earnings, and take control of your transport business.</p>
             </Link>
             <button onClick={handleDriverInstall} className="mt-auto flex items-center justify-center gap-3 w-full py-4 bg-white dark:bg-black text-green-600 dark:text-green-400 font-bold rounded-2xl shadow-sm hover:shadow-md border border-gray-100 dark:border-zinc-800 hover:border-green-200 dark:hover:border-green-900 transition-all">
               <Download size={20} /> Install Driver App

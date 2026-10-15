@@ -2,29 +2,58 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   return NextResponse.json({
-    name: 'SOLO Driver',
+    id: '/driver',
+    name: 'SOLO Driver | Zero Commission',
     short_name: 'SOLO Driver',
-    description: 'Zero-Commission E-Hailing for Drivers',
+    description: 'Zero-Commission Driver Portal: keep 100% of your trip fares with R999/pm flat SaaS.',
     start_url: '/driver',
     scope: '/driver',
     display: 'standalone',
-    background_color: '#000000',
-    theme_color: '#000000',
+    orientation: 'portrait',
+    background_color: '#09090b',
+    theme_color: '#16a34a',
+    categories: ['transportation', 'business'],
     icons: [
       {
-        src: '/icon-192.png',
+        src: '/driver-icon-192.png',
         sizes: '192x192',
-        type: 'image/png'
+        type: 'image/png',
+        purpose: 'any'
       },
       {
-        src: '/icon-512.png',
+        src: '/driver-icon-512.png',
         sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any'
+      },
+      {
+        src: '/icon-maskable.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable'
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
         type: 'image/png'
+      }
+    ],
+    shortcuts: [
+      {
+        name: "Go Online",
+        url: "/driver",
+        icons: [{ src: "/driver-icon-192.png", sizes: "192x192" }]
+      },
+      {
+        name: "Driver KYC Documents",
+        url: "/driver",
+        icons: [{ src: "/driver-icon-192.png", sizes: "192x192" }]
       }
     ]
   }, {
     headers: {
-      'Content-Type': 'application/manifest+json'
+      'Content-Type': 'application/manifest+json',
+      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800'
     }
   });
 }
