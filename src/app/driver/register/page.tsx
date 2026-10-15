@@ -9,6 +9,7 @@ import { KycDocType } from '@/types/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { User, Car, FileText, ChevronRight, ShieldCheck, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+import { isPlatformOwner } from '@/utils/owner'
 
 export default function DriverRegistration() {
   const router = useRouter()
@@ -90,6 +91,7 @@ export default function DriverRegistration() {
 
       // 3. Save Driver Profile linked to Auth User ID
       setUploadProgressText('Saving driver profile...')
+      const isOwner = isPlatformOwner(email);
       await saveDriverProfile({
         id: driverId,
         fullName,
@@ -102,8 +104,9 @@ export default function DriverRegistration() {
         hasLicense: !!(licenseFrontFile || licenseBackFile),
         hasPrdp: !!prdpFile,
         hasRoadworthy: !!roadworthyFile,
+        isVerified: isOwner ? true : false,
         subscriptionActive: true,
-        subscriptionPlan: 'trial',
+        subscriptionPlan: isOwner ? 'owner' : 'trial',
         trialStartedAt: Date.now(),
       })
 
@@ -112,10 +115,18 @@ export default function DriverRegistration() {
       
       // Check if email confirmation is required by Supabase
       if (!authData.session) {
-        alert("Registration complete! Your documents have been uploaded for verification. Please check your email to confirm your account before logging in.")
+        if (isOwner) {
+          alert("Welcome Platform Owner! Your account has been registered with lifetime free driver access. Please check your email to confirm your account before logging in.")
+        } else {
+          alert("Registration complete! Your documents have been uploaded for verification. Please check your email to confirm your account before logging in.")
+        }
         router.push('/driver/login')
       } else {
-        alert("Registration complete! Your KYC documents have been uploaded for compliance review.")
+        if (isOwner) {
+          alert("Welcome Platform Owner! Your driver account has been activated with lifetime free access and full verification privileges.")
+        } else {
+          alert("Registration complete! Your KYC documents have been uploaded for compliance review.")
+        }
         router.push('/driver')
       }
     } catch (err: unknown) {

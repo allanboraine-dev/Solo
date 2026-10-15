@@ -23,9 +23,11 @@ import {
   Calendar,
   CreditCard,
   UserCheck,
+  Crown,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
+import { isPlatformOwner } from "@/utils/owner";
 
 const REJECTION_PRESETS = [
   "Document is expired according to license card date",
@@ -296,9 +298,10 @@ export default function AdminComplianceDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {drivers.map((driver) => {
-              const isFullyVerified = driver.complianceStatus === "verified";
-              const isPending = driver.complianceStatus === "pending_review";
-              const isRejected = driver.complianceStatus === "rejected";
+              const isOwnerDriver = driver.subscriptionPlan === "owner" || isPlatformOwner(driver.email);
+              const isFullyVerified = driver.complianceStatus === "verified" || isOwnerDriver;
+              const isPending = driver.complianceStatus === "pending_review" && !isOwnerDriver;
+              const isRejected = driver.complianceStatus === "rejected" && !isOwnerDriver;
 
               return (
                 <div
@@ -309,7 +312,14 @@ export default function AdminComplianceDashboard() {
                     {/* Header: Driver Info & Status Badge */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h4 className="font-bold text-base text-white truncate">{driver.fullName}</h4>
+                        <h4 className="font-bold text-base text-white truncate flex items-center gap-1.5">
+                          {driver.fullName}
+                          {isOwnerDriver && (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-black">
+                              OWNER
+                            </span>
+                          )}
+                        </h4>
                         <div className="flex items-center gap-2 text-xs text-zinc-400 mt-0.5">
                           <Phone size={12} className="text-zinc-500" />
                           <a href={`tel:${driver.phone}`} className="hover:text-blue-400 transition">
@@ -320,7 +330,9 @@ export default function AdminComplianceDashboard() {
 
                       <span
                         className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full shrink-0 flex items-center gap-1 ${
-                          isFullyVerified
+                          isOwnerDriver
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            : isFullyVerified
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                             : isPending
                             ? "bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse"
@@ -329,7 +341,11 @@ export default function AdminComplianceDashboard() {
                             : "bg-zinc-800 text-zinc-400 border border-zinc-700"
                         }`}
                       >
-                        {isFullyVerified ? (
+                        {isOwnerDriver ? (
+                          <>
+                            <Crown size={11} className="text-amber-400" /> Platform Owner
+                          </>
+                        ) : isFullyVerified ? (
                           <>
                             <Check size={10} /> Verified
                           </>
@@ -362,7 +378,9 @@ export default function AdminComplianceDashboard() {
                       <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-zinc-900">
                         <span className="flex items-center gap-1">
                           <CreditCard size={11} />
-                          {driver.subscriptionPlan === "paid"
+                          {isOwnerDriver
+                            ? "👑 Lifetime Free (Owner)"
+                            : driver.subscriptionPlan === "paid"
                             ? "R499/mo Active"
                             : driver.subscriptionPlan === "trial"
                             ? "7-Day Free Trial"

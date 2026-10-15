@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
+import { isPlatformOwner } from '@/utils/owner';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ export interface DriverKycSummary {
   licensePlate: string;
   prdpNumber: string;
   isVerified: boolean;
-  subscriptionPlan: 'trial' | 'paid' | 'expired';
+  subscriptionPlan: 'trial' | 'paid' | 'owner' | 'expired';
   trialStartedAt?: string | null;
   createdAt: string;
   documents: DriverDocument[];
@@ -98,8 +99,9 @@ export async function GET(req: NextRequest) {
           docsWithUrls.some((d) => d.doc_type === type && d.status === 'approved')
         );
 
+        const isOwner = isPlatformOwner(driver.email) || driver.subscription_plan === 'owner';
         let complianceStatus: DriverKycSummary['complianceStatus'] = 'incomplete';
-        if (driver.is_verified || allRequiredApproved) {
+        if (isOwner || driver.is_verified || allRequiredApproved) {
           complianceStatus = 'verified';
         } else if (pendingCount > 0) {
           complianceStatus = 'pending_review';
@@ -118,8 +120,8 @@ export async function GET(req: NextRequest) {
           vehicleModel: driver.vehicle_model || '',
           licensePlate: driver.license_plate || '',
           prdpNumber: driver.prdp_number || '',
-          isVerified: driver.is_verified || allRequiredApproved,
-          subscriptionPlan: driver.subscription_plan || 'trial',
+          isVerified: isOwner || driver.is_verified || allRequiredApproved,
+          subscriptionPlan: isOwner ? 'owner' : (driver.subscription_plan || 'trial'),
           trialStartedAt: driver.trial_started_at || null,
           createdAt: driver.created_at || new Date().toISOString(),
           documents: docsWithUrls,

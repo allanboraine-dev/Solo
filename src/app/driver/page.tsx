@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2 } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
@@ -14,6 +14,7 @@ import { fetchDriverKycDocuments } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
+import { isPlatformOwner } from '@/utils/owner'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -99,6 +100,8 @@ export default function DriverPage() {
     }
   }, [activeTab, activeTrip])
 
+  const isOwner = isPlatformOwner(profile?.email) || profile?.subscriptionPlan === 'owner';
+
   useEffect(() => {
     const loadProfile = async () => {
       const prof = await getDriverProfile();
@@ -140,14 +143,22 @@ export default function DriverPage() {
           }
         }
 
-        setProfile(prof)
-        if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
+        const isOwnerAccount = isPlatformOwner(prof.email) || prof.subscriptionPlan === 'owner';
+        if (isOwnerAccount) {
+          prof.subscriptionPlan = 'owner';
+          prof.subscriptionActive = true;
+          prof.isVerified = true;
+          setIsDriverVerified(true);
+          setIsTrialExpired(false);
+          setShowSubModal(false);
+        } else if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
           const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - prof.trialStartedAt > SEVEN_DAYS) {
             setIsTrialExpired(true);
             setShowSubModal(true);
           }
         }
+        setProfile(prof)
       }
     };
     loadProfile();
@@ -293,6 +304,11 @@ export default function DriverPage() {
 
   const handleSubscribe = async () => {
     if (!profile) return;
+    if (isOwner) {
+      alert('Platform Owner Account: You have lifetime free access to SOLO Driver Pro with 0% commission. No subscription fee required.');
+      setShowSubModal(false);
+      return;
+    }
     setIsProcessingSub(true);
     
     try {
@@ -406,7 +422,12 @@ export default function DriverPage() {
                 <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
                 {ratingSummary.count > 0 && <span className="text-[10px] text-gray-400 font-normal">({ratingSummary.count})</span>}
               </div>
-              {profile?.subscriptionPlan === 'paid' ? (
+              {isOwner ? (
+                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60 uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                  <Crown size={11} className="text-amber-600 dark:text-amber-400" />
+                  Platform Owner
+                </span>
+              ) : profile?.subscriptionPlan === 'paid' ? (
                 <span className="bg-blue-100/80 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider">Premium SaaS</span>
               ) : (
                 <span className="bg-green-100/80 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider">7-Day Free Trial</span>
@@ -562,8 +583,16 @@ export default function DriverPage() {
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-500 text-sm font-medium">Subscription</span>
-                    <span className="font-bold text-sm text-blue-600 dark:text-blue-400">
-                      {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R499/mo)' : 'Active (7-Day Trial)'}
+                    <span className="font-bold text-sm">
+                      {isOwner ? (
+                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Crown size={14} /> Lifetime Free (Founder Exemption)
+                        </span>
+                      ) : profile?.subscriptionPlan === 'paid' ? (
+                        <span className="text-blue-600 dark:text-blue-400">Active (Paid R499/mo)</span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">Active (7-Day Trial)</span>
+                      )}
                     </span>
                   </div>
                 </div>
@@ -600,7 +629,11 @@ export default function DriverPage() {
                       <ShieldCheck size={18} className="text-blue-500" />
                       <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">KYC Verification & Compliance</h3>
                     </div>
-                    {isDriverVerified ? (
+                    {isOwner ? (
+                      <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <Crown size={12} className="text-amber-600" /> Verified Platform Owner
+                      </span>
+                    ) : isDriverVerified ? (
                       <span className="text-[11px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-950/60 border border-green-200 dark:border-green-800/60 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         <CheckCircle2 size={12} /> Verified Partner
                       </span>
@@ -693,12 +726,29 @@ export default function DriverPage() {
                   )}
                 </div>
                 
-                <button 
-                  onClick={() => setShowSubModal(true)}
-                  className="mt-6 w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
-                >
-                  {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R499/mo'}
-                </button>
+                {isOwner ? (
+                  <div className="mt-6 w-full p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/20 to-yellow-500/10 border border-amber-300/60 dark:border-amber-700/60 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-amber-500 text-black rounded-xl">
+                        <Crown size={20} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-amber-900 dark:text-amber-100">Platform Owner Privilege</p>
+                        <p className="text-xs text-amber-700 dark:text-amber-300">Lifetime Free Access (R0/mo) • 0% Commission</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black bg-amber-500 text-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      VIP
+                    </span>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setShowSubModal(true)}
+                    className="mt-6 w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
+                  >
+                    {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R499/mo'}
+                  </button>
+                )}
                 <button 
                   onClick={async () => {
                     const supabase = createClient();
@@ -711,8 +761,8 @@ export default function DriverPage() {
                 >
                   Sign Out
                 </button>
-                {/* DEV ONLY BUTTON TO TEST EXPIRY */}
-                {profile?.subscriptionPlan === 'trial' && (
+                {/* DEV ONLY BUTTON TO TEST EXPIRY (hidden for owner) */}
+                {!isOwner && profile?.subscriptionPlan === 'trial' && (
                   <button 
                     onClick={() => {
                       if (profile) {
@@ -854,74 +904,118 @@ export default function DriverPage() {
       {showSubModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
-            {!isTrialExpired && (
+            {(!isTrialExpired || isOwner) && (
               <button 
                 onClick={() => setShowSubModal(false)}
                 className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <X size={20} />
               </button>
             )}
-            <h2 className="text-2xl font-black mb-1">
-              {isTrialExpired ? 'Trial Expired' : profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to Premium'}
-            </h2>
-            <p className="text-gray-500 mb-6 text-sm">
-              {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
-            </p>
-            
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Driver Pro</span>
-                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R499.00</span>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Flat monthly SaaS fee. Zero commission on fares.</p>
-            </div>
 
-            {/* Value Proposition List */}
-            <div className="space-y-3 mb-6 bg-gray-50 dark:bg-zinc-900/70 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
-              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
-                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-                <span><strong>0% Commission:</strong> You keep 100% of every ride fare.</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
-                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-                <span><strong>Direct Payouts:</strong> In-app rider fares and cash are yours.</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
-                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-                <span><strong>Unlimited Rides:</strong> 24/7 priority radar dispatch.</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
-                <CheckCircle2 size={16} className="text-green-500 shrink-0" />
-                <span><strong>Automated Renewal:</strong> Cancel or pause anytime with one click.</span>
-              </div>
-            </div>
+            {isOwner ? (
+              <div className="text-center py-2">
+                <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-3xl flex items-center justify-center text-amber-600 shadow-lg">
+                  <Crown size={36} />
+                </div>
+                <h2 className="text-2xl font-black mb-1">Platform Owner Privilege</h2>
+                <p className="text-gray-500 mb-6 text-sm">
+                  You are the owner of SOLO. Subscription fees and trial expirations are permanently waived.
+                </p>
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50/50 dark:from-amber-950/40 dark:to-yellow-950/20 rounded-2xl p-5 mb-5 border border-amber-200 dark:border-amber-900/50 text-left">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Founder Tier</span>
+                    <span className="font-black text-2xl text-amber-600 dark:text-amber-400">R0.00 / Life</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Permanent VIP exemption • 0% commission on all rides.</p>
+                </div>
 
-            {/* PCI-DSS Paystack Info */}
-            <div className="mb-6 p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-xl border border-gray-200/60 dark:border-white/5 flex items-center gap-2.5 text-[11px] text-gray-500 dark:text-gray-400">
-              <Lock size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
-              <span>Bank-grade 256-bit SSL encrypted checkout powered by Paystack. Supports Visa, Mastercard, and Instant EFT.</span>
-            </div>
+                <div className="space-y-3 mb-6 bg-gray-50 dark:bg-zinc-900/70 p-4 rounded-2xl border border-gray-100 dark:border-white/5 text-left">
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-amber-500 shrink-0" />
+                    <span><strong>0% Commission:</strong> Keep 100% of all fares permanently.</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-amber-500 shrink-0" />
+                    <span><strong>Zero Subscription:</strong> No monthly SaaS deductions ever.</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-amber-500 shrink-0" />
+                    <span><strong>Auto-Verified:</strong> Full access to live passenger dispatch.</span>
+                  </div>
+                </div>
 
-            <button 
-              onClick={handleSubscribe}
-              disabled={isProcessingSub || profile?.subscriptionPlan === 'paid'}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95"
-            >
-              {isProcessingSub ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Connecting to Paystack...</span>
-                </>
-              ) : profile?.subscriptionPlan === 'paid' ? (
-                'Subscription Active'
-              ) : (
-                <>
-                  <CreditCard size={18} />
-                  <span>Subscribe via Paystack (R499/mo)</span>
-                </>
-              )}
-            </button>
+                <button
+                  onClick={() => setShowSubModal(false)}
+                  className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
+                >
+                  Continue Driving (Free Access)
+                </button>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-black mb-1">
+                  {isTrialExpired ? 'Trial Expired' : profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to Premium'}
+                </h2>
+                <p className="text-gray-500 mb-6 text-sm">
+                  {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
+                </p>
+                
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Driver Pro</span>
+                    <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R499.00</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Flat monthly SaaS fee. Zero commission on fares.</p>
+                </div>
+
+                {/* Value Proposition List */}
+                <div className="space-y-3 mb-6 bg-gray-50 dark:bg-zinc-900/70 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                    <span><strong>0% Commission:</strong> You keep 100% of every ride fare.</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                    <span><strong>Direct Payouts:</strong> In-app rider fares and cash are yours.</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                    <span><strong>Unlimited Rides:</strong> 24/7 priority radar dispatch.</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-gray-700 dark:text-gray-300">
+                    <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                    <span><strong>Automated Renewal:</strong> Cancel or pause anytime with one click.</span>
+                  </div>
+                </div>
+
+                {/* PCI-DSS Paystack Info */}
+                <div className="mb-6 p-3 bg-gray-50 dark:bg-zinc-900/40 rounded-xl border border-gray-200/60 dark:border-white/5 flex items-center gap-2.5 text-[11px] text-gray-500 dark:text-gray-400">
+                  <Lock size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span>Bank-grade 256-bit SSL encrypted checkout powered by Paystack. Supports Visa, Mastercard, and Instant EFT.</span>
+                </div>
+
+                <button 
+                  onClick={handleSubscribe}
+                  disabled={isProcessingSub || profile?.subscriptionPlan === 'paid'}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95"
+                >
+                  {isProcessingSub ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Connecting to Paystack...</span>
+                    </>
+                  ) : profile?.subscriptionPlan === 'paid' ? (
+                    'Subscription Active'
+                  ) : (
+                    <>
+                      <CreditCard size={18} />
+                      <span>Subscribe via Paystack (R499/mo)</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

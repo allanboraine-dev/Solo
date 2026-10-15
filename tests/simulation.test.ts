@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { isWithinRadiusKm } from '../src/utils/geo.ts';
 import { calculateFare } from '../src/utils/mapService.ts';
+import { isPlatformOwner, applyOwnerPrivileges } from '../src/utils/owner.ts';
 
 describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
   it('simulates the complete trip state machine from booking to Paystack completion', () => {
@@ -131,4 +132,58 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     assert.strictEqual(checkExpiry(driverProfile, day15), false, 'Paid subscription never expires on trial check');
     assert.strictEqual(driverProfile.subscriptionPlan, 'paid');
   });
+
+  it('guarantees platform owner (Allan Boraine) lifetime free driver access with zero subscription charges', () => {
+    const ownerEmail = 'allanboraine@gmail.com';
+    const regularDriverEmail = 'driver.test@example.com';
+
+    // 1. Identity Verification
+    assert.strictEqual(isPlatformOwner(ownerEmail), true, 'Platform owner email must be recognized');
+    assert.strictEqual(isPlatformOwner('ALLANBORAINE@GMAIL.COM'), true, 'Recognition must be case-insensitive');
+    assert.strictEqual(isPlatformOwner('  allanboraine@gmail.com  '), true, 'Recognition must trim whitespace');
+    assert.strictEqual(isPlatformOwner(regularDriverEmail), false, 'Regular driver must not have owner privileges');
+    assert.strictEqual(isPlatformOwner(null), false, 'Null email must return false');
+
+    // 2. Normalization via applyOwnerPrivileges
+    const unprivilegedOwnerProfile = {
+      fullName: 'Allan Boraine',
+      email: ownerEmail,
+      subscriptionPlan: 'trial' as 'trial' | 'paid' | 'owner',
+      subscriptionActive: false,
+      isVerified: false,
+    };
+
+    const elevatedProfile = applyOwnerPrivileges(unprivilegedOwnerProfile);
+    assert.strictEqual(elevatedProfile.subscriptionPlan, 'owner', 'Owner plan must be set to owner');
+    assert.strictEqual(elevatedProfile.subscriptionActive, true, 'Owner subscription must be permanently active');
+    assert.strictEqual(elevatedProfile.isVerified, true, 'Owner driver must be automatically KYC-verified');
+
+    // Regular driver profile must remain untouched
+    const regularProfile = {
+      fullName: 'Sipho Zulu',
+      email: regularDriverEmail,
+      subscriptionPlan: 'trial' as 'trial' | 'paid' | 'owner',
+      subscriptionActive: true,
+      isVerified: false,
+    };
+    const untouched = applyOwnerPrivileges(regularProfile);
+    assert.strictEqual(untouched.subscriptionPlan, 'trial');
+    assert.strictEqual(untouched.isVerified, false);
+
+    // 3. 100-Day Expiry Simulation
+    const now = Date.now();
+    const hundredDaysLater = now + (100 * 24 * 60 * 60 * 1000);
+    const isTrialExpired = (profile: typeof elevatedProfile, currentTime: number) => {
+      if (profile.subscriptionPlan === 'owner') return false; // Owner is permanently exempt
+      if (profile.subscriptionPlan === 'trial') return (currentTime - now) > (7 * 24 * 60 * 60 * 1000);
+      return false;
+    };
+
+    assert.strictEqual(
+      isTrialExpired(elevatedProfile, hundredDaysLater),
+      false,
+      'Owner account must never be flagged as expired even 100 days later'
+    );
+  });
 });
+

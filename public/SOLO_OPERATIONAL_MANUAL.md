@@ -185,6 +185,7 @@ SOLO replaces predatory percentage commissions with a transparent, predictable S
 
 - **7-Day Free Trial:** Newly approved drivers receive 7 days of unlimited ride dispatch with R0 platform charges.
 - **Monthly Subscription:** After 7 days, drivers maintain platform access for **R499.00 per month** billed automatically through Paystack recurring debit order or card authorization.
+- **Platform Owner & Founder Lifetime Exemption:** Platform owner and founder accounts (e.g. `allanboraine@gmail.com`) receive permanent lifetime free driver access (`subscriptionPlan: 'owner'`). Platform owners are completely exempt from all subscription charges (R0/month forever), are bypassed from trial expiration locks, and receive automatic VIP verification for testing, platform monitoring, and active operational driving.
 
 ### 2.4 South African Banking Setup & Direct Settlement
 Drivers must link a valid South African bank account to receive rider payments directly into their accounts without delay.

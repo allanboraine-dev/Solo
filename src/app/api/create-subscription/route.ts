@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { isPlatformOwner } from '@/utils/owner'
 
 // In-memory cache for plan code so we don't call Paystack /plan on every request
 let cachedPlanCode: string | null = null
@@ -74,6 +75,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Driver email is required' }, { status: 400 })
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
+    // Owner Lifetime Exemption Bypass: Do not charge the platform owner
+    if (isPlatformOwner(email)) {
+      return NextResponse.json({
+        url: `${siteUrl}/driver?payment=success&driver_id=${encodeURIComponent(driverId)}&owner=true`,
+        message: 'Platform owner exempt from driver subscription charges',
+        isOwner: true,
+      })
+    }
+
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
       return NextResponse.json({ error: 'PAYSTACK_SECRET_KEY is missing' }, { status: 500 })
@@ -81,8 +93,6 @@ export async function POST(req: Request) {
 
     // Try to get or create recurring plan code
     const planCode = await getOrCreatePlanCode(secretKey)
-
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
     const payload: Record<string, unknown> = {
       email,

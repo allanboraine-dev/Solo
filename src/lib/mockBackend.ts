@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
 
 export type MockTrip = {
   id: string; // UUID in Supabase
@@ -39,7 +40,7 @@ export type MockDriverProfile = {
   hasRoadworthy: boolean;
   isVerified?: boolean;
   subscriptionActive: boolean;
-  subscriptionPlan?: 'trial' | 'paid';
+  subscriptionPlan?: 'trial' | 'paid' | 'owner';
   trialStartedAt?: number;
 };
 
@@ -58,7 +59,7 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
       const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', driverId).single();
       if (data && !error) {
         // Map database fields back to our camelCase frontend model
-        return {
+        const mappedProfile: MockDriverProfile = {
           id: data.id,
           fullName: data.full_name,
           email: data.email,
@@ -75,6 +76,7 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
           subscriptionPlan: data.subscription_plan,
           trialStartedAt: data.trial_started_at ? new Date(data.trial_started_at).getTime() : undefined,
         };
+        return applyOwnerPrivileges(mappedProfile);
       }
     } catch (e) {
       console.error('Error fetching driver profile:', e);
@@ -83,12 +85,23 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
 
   // Fallback to local cache if offline or missing
   const localData = localStorage.getItem('mock_driver_profile');
-  return localData ? JSON.parse(localData) : null;
+  if (localData) {
+    try {
+      const parsed = JSON.parse(localData);
+      return applyOwnerPrivileges(parsed);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 };
 
 export const saveDriverProfile = async (profile: MockDriverProfile) => {
   if (typeof window === 'undefined') return;
   
+  // Ensure owner privileges are applied before saving
+  profile = applyOwnerPrivileges(profile);
+
   // Store locally for quick access/fallback
   localStorage.setItem('mock_driver_profile', JSON.stringify(profile));
 
@@ -105,6 +118,7 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
       has_license: profile.hasLicense,
       has_prdp: profile.hasPrdp,
       has_roadworthy: profile.hasRoadworthy,
+      is_verified: profile.isVerified ?? false,
       subscription_active: profile.subscriptionActive,
       subscription_plan: profile.subscriptionPlan,
       trial_started_at: profile.trialStartedAt ? new Date(profile.trialStartedAt).toISOString() : undefined,
