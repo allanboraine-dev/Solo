@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2 } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
@@ -13,6 +13,7 @@ import { DriverDocument, KycDocType } from '@/types/kyc'
 import { fetchDriverKycDocuments } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
+import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -38,6 +39,7 @@ export default function DriverPage() {
   const [showFareCollection, setShowFareCollection] = useState(false)
   const [isWaitingForPayment, setIsWaitingForPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
+  const [showBankModal, setShowBankModal] = useState(false)
 
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
@@ -561,9 +563,34 @@ export default function DriverPage() {
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-500 text-sm font-medium">Subscription</span>
                     <span className="font-bold text-sm text-blue-600 dark:text-blue-400">
-                      {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R999/mo)' : 'Active (7-Day Trial)'}
+                      {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R300/mo)' : 'Active (7-Day Trial)'}
                     </span>
                   </div>
+                </div>
+
+                {/* Bank Settlement & Direct Payouts Card */}
+                <div className="mt-5 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 size={18} className="text-emerald-500" />
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">Bank Settlement & Payouts</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowBankModal(true)}
+                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                    >
+                      Configure
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
+                    Link your South African bank account (FNB, Standard Bank, Capitec, Nedbank, ABSA, etc.) to receive 100% fare payouts directly with zero commission deductions.
+                  </p>
+                  <button
+                    onClick={() => setShowBankModal(true)}
+                    className="w-full py-2.5 px-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition"
+                  >
+                    <Building2 size={14} /> Link / Update Bank Details
+                  </button>
                 </div>
 
                 {/* KYC Compliance & Document Verification Card */}
@@ -670,7 +697,7 @@ export default function DriverPage() {
                   onClick={() => setShowSubModal(true)}
                   className="mt-6 w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
                 >
-                  {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R999/mo'}
+                  {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R300/mo'}
                 </button>
                 <button 
                   onClick={async () => {
@@ -839,13 +866,13 @@ export default function DriverPage() {
               {isTrialExpired ? 'Trial Expired' : profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to Premium'}
             </h2>
             <p className="text-gray-500 mb-6 text-sm">
-              {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R999/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
+              {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R300/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
             </p>
             
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
               <div className="flex justify-between items-center mb-1">
                 <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Driver Pro</span>
-                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R999.00</span>
+                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R300.00</span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Flat monthly SaaS fee. Zero commission on fares.</p>
             </div>
@@ -891,13 +918,21 @@ export default function DriverPage() {
               ) : (
                 <>
                   <CreditCard size={18} />
-                  <span>Subscribe via Paystack (R999/mo)</span>
+                  <span>Subscribe via Paystack (R300/mo)</span>
                 </>
               )}
             </button>
           </div>
         </div>
       )}
+
+      {/* South African Bank Settlement Modal */}
+      <DriverBankSettlementModal
+        driverId={profile?.id || ''}
+        driverFullName={profile?.fullName || 'Driver'}
+        isOpen={showBankModal}
+        onClose={() => setShowBankModal(false)}
+      />
     </div>
   )
 }
