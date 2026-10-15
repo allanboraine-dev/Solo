@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { formatPhoneNumber, isValidSAPhone } from '@/utils/phone'
-import { Smartphone, ShieldCheck, ArrowRight, AlertCircle, RefreshCw, Navigation } from 'lucide-react'
+import { Smartphone, ShieldCheck, ArrowRight, AlertCircle, RefreshCw, Navigation, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function RiderLoginPage() {
   const router = useRouter()
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
+  const [channel, setChannel] = useState<'whatsapp' | 'sms'>('whatsapp')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
@@ -38,10 +39,11 @@ export default function RiderLoginPage() {
     return () => clearTimeout(timer)
   }, [countdown])
 
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  const handleSendOtp = async (e?: React.FormEvent, overrideChannel?: 'whatsapp' | 'sms') => {
     if (e) e.preventDefault()
     setError(null)
     setSmsNotice(null)
+    const targetChannel = overrideChannel || channel
 
     if (!fullName.trim()) {
       setError('Please enter your full name')
@@ -61,6 +63,7 @@ export default function RiderLoginPage() {
       const { error: otpError } = await supabase.auth.signInWithOtp({
         phone: e164,
         options: {
+          channel: targetChannel,
           data: {
             full_name: fullName.trim(),
             user_type: 'rider',
@@ -70,9 +73,9 @@ export default function RiderLoginPage() {
 
       if (otpError) {
         const msg = otpError.message.toLowerCase()
-        if (msg.includes('sms') || msg.includes('provider') || msg.includes('twilio') || msg.includes('gateway') || msg.includes('unsupported')) {
+        if (msg.includes('sms') || msg.includes('provider') || msg.includes('twilio') || msg.includes('gateway') || msg.includes('unsupported') || msg.includes('whatsapp') || msg.includes('channel')) {
           setSmsNotice(
-            'Notice: Your Supabase project does not have an SMS provider (Twilio / MessageBird) enabled yet. You can sign in using a demo session below for testing.'
+            `Notice: Your Supabase project needs a phone provider (Twilio Verify) enabled to send live ${targetChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'} passcodes. You can sign in using a demo session below for instant testing.`
           )
         }
         throw otpError
@@ -81,7 +84,7 @@ export default function RiderLoginPage() {
       setStep('otp')
       setCountdown(45)
     } catch (err: any) {
-      setError(err?.message || 'Failed to send verification code. Please try again.')
+      setError(err?.message || `Failed to send verification code via ${targetChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}. Please try again.`)
     } finally {
       setIsLoading(false)
     }
@@ -179,7 +182,9 @@ export default function RiderLoginPage() {
             {step === 'phone' ? 'Rider Sign In' : 'Verify Phone'}
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">
-            {step === 'phone' ? 'Sign in with your South African mobile number.' : `We sent an SMS code to ${formattedPhone}`}
+            {step === 'phone'
+              ? 'Sign in with your South African mobile number.'
+              : `We sent a 6-digit passcode via ${channel === 'whatsapp' ? 'WhatsApp 💬' : 'SMS 📱'} to ${formattedPhone}`}
           </p>
         </div>
 
@@ -199,7 +204,7 @@ export default function RiderLoginPage() {
               disabled={isLoading}
               className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-xl font-bold transition text-xs shadow-sm flex items-center justify-center gap-1.5"
             >
-              {isLoading ? 'Connecting...' : 'Sign In with Demo Session (Bypass SMS)'}
+              {isLoading ? 'Connecting...' : 'Sign In with Demo Session (Bypass SMS / WhatsApp)'}
             </button>
           </div>
         )}
@@ -236,19 +241,61 @@ export default function RiderLoginPage() {
               </div>
             </div>
 
+            {/* Delivery Channel Toggle (WhatsApp vs SMS) */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Receive Passcode Via</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChannel('whatsapp')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                    channel === 'whatsapp'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-emerald-500'
+                      : 'bg-gray-100 dark:bg-zinc-800 border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <MessageCircle size={16} className={channel === 'whatsapp' ? 'text-emerald-500' : ''} />
+                  <span>WhatsApp (Fast)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChannel('sms')}
+                  className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                    channel === 'sms'
+                      ? 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-blue-500'
+                      : 'bg-gray-100 dark:bg-zinc-800 border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Smartphone size={16} className={channel === 'sms' ? 'text-blue-500' : ''} />
+                  <span>Cellular SMS</span>
+                </button>
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition"
+              className={`w-full text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition ${
+                channel === 'whatsapp'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 shadow-lg shadow-emerald-600/25'
+                  : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-lg shadow-blue-600/25'
+              }`}
             >
-              {isLoading ? 'Sending Code...' : 'Continue'}
-              <ArrowRight size={18} />
+              {isLoading ? (
+                <span>Sending Passcode...</span>
+              ) : (
+                <>
+                  <span>Send Passcode via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}</span>
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
         ) : (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Enter 6-Digit Code</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Enter 6-Digit Passcode</label>
               <input
                 type="text"
                 maxLength={6}
@@ -269,26 +316,44 @@ export default function RiderLoginPage() {
               {isLoading ? 'Verifying...' : 'Verify & Sign In'}
             </button>
 
-            <div className="flex items-center justify-between pt-2 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setStep('phone')}
-                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
-              >
-                Change Number
-              </button>
-
-              {countdown > 0 ? (
-                <span className="text-gray-400">Resend in {countdown}s</span>
-              ) : (
+            <div className="space-y-2 pt-2 text-center text-xs font-semibold">
+              <div className="flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => handleSendOtp()}
-                  className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  onClick={() => setStep('phone')}
+                  className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
                 >
-                  <RefreshCw size={12} />
-                  Resend Code
+                  Change Number
                 </button>
+
+                {countdown > 0 ? (
+                  <span className="text-gray-400">Resend in {countdown}s</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSendOtp(undefined, channel)}
+                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <RefreshCw size={12} />
+                    Resend via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                  </button>
+                )}
+              </div>
+
+              {countdown === 0 && (
+                <div className="pt-1 border-t border-gray-100 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const altChannel = channel === 'whatsapp' ? 'sms' : 'whatsapp'
+                      setChannel(altChannel)
+                      handleSendOtp(undefined, altChannel)
+                    }}
+                    className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
+                  >
+                    Didn't receive it? Send via {channel === 'whatsapp' ? 'Cellular SMS instead' : 'WhatsApp instead'}
+                  </button>
+                </div>
               )}
             </div>
           </form>

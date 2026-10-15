@@ -35,4 +35,29 @@ describe('South African Phone Number Authentication Suite', () => {
     assert.strictEqual(isValidSAPhone('+14155552671'), false); // US number
     assert.strictEqual(isValidSAPhone('0000000000'), false); // Zero lead
   });
+
+  it('validates WhatsApp vs SMS OTP dispatch options payload', () => {
+    const buildOtpPayload = (phoneRaw: string, channel: 'whatsapp' | 'sms', fullName: string) => {
+      const e164 = formatPhoneNumber(phoneRaw);
+      return {
+        phone: e164,
+        options: {
+          channel,
+          data: {
+            full_name: fullName.trim(),
+            user_type: 'rider',
+          },
+        },
+      };
+    };
+
+    const whatsappPayload = buildOtpPayload('082 123 4567', 'whatsapp', 'Thabo Mbeki');
+    assert.strictEqual(whatsappPayload.phone, '+27821234567');
+    assert.strictEqual(whatsappPayload.options.channel, 'whatsapp');
+    assert.strictEqual(whatsappPayload.options.data.full_name, 'Thabo Mbeki');
+
+    const smsPayload = buildOtpPayload('071 999 8888', 'sms', 'Lindiwe Sisulu');
+    assert.strictEqual(smsPayload.phone, '+27719998888');
+    assert.strictEqual(smsPayload.options.channel, 'sms');
+  });
 });

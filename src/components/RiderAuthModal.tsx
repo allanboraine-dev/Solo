@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { formatPhoneNumber, isValidSAPhone } from '@/utils/phone'
-import { Smartphone, ShieldCheck, ArrowRight, X, AlertCircle, RefreshCw } from 'lucide-react'
+import { Smartphone, ShieldCheck, ArrowRight, X, AlertCircle, RefreshCw, MessageCircle } from 'lucide-react'
 
 interface RiderAuthModalProps {
   isOpen: boolean
@@ -13,6 +13,7 @@ interface RiderAuthModalProps {
 
 export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuthModalProps) {
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
+  const [channel, setChannel] = useState<'whatsapp' | 'sms'>('whatsapp')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
@@ -34,10 +35,11 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
 
   if (!isOpen) return null
 
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  const handleSendOtp = async (e?: React.FormEvent, overrideChannel?: 'whatsapp' | 'sms') => {
     if (e) e.preventDefault()
     setError(null)
     setSmsNotice(null)
+    const targetChannel = overrideChannel || channel
 
     if (!fullName.trim()) {
       setError('Please enter your full name')
@@ -57,6 +59,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
       const { data, error: otpError } = await supabase.auth.signInWithOtp({
         phone: e164,
         options: {
+          channel: targetChannel,
           data: {
             full_name: fullName.trim(),
             user_type: 'rider',
@@ -67,9 +70,9 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
       if (otpError) {
         // Check if error is related to unconfigured SMS provider in Supabase
         const msg = otpError.message.toLowerCase()
-        if (msg.includes('sms') || msg.includes('provider') || msg.includes('twilio') || msg.includes('gateway') || msg.includes('unsupported')) {
+        if (msg.includes('sms') || msg.includes('provider') || msg.includes('twilio') || msg.includes('gateway') || msg.includes('unsupported') || msg.includes('whatsapp') || msg.includes('channel')) {
           setSmsNotice(
-            'SMS Provider Notice: Your Supabase project has not connected an SMS provider (Twilio / MessageBird) yet. You can enable Twilio in the Supabase Dashboard, or click below to simulate login for testing.'
+            `Notice: Your Supabase project needs a phone provider (Twilio Verify) enabled to send live ${targetChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'} passcodes. You can sign in using a demo session below for instant testing.`
           )
         }
         throw otpError
@@ -78,7 +81,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
       setStep('otp')
       setCountdown(45)
     } catch (err: any) {
-      setError(err?.message || 'Failed to send verification code. Please try again.')
+      setError(err?.message || `Failed to send verification code via ${targetChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}. Please try again.`)
     } finally {
       setIsLoading(false)
     }
@@ -194,7 +197,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">
             {step === 'phone'
               ? 'We will send a one-time passcode to verify your phone number.'
-              : `Sent via SMS to ${formattedPhone}`}
+              : `We sent a 6-digit passcode via ${channel === 'whatsapp' ? 'WhatsApp 💬' : 'SMS 📱'} to ${formattedPhone}`}
           </p>
         </div>
 
@@ -206,7 +209,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
           </div>
         )}
 
-        {/* SMS Provider Missing Notice */}
+        {/* SMS / WhatsApp Provider Missing Notice */}
         {smsNotice && (
           <div className="mx-8 mb-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 rounded-2xl text-xs">
             <p className="font-bold mb-1">Notice for Developer / Admin:</p>
@@ -216,7 +219,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
               disabled={isLoading}
               className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-xl font-bold transition text-xs shadow-sm flex items-center justify-center gap-1.5"
             >
-              {isLoading ? 'Connecting...' : 'Sign In with Demo Session (Bypass SMS)'}
+              {isLoading ? 'Connecting...' : 'Sign In with Demo Session (Bypass SMS / WhatsApp)'}
             </button>
           </div>
         )}
@@ -259,16 +262,54 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
                 </div>
               </div>
 
+              {/* Delivery Channel Selector */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  Receive Passcode Via
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChannel('whatsapp')}
+                    className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                      channel === 'whatsapp'
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-emerald-500'
+                        : 'bg-gray-100 dark:bg-zinc-900 border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <MessageCircle size={16} className={channel === 'whatsapp' ? 'text-emerald-500' : ''} />
+                    <span>WhatsApp (Fast)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setChannel('sms')}
+                    className={`p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                      channel === 'sms'
+                        ? 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-blue-500'
+                        : 'bg-gray-100 dark:bg-zinc-900 border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Smartphone size={16} className={channel === 'sms' ? 'text-blue-500' : ''} />
+                    <span>Cellular SMS</span>
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95"
+                className={`w-full mt-4 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 ${
+                  channel === 'whatsapp'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 shadow-lg shadow-emerald-600/25'
+                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-lg shadow-blue-500/25'
+                }`}
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Send Verification Code</span>
+                    <span>Send Passcode via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}</span>
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -278,7 +319,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-2">
-                  6-Digit One-Time Code
+                  6-Digit One-Time Passcode
                 </label>
                 <input
                   type="text"
@@ -304,26 +345,44 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
                 )}
               </button>
 
-              <div className="flex items-center justify-between pt-2 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setStep('phone')}
-                  className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
-                >
-                  Change Number
-                </button>
-
-                {countdown > 0 ? (
-                  <span className="text-gray-400">Resend in {countdown}s</span>
-                ) : (
+              <div className="space-y-2 pt-2 text-center text-xs font-semibold">
+                <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => handleSendOtp()}
-                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    onClick={() => setStep('phone')}
+                    className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
                   >
-                    <RefreshCw size={12} />
-                    Resend Code
+                    Change Number
                   </button>
+
+                  {countdown > 0 ? (
+                    <span className="text-gray-400">Resend in {countdown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendOtp(undefined, channel)}
+                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw size={12} />
+                      Resend via {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                    </button>
+                  )}
+                </div>
+
+                {countdown === 0 && (
+                  <div className="pt-1 border-t border-gray-100 dark:border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const altChannel = channel === 'whatsapp' ? 'sms' : 'whatsapp'
+                        setChannel(altChannel)
+                        handleSendOtp(undefined, altChannel)
+                      }}
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
+                    >
+                      Didn't receive it? Send via {channel === 'whatsapp' ? 'Cellular SMS instead' : 'WhatsApp instead'}
+                    </button>
+                  </div>
                 )}
               </div>
             </form>
