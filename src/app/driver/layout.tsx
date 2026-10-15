@@ -3,7 +3,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 
 export const metadata: Metadata = {
   title: "SOLO Driver | Zero Commission",
-  description: "Keep 100% of your e-hailing fares with SOLO Driver. Flat R999/pm SaaS subscription with 7-day free trial.",
+  description: "Keep 100% of your e-hailing fares with SOLO Driver. Flat R499/pm SaaS subscription with 7-day free trial.",
   manifest: "/api/manifest/driver",
   icons: {
     icon: [

@@ -563,7 +563,7 @@ export default function DriverPage() {
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-500 text-sm font-medium">Subscription</span>
                     <span className="font-bold text-sm text-blue-600 dark:text-blue-400">
-                      {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R300/mo)' : 'Active (7-Day Trial)'}
+                      {profile?.subscriptionPlan === 'paid' ? 'Active (Paid R499/mo)' : 'Active (7-Day Trial)'}
                     </span>
                   </div>
                 </div>
@@ -697,7 +697,7 @@ export default function DriverPage() {
                   onClick={() => setShowSubModal(true)}
                   className="mt-6 w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
                 >
-                  {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R300/mo'}
+                  {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R499/mo'}
                 </button>
                 <button 
                   onClick={async () => {
@@ -758,7 +758,7 @@ export default function DriverPage() {
 
                   <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
                     <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">4. Your Subscription</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">You keep 100% of all fares. Just pay a flat R999/month fee via the <b>Profile</b> tab after your 7-day trial ends.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">You keep 100% of all fares. Just pay a flat R499/month fee via the <b>Profile</b> tab after your 7-day trial ends.</p>
                   </div>
                 </div>
               </div>
@@ -866,13 +866,13 @@ export default function DriverPage() {
               {isTrialExpired ? 'Trial Expired' : profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to Premium'}
             </h2>
             <p className="text-gray-500 mb-6 text-sm">
-              {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R300/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
+              {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
             </p>
             
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
               <div className="flex justify-between items-center mb-1">
                 <span className="font-bold text-gray-800 dark:text-gray-200 text-base">SOLO Driver Pro</span>
-                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R300.00</span>
+                <span className="font-black text-2xl text-blue-600 dark:text-blue-400">R499.00</span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Flat monthly SaaS fee. Zero commission on fares.</p>
             </div>
@@ -918,7 +918,7 @@ export default function DriverPage() {
               ) : (
                 <>
                   <CreditCard size={18} />
-                  <span>Subscribe via Paystack (R300/mo)</span>
+                  <span>Subscribe via Paystack (R499/mo)</span>
                 </>
               )}
             </button>

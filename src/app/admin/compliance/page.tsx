@@ -363,7 +363,7 @@ export default function AdminComplianceDashboard() {
                         <span className="flex items-center gap-1">
                           <CreditCard size={11} />
                           {driver.subscriptionPlan === "paid"
-                            ? "R999/mo Active"
+                            ? "R499/mo Active"
                             : driver.subscriptionPlan === "trial"
                             ? "7-Day Free Trial"
                             : "Expired"}

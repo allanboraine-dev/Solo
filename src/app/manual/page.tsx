@@ -80,7 +80,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section B: Driver Partner Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                NLTA statutory compliance, 4 mandatory KYC documents (PrDP, CoR), 0% commission R300/mo SaaS model, and 6-digit retail bank branch codes.
+                NLTA statutory compliance, 4 mandatory KYC documents (PrDP, CoR), 0% commission R499/mo SaaS model, and 6-digit retail bank branch codes.
               </p>
             </div>
             <a

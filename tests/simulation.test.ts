@@ -119,7 +119,7 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     const day8 = now + (8 * 24 * 60 * 60 * 1000);
     assert.strictEqual(checkExpiry(driverProfile, day8), true, 'Day 8 must be flagged as expired');
 
-    // Driver authorizes Paystack R999/mo subscription
+    // Driver authorizes Paystack R499/mo subscription
     driverProfile = {
       ...driverProfile,
       subscriptionPlan: 'paid',

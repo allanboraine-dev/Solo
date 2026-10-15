@@ -9,8 +9,8 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
     const rawPayload = JSON.stringify({
       event: 'charge.success',
       data: {
-        reference: 'trx_test_ref_999',
-        amount: 99900,
+        reference: 'trx_test_ref_499',
+        amount: 49900,
         currency: 'ZAR',
         metadata: {
           payment_type: 'solo_saas_subscription',
@@ -50,7 +50,7 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
     // Paystack expects integer cents
     const toCents = (zarAmount: number) => Math.round(zarAmount * 100);
 
-    assert.strictEqual(toCents(999.00), 99900); // R999 driver SaaS
+    assert.strictEqual(toCents(499.00), 49900); // R499 driver SaaS
     assert.strictEqual(toCents(145.50), 14550); // R145.50 ride fare
     assert.strictEqual(toCents(30.00), 3000);   // R30 base ride
     assert.strictEqual(toCents(45.99), 4599);   // Precision handling

@@ -41,7 +41,7 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-3 pt-6 text-sm font-semibold text-gray-700 dark:text-gray-300">
             <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><ShieldCheck size={18} className="text-green-500"/> Verified Drivers</div>
             <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Map size={18} className="text-blue-500"/> Real-time Tracking</div>
-            <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Car size={18} className="text-purple-500"/> 7 Days Free, then R300/pm</div>
+            <div className="flex items-center gap-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/50 dark:border-white/5 shadow-sm"><Car size={18} className="text-purple-500"/> 7 Days Free, then R499/pm</div>
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 pt-2 text-xs">
@@ -99,7 +99,7 @@ export default function Home() {
               </div>
               <h2 className="text-3xl font-bold mb-3 tracking-tight">Driver Portal</h2>
               <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
-                Keep 100% of your rider fares. Enjoy a 7-day free trial, then a flat R300/pm SaaS fee. Take full control of your transport business.
+                Keep 100% of your rider fares. Enjoy a 7-day free trial, then a flat R499/pm SaaS fee. Take full control of your transport business.
               </p>
             </div>
 

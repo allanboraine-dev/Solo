@@ -392,7 +392,7 @@
       </p>
 
       <div class="alert alert-success">
-        <strong>The SOLO Economic Formula:</strong> Drivers retain 100% of all rider fares. The platform charges no percentage cut, replacing it with a flat-rate R300.00/month SaaS subscription after an initial 7-day unrestricted trial.
+        <strong>The SOLO Economic Formula:</strong> Drivers retain 100% of all rider fares. The platform charges no percentage cut, replacing it with a flat-rate R499.00/month SaaS subscription after an initial 7-day unrestricted trial.
       </div>
 
       <table>
@@ -418,7 +418,7 @@
             <td>R100.00</td>
             <td>R0.00 (0.0%)</td>
             <td>R100.00</td>
-            <td>R19,700.00 (after flat R300 SaaS fee)</td>
+            <td>R19,501.00 (after flat R499 SaaS fee)</td>
           </tr>
         </tbody>
       </table>
@@ -447,7 +447,7 @@
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#driver-nlta">2.1 Statutory NLTA Compliance</a></li>
             <li><a href="#driver-kyc">2.2 KYC Document Submission</a></li>
-            <li><a href="#driver-saas">2.3 7-Day Trial & R300/mo SaaS</a></li>
+            <li><a href="#driver-saas">2.3 7-Day Trial & R499/mo SaaS</a></li>
             <li><a href="#driver-bank">2.4 SA Universal Branch Codes</a></li>
             <li><a href="#driver-routine">2.5 Online Dispatch & Navigation</a></li>
             <li><a href="#driver-pin">2.6 Arrival & PIN Verification</a></li>
@@ -555,13 +555,13 @@
         Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code>. Documents are stored in an encrypted, private storage bucket with strict access controls.
       </p>
 
-      <h3 id="driver-saas">2.3 SaaS Subscription Model (7-Day Trial & R300/mo)</h3>
+      <h3 id="driver-saas">2.3 SaaS Subscription Model (7-Day Trial & R499/mo)</h3>
       <p>
         SOLO does not take 25% of your earnings. Instead:
       </p>
       <ul>
         <li><strong>7-Day Free Trial:</strong> Once approved, you enjoy 7 full days of unlimited dispatches with zero platform fees.</li>
-        <li><strong>R300.00 / month Flat SaaS Fee:</strong> After the trial, maintain full platform access for a flat R300/month billed through Paystack. You keep 100% of every ride fare you generate.</li>
+        <li><strong>R499.00 / month Flat SaaS Fee:</strong> After the trial, maintain full platform access for a flat R499/month billed through Paystack. You keep 100% of every ride fare you generate.</li>
       </ul>
 
       <h3 id="driver-bank">2.4 South African Banking Setup & Direct Settlement</h3>
@@ -601,7 +601,7 @@
 
       <h3 id="driver-sars">2.7 Driver SARS Tax Guidance</h3>
       <div class="alert alert-info">
-        <strong>Tax Transparency for Drivers:</strong> Because SOLO drivers receive 100% gross fares, drivers operate as independent contractors for SARS purposes. Fuel, vehicle maintenance, insurance, cell data, and your R300 monthly SOLO SaaS fee are legitimate tax-deductible business expenses. Drivers can consider registering for SARS Turnover Tax if annual turnover is under R1,000,000.
+        <strong>Tax Transparency for Drivers:</strong> Because SOLO drivers receive 100% gross fares, drivers operate as independent contractors for SARS purposes. Fuel, vehicle maintenance, insurance, cell data, and your R499 monthly SOLO SaaS fee are legitimate tax-deductible business expenses. Drivers can consider registering for SARS Turnover Tax if annual turnover is under R1,000,000.
       </div>
     </section>
 
@@ -645,7 +645,7 @@
 
       <h3 id="admin-webhooks">3.4 Paystack HMAC SHA512 Webhooks</h3>
       <p>
-        All billing operations (trip fare settlement and R300/mo driver subscriptions) are validated cryptographically at <code>/api/paystack-webhook</code>. Incoming webhooks are verified against <code>PAYSTACK_SECRET_KEY</code> using HMAC-SHA512. Forged payloads or incorrect signatures are rejected with HTTP 401.
+        All billing operations (trip fare settlement and R499/mo driver subscriptions) are validated cryptographically at <code>/api/paystack-webhook</code>. Incoming webhooks are verified against <code>PAYSTACK_SECRET_KEY</code> using HMAC-SHA512. Forged payloads or incorrect signatures are rejected with HTTP 401.
       </p>
 
       <h3 id="admin-postgis">3.5 PostGIS Proximity Matching Algorithms</h3>

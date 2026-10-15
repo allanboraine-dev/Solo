@@ -141,7 +141,7 @@ export default function DriverRegistration() {
             </span>
           </div>
           <p className="text-blue-100 text-sm">
-            Keep 100% of your rider fares. 7-day free trial, then flat R300/month.
+            Keep 100% of your rider fares. 7-day free trial, then flat R499/month.
           </p>
           
           <div className="flex items-center gap-2 mt-8">

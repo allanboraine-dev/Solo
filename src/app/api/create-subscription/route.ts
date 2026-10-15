@@ -44,7 +44,7 @@ async function getOrCreatePlanCode(secretKey: string): Promise<string | null> {
       body: JSON.stringify({
         name: 'SOLO Driver Pro Monthly',
         interval: 'monthly',
-        amount: 99900, // R999.00 in ZAR cents
+        amount: 49900, // R499.00 in ZAR cents
         currency: 'ZAR',
         description: 'SOLO Zero-Commission Driver Pro Monthly Subscription',
       }),
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
 
     const payload: Record<string, unknown> = {
       email,
-      amount: 99900, // R999.00 in cents (ZAR)
+      amount: 49900, // R499.00 in cents (ZAR)
       currency: 'ZAR',
       callback_url: `${siteUrl}/driver?payment=success&driver_id=${encodeURIComponent(driverId)}`,
       metadata: {

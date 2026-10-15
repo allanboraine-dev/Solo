@@ -20,13 +20,13 @@
 +-------------------------------------------------------------+
 |  SOLO Platform:      R100 Fare --> Driver receives R100.00  |
 |                      Platform takes: R0.00 (0.0%)           |
-|                      Driver pays flat: R300.00 / month      |
+|                      Driver pays flat: R499.00 / month      |
 +-------------------------------------------------------------+
 ```
 
 ### Key Architectural Pillars
 1. **100% Fare Retention for Drivers:** Drivers retain 100% of the metered gross fare calculated per trip (R20 base fare + R10/km, subject to an R30 minimum fare threshold).
-2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly access fee of **R300.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking.
+2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly access fee of **R499.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking.
 3. **South African Banking Integration:** Direct bank payout recipient creation using standard 6-digit South African universal clearing branch codes (FNB, Standard Bank, Capitec, Nedbank, ABSA, Investec, TymeBank, African Bank, Discovery).
 4. **Mandatory 4-Digit Anti-Impersonation PIN:** Every trip requires real-time physical confirmation of a cryptographic 4-digit PIN between rider and driver before the trip state transitions to `in_progress`.
 5. **SARS Tax & NLTA Regulatory Transparency:** Built-in automated tax invoicing complying with SARS Section 11(2) statutory disclosures, and strict document verification matching South African National Land Transport regulations (PrDP and Roadworthy certification).
@@ -48,7 +48,7 @@
 2. [Section B: Driver Operations & Partner Guide](#section-b-driver-operations--partner-guide)
    - 2.1 Driver Onboarding & Statutory Requirements (NLTA)
    - 2.2 KYC Document Submission Protocol
-   - 2.3 SaaS Subscription Model (7-Day Trial & R300/mo)
+   - 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
    - 2.4 South African Banking Setup & Direct Settlement
    - 2.5 Daily Operating Routine: Going Online & Accepting Rides
    - 2.6 Arrival, Rider Identification & PIN Validation
@@ -173,18 +173,18 @@ SOLO strictly adheres to the **National Land Transport Act (Act No. 5 of 2009)**
 3. Ensure all four corners of the cards are visible, free of glare, with text clearly legible.
 4. Documents are encrypted and transferred directly into the private, isolated `driver-documents` storage bucket.
 
-### 2.3 SaaS Subscription Model (7-Day Trial & R300/mo)
+### 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
 SOLO replaces predatory percentage commissions with a transparent, predictable Software-as-a-Service (SaaS) subscription model.
 
-| Metric | Traditional Legacy Platform (25% Commission) | SOLO Zero-Commission (R300/mo SaaS) | Driver Advantage |
+| Metric | Traditional Legacy Platform (25% Commission) | SOLO Zero-Commission (R499/mo SaaS) | Driver Advantage |
 | :--- | :--- | :--- | :--- |
 | **Gross Monthly Fares** | R20,000.00 | R20,000.00 | Equal |
-| **Platform Deduction** | **-R5,000.00 (25%)** | **-R300.00 (Flat Fee)** | **+R4,700.00 extra cash** |
-| **Net Driver Earnings** | R15,000.00 | **R19,700.00** | **+31.3% Net Increase** |
+| **Platform Deduction** | **-R5,000.00 (25%)** | **-R499.00 (Flat Fee)** | **+R4,501.00 extra cash** |
+| **Net Driver Earnings** | R15,000.00 | **R19,501.00** | **+30.0% Net Increase** |
 | **Trial Period** | None (Immediate commission cut) | **7 Days Free** | Zero financial risk |
 
 - **7-Day Free Trial:** Newly approved drivers receive 7 days of unlimited ride dispatch with R0 platform charges.
-- **Monthly Subscription:** After 7 days, drivers maintain platform access for **R300.00 per month** billed automatically through Paystack recurring debit order or card authorization.
+- **Monthly Subscription:** After 7 days, drivers maintain platform access for **R499.00 per month** billed automatically through Paystack recurring debit order or card authorization.
 
 ### 2.4 South African Banking Setup & Direct Settlement
 Drivers must link a valid South African bank account to receive rider payments directly into their accounts without delay.
@@ -254,7 +254,7 @@ Under South African tax legislation, SOLO driver partners operate as independent
   - Vehicle maintenance, servicing, and tyre replacements
   - Commercial vehicle insurance premiums
   - Smartphone cellular data used for navigation
-  - SOLO platform SaaS subscription fees (R300/mo)
+  - SOLO platform SaaS subscription fees (R499/mo)
   - Vehicle financing interest and depreciation allowances
 - **Tax Clearance:** Drivers earning above the mandatory statutory thresholds should register for Provisional Tax with the South African Revenue Service (SARS) and consider the simplified **Turnover Tax** regime if annual turnover is under R1,000,000.
 
@@ -323,7 +323,7 @@ $$\text{Signature} = \text{HMAC-SHA512}\left(\text{Payload Body}, \text{PAYSTACK
 
 #### Monitored Event Types:
 - `charge.success`: Trip fare authorized and captured successfully.
-- `subscription.create`: Driver initiates the R300/mo SaaS subscription following the 7-day free trial.
+- `subscription.create`: Driver initiates the R499/mo SaaS subscription following the 7-day free trial.
 - `subscription.disable`: Driver cancels subscription or card expires; driver status set to `inactive`.
 - `invoice.payment_failed`: Recurring billing failure; system triggers a 48-hour grace period notice before suspension.
 

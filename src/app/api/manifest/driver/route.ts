@@ -5,7 +5,7 @@ export async function GET() {
     id: '/driver',
     name: 'SOLO Driver | Zero Commission',
     short_name: 'SOLO Driver',
-    description: 'Zero-Commission Driver Portal: keep 100% of your trip fares with R999/pm flat SaaS.',
+    description: 'Zero-Commission Driver Portal: keep 100% of your trip fares with R499/pm flat SaaS.',
     start_url: '/driver',
     scope: '/driver',
     display: 'standalone',
