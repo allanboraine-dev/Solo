@@ -15,6 +15,7 @@ import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { isPlatformOwner } from '@/utils/owner'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -574,18 +575,21 @@ export default function DriverPage() {
             </div>
             <p className="text-xs md:text-sm text-gray-500 font-medium mt-0.5 truncate">Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}</p>
           </div>
-          <button 
-            onClick={() => setIsOnline(!isOnline)}
-            disabled={!!activeTrip}
-            className={`flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-sm shrink-0 ${
-              isOnline 
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 border border-green-200/50 dark:border-green-800/50 shadow-[0_0_20px_rgba(34,197,94,0.2)]' 
-                : 'bg-gray-200/50 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300'
-            } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-          >
-            <Power size={16} />
-            {isOnline ? 'Online' : 'Offline'}
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5" />
+            <button 
+              onClick={() => setIsOnline(!isOnline)}
+              disabled={!!activeTrip}
+              className={`flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-sm ${
+                isOnline 
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 border border-green-200/50 dark:border-green-800/50 shadow-[0_0_20px_rgba(34,197,94,0.2)]' 
+                  : 'bg-gray-200/50 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300'
+              } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+            >
+              <Power size={16} />
+              {isOnline ? 'Online' : 'Offline'}
+            </button>
+          </div>
         </div>
       </div>
 

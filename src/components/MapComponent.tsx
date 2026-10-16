@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
+import { useTheme } from '@/components/ThemeProvider';
 
 export interface DriverMarkerData {
   id: string;
@@ -155,7 +156,9 @@ const MapComponent = (props: MapProps) => {
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
 
-  const tileConfig = getTileLayerConfig(false);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const tileConfig = getTileLayerConfig(isDark);
 
   return (
     <div className="w-full h-full relative z-0">
@@ -166,6 +169,7 @@ const MapComponent = (props: MapProps) => {
         zoomControl={false}
       >
         <TileLayer
+          key={tileConfig.url}
           attribution={tileConfig.attribution}
           url={tileConfig.url}
           maxZoom={tileConfig.maxZoom}

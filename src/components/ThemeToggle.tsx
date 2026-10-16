@@ -2,20 +2,36 @@
 
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+import { useTheme } from "@/components/ThemeProvider"
 
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+export function ThemeToggle({ className }: { className?: string }) {
+  const { resolvedTheme, setTheme, portal } = useTheme()
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <div className={`w-9 h-9 p-2 rounded-xl ${className || ""}`} />
+  }
+
+  const isDark = resolvedTheme === "dark"
 
   return (
     <button
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-      aria-label="Toggle theme"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className={`p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center text-gray-700 dark:text-gray-200 ${className || ""}`}
+      aria-label={`Toggle night mode (${portal})`}
+      title={isDark ? `Night mode is ON (${portal}) — Click for Day mode` : `Night mode is OFF (${portal}) — Click for Night mode`}
     >
-      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-black dark:text-white" />
-      <Moon className="absolute top-2 h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-black dark:text-white" />
-      <span className="sr-only">Toggle theme</span>
+      {isDark ? (
+        <Sun className="h-5 w-5 text-amber-400 rotate-0 scale-100 transition-all hover:rotate-45" />
+      ) : (
+        <Moon className="h-5 w-5 text-blue-600 rotate-0 scale-100 transition-all hover:-rotate-12" />
+      )}
+      <span className="sr-only">Toggle {portal} theme</span>
     </button>
   )
 }
+

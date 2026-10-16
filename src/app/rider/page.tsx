@@ -12,6 +12,7 @@ import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 // Dynamically import Map component to disable SSR
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
@@ -639,23 +640,26 @@ export default function RiderPage() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsSheetMinimized(prev => !prev)}
-                    className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0"
-                  >
-                    {isSheetMinimized ? (
-                      <>
-                        <span>Book</span>
-                        <ChevronUp size={14} />
-                      </>
-                    ) : (
-                      <>
-                        <span>Map</span>
-                        <ChevronDown size={14} />
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-zinc-800" />
+                    <button
+                      type="button"
+                      onClick={() => setIsSheetMinimized(prev => !prev)}
+                      className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0"
+                    >
+                      {isSheetMinimized ? (
+                        <>
+                          <span>Book</span>
+                          <ChevronUp size={14} />
+                        </>
+                      ) : (
+                        <>
+                          <span>Map</span>
+                          <ChevronDown size={14} />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {!isSheetMinimized && (
