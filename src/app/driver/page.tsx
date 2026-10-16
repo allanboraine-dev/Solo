@@ -55,7 +55,6 @@ export default function DriverPage() {
   const [showSubModal, setShowSubModal] = useState(false)
   const [isProcessingSub, setIsProcessingSub] = useState(false)
   const [showFareCollection, setShowFareCollection] = useState(false)
-  const [isWaitingForPayment, setIsWaitingForPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
   const [showBankModal, setShowBankModal] = useState(false)
   const [completionNotice, setCompletionNotice] = useState<string | null>(null)
@@ -507,23 +506,10 @@ export default function DriverPage() {
       markTripCompleted(tripToComplete.id);
       updateActiveTripState(null);
       setRequest(null);
-      setIsWaitingForPayment(false);
       setShowFareCollection(false);
       setCompletionNotice(`Trip completed! R${tripToComplete.fare_amount} fare settled.`);
       await completeTripAtomic(tripToComplete.id, 'cash', tripToComplete);
       await saveTrip({ ...tripToComplete, status: 'completed' });
-    }
-  }
-
-  const handleInAppPaymentRequest = async () => {
-    const current = activeTripRef.current || activeTrip;
-    if (current) {
-      const updated: MockTrip = { ...current, status: 'payment_pending' };
-      recordTripStatusOverride(updated.id, 'payment_pending', updated.driver_id);
-      updateActiveTripState(updated);
-      setIsWaitingForPayment(true);
-      await completeTripAtomic(current.id, 'in_app', current);
-      await saveTrip(updated);
     }
   }
 
@@ -1014,62 +1000,31 @@ export default function DriverPage() {
       {showFareCollection && activeTrip && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
-            {isWaitingForPayment ? (
-              <div className="text-center py-6">
-                <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-800 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
-                <h2 className="text-2xl font-black mb-2">Waiting for Rider...</h2>
-                <p className="text-gray-500 mb-6 text-sm">
-                  The rider is processing the payment of R{activeTrip.fare_amount} on their device. The trip will close automatically once verified, or you can confirm payment below.
-                </p>
-                <div className="space-y-2.5">
-                  <button
-                    onClick={handleCashPayment}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-green-600/25 active:scale-95"
-                  >
-                    Confirm Payment Received & End Trip
-                  </button>
-                  <button
-                    onClick={() => setIsWaitingForPayment(false)}
-                    className="w-full py-2.5 text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
-                  >
-                    Back to Payment Options
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <button 
-                  onClick={() => setShowFareCollection(false)}
-                  className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-black mb-1">Collect Fare</h2>
-                  <p className="text-gray-500 text-sm">How would you like to receive payment?</p>
-                </div>
-                
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6 mb-6 border border-green-100 dark:border-green-900/50 flex flex-col items-center">
-                  <span className="text-green-800 dark:text-green-300 font-bold mb-1 uppercase tracking-wider text-xs">Total Amount</span>
-                  <span className="font-black text-5xl text-green-600 dark:text-green-400">R{activeTrip.fare_amount}</span>
-                </div>
+            <button 
+              onClick={() => setShowFareCollection(false)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-black mb-1">Collect Fare</h2>
+              <p className="text-gray-500 text-sm">Collect payment directly from rider via cash or your own POS.</p>
+            </div>
+            
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6 mb-6 border border-green-100 dark:border-green-900/50 flex flex-col items-center">
+              <span className="text-green-800 dark:text-green-300 font-bold mb-1 uppercase tracking-wider text-xs">Total Amount Due</span>
+              <span className="font-black text-5xl text-green-600 dark:text-green-400">R{activeTrip.fare_amount}</span>
+              <span className="text-[11px] text-green-700 dark:text-green-400/80 font-medium mt-2">100% of this fare belongs to you (0% platform commission)</span>
+            </div>
 
-                <div className="space-y-3">
-                  <button 
-                    onClick={handleInAppPaymentRequest}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95"
-                  >
-                    Request In-App Transfer
-                  </button>
-                  <button 
-                    onClick={handleCashPayment}
-                    className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95"
-                  >
-                    Paid via Cash / Own POS
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="space-y-3">
+              <button 
+                onClick={handleCashPayment}
+                className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95 text-base"
+              >
+                Paid via Cash / Own POS
+              </button>
+            </div>
           </div>
         </div>
       )}
