@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
@@ -33,6 +33,7 @@ export default function DriverPage() {
   const router = useRouter()
   const [isOnline, setIsOnline] = useState(false)
   const [activeTab, setActiveTab] = useState<'home' | 'earnings' | 'profile' | 'help'>('home')
+  const [isHomeSheetMinimized, setIsHomeSheetMinimized] = useState(false)
   
   const [request, setRequest] = useState<MockTrip | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
@@ -64,6 +65,9 @@ export default function DriverPage() {
 
   useEffect(() => {
     activeTripRef.current = activeTrip
+    if (activeTrip) {
+      setIsHomeSheetMinimized(false)
+    }
   }, [activeTrip])
 
   useEffect(() => {
@@ -567,12 +571,12 @@ export default function DriverPage() {
       {/* Real Map Background */}
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
-        {/* Overlay to dim map slightly when offline */}
-        {!isOnline && <div className="absolute inset-0 bg-white/40 dark:bg-black/60 z-[400] backdrop-blur-sm transition-all duration-500"></div>}
+        {/* Overlay to dim map slightly when offline - pointer-events-none so touches pass through to map/buttons */}
+        {!isOnline && <div className="absolute inset-0 bg-white/40 dark:bg-black/60 z-[1] backdrop-blur-sm transition-all duration-500 pointer-events-none"></div>}
         
         {/* Animated Radar overlay when online, only if no active trip */}
         {isOnline && !activeTrip && !request && (
-          <div className="absolute inset-0 z-[400] pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 z-[1] pointer-events-none flex items-center justify-center">
             <div className="w-48 h-48 bg-green-500/20 rounded-full animate-ping"></div>
             <div className="absolute w-96 h-96 bg-green-500/10 rounded-full animate-ping" style={{ animationDelay: '0.5s' }}></div>
           </div>
@@ -580,31 +584,37 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Header */}
-      <div className="absolute top-2.5 md:top-4 pt-safe left-3 right-3 md:left-8 md:right-auto md:w-96 z-10">
-        <div className="bg-white/85 dark:bg-zinc-950/85 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 p-3.5 md:p-5 flex justify-between items-center gap-2 transition-all">
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="text-lg md:text-xl font-black tracking-tight">Driver Portal</h1>
-              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-400 font-bold text-[11px] shadow-sm">
+      <div className="absolute top-2 sm:top-2.5 md:top-4 pt-safe left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 z-30 pointer-events-auto">
+        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-white/40 dark:border-white/10 p-2.5 sm:p-3.5 md:p-5 flex justify-between items-center gap-2 transition-all">
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap overflow-hidden">
+              <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight shrink-0">SOLO</h1>
+              <div className="flex items-center gap-0.5 sm:gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-1.5 sm:px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-400 font-bold text-[10px] sm:text-[11px] shadow-sm shrink-0">
                 <span>★</span>
                 <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
-                {ratingSummary.count > 0 && <span className="text-[10px] text-gray-400 font-normal">({ratingSummary.count})</span>}
+                {ratingSummary.count > 0 && <span className="text-[9px] sm:text-[10px] text-gray-400 font-normal">({ratingSummary.count})</span>}
               </div>
               {isOwner ? (
-                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60 uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                  <Crown size={11} className="text-amber-600 dark:text-amber-400" />
-                  Platform Owner
+                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60 uppercase tracking-wider flex items-center gap-1 shadow-sm shrink-0 truncate">
+                  <Crown size={10} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span className="hidden sm:inline">Platform </span>Owner
                 </span>
               ) : profile?.subscriptionPlan === 'paid' ? (
-                <span className="bg-blue-100/80 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider">Premium SaaS</span>
+                <span className="bg-blue-100/80 text-blue-800 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider shrink-0">
+                  <span className="hidden sm:inline">Premium </span>Pro
+                </span>
               ) : (
-                <span className="bg-green-100/80 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider">7-Day Free Trial</span>
+                <span className="bg-green-100/80 text-green-800 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider shrink-0">
+                  <span className="hidden sm:inline">7-Day </span>Trial
+                </span>
               )}
             </div>
-            <p className="text-xs md:text-sm text-gray-500 font-medium mt-0.5 truncate">Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}</p>
+            <p className="text-[11px] sm:text-xs md:text-sm text-gray-500 font-medium mt-0.5 truncate">
+              Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}
+            </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5" />
+            <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5 h-10 w-10 flex items-center justify-center touch-manipulation" />
             <button 
               onClick={async () => {
                 const nextOnline = !isOnline;
@@ -622,23 +632,55 @@ export default function DriverPage() {
                 }
               }}
               disabled={!!activeTrip}
-              className={`flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-sm ${
+              className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 min-h-[42px] min-w-[84px] rounded-2xl text-xs sm:text-sm font-black transition-all shadow-sm touch-manipulation ${
                 isOnline 
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 border border-green-200/50 dark:border-green-800/50 shadow-[0_0_20px_rgba(34,197,94,0.2)]' 
-                  : 'bg-gray-200/50 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300'
-              } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.35)]' 
+                  : 'bg-zinc-900 text-white hover:bg-black dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700'
+              } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             >
-              <Power size={16} />
-              {isOnline ? 'Online' : 'Offline'}
+              <Power size={15} />
+              <span>{isOnline ? 'Online' : 'Go Online'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Floating Main Content Panel */}
-      <div className="absolute top-24 md:top-28 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-28 left-3 right-3 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
-        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited">
-          <div className="p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col">
+      <div 
+        className={`absolute left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 flex flex-col z-20 pointer-events-none transition-all duration-300 ${
+          activeTab === 'home'
+            ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28 md:top-28 max-h-[72vh] md:max-h-none'
+            : 'top-[76px] sm:top-[86px] md:top-28 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28'
+        }`}
+      >
+        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited">
+          {/* Mobile Handle for Home tab */}
+          {activeTab === 'home' && (
+            <div 
+              onClick={() => setIsHomeSheetMinimized(!isHomeSheetMinimized)}
+              className="md:hidden flex items-center justify-between px-4 py-2.5 bg-gray-50/80 dark:bg-zinc-900/80 border-b border-gray-100 dark:border-white/5 cursor-pointer touch-manipulation select-none"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-1 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
+                <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 truncate">
+                  {isHomeSheetMinimized 
+                    ? (activeTrip ? `Trip: R${activeTrip.fare_amount} (Tap to expand)` : isOnline ? "Online • Searching (Tap to expand)" : "Offline • Tap to expand")
+                    : "Driver Controls"}
+                </span>
+              </div>
+              <button 
+                type="button" 
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-0.5 p-1 shrink-0 touch-manipulation"
+              >
+                <span>{isHomeSheetMinimized ? 'Expand' : 'Map View'}</span>
+                {isHomeSheetMinimized ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+          )}
+
+          <div className={`p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
+            activeTab === 'home' && isHomeSheetMinimized ? 'hidden md:flex' : 'pb-28 md:pb-8'
+          }`}>
             {activeTab === 'home' && (
               activeTrip ? (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500 flex flex-col h-full">
@@ -658,14 +700,14 @@ export default function DriverPage() {
                   {activeTrip.status === 'accepted' ? (
                     <button 
                       onClick={handleConfirmPickup}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center text-sm sm:text-base"
                     >
                       Confirm Pickup
                     </button>
                   ) : (
                     <button 
                       onClick={handleComplete}
-                      className="w-full bg-black dark:bg-white text-white dark:text-black p-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
+                      className="w-full bg-black dark:bg-white text-white dark:text-black min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
                     >
                       Confirm Dropoff (Complete)
                     </button>
@@ -846,9 +888,9 @@ export default function DriverPage() {
                   </p>
                   <button
                     onClick={() => setShowBankModal(true)}
-                    className="w-full py-2.5 px-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition"
+                    className="w-full py-3 px-4 min-h-[44px] bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition active:scale-98 touch-manipulation"
                   >
-                    <Building2 size={14} /> Link / Update Bank Details
+                    <Building2 size={15} /> Link / Update Bank Details
                   </button>
                 </div>
 
@@ -974,7 +1016,7 @@ export default function DriverPage() {
                 ) : (
                   <button 
                     onClick={() => setShowSubModal(true)}
-                    className="mt-6 w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl"
+                    className="mt-6 w-full min-h-[48px] py-3.5 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
                   >
                     {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R499/mo'}
                   </button>
@@ -987,7 +1029,7 @@ export default function DriverPage() {
                     localStorage.removeItem('mock_driver_profile');
                     router.push('/driver/login');
                   }}
-                  className="mt-8 w-full py-4 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition"
+                  className="mt-6 w-full min-h-[48px] py-3.5 text-red-600 dark:text-red-400 font-bold bg-red-50/80 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl transition active:scale-[0.98] touch-manipulation flex items-center justify-center border border-red-200/60 dark:border-red-900/40 text-sm sm:text-base"
                 >
                   Sign Out
                 </button>
@@ -1048,34 +1090,37 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Bottom Navigation */}
-      <div className="absolute bottom-4 sm:bottom-6 mb-safe left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border border-gray-200/50 dark:border-white/10 p-2 flex justify-around items-center rounded-3xl shadow-2xl z-[1000] gpu-composited">
+      <div className="absolute bottom-2.5 sm:bottom-4 mb-safe left-1/2 -translate-x-1/2 w-[calc(100vw-20px)] sm:w-[calc(100vw-32px)] max-w-sm bg-white/90 dark:bg-zinc-900/90 backdrop-blur-2xl border border-gray-200/60 dark:border-white/10 p-1.5 sm:p-2 flex justify-around items-center rounded-3xl shadow-2xl z-30 pointer-events-auto gpu-composited">
         <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'home' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+          onClick={() => {
+            setActiveTab('home')
+            setIsHomeSheetMinimized(false)
+          }}
+          className={`flex flex-col items-center justify-center min-h-[46px] p-2 rounded-2xl w-full transition-all touch-manipulation active:scale-95 ${activeTab === 'home' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          <Car size={24} />
-          <span className="text-[10px] mt-1 uppercase tracking-wider">Home</span>
+          <Car size={22} />
+          <span className="text-[10px] mt-0.5 uppercase tracking-wider font-semibold">Home</span>
         </button>
         <button 
           onClick={() => setActiveTab('earnings')}
-          className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'earnings' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+          className={`flex flex-col items-center justify-center min-h-[46px] p-2 rounded-2xl w-full transition-all touch-manipulation active:scale-95 ${activeTab === 'earnings' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          <span className="text-[10px] mt-1 uppercase tracking-wider">Earnings</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span className="text-[10px] mt-0.5 uppercase tracking-wider font-semibold">Earnings</span>
         </button>
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'profile' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+          className={`flex flex-col items-center justify-center min-h-[46px] p-2 rounded-2xl w-full transition-all touch-manipulation active:scale-95 ${activeTab === 'profile' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          <User size={24} />
-          <span className="text-[10px] mt-1 uppercase tracking-wider">Profile</span>
+          <User size={22} />
+          <span className="text-[10px] mt-0.5 uppercase tracking-wider font-semibold">Profile</span>
         </button>
         <button 
           onClick={() => setActiveTab('help')}
-          className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'help' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+          className={`flex flex-col items-center justify-center min-h-[46px] p-2 rounded-2xl w-full transition-all touch-manipulation active:scale-95 ${activeTab === 'help' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          <BookOpen size={24} />
-          <span className="text-[10px] mt-1 uppercase tracking-wider">Help</span>
+          <BookOpen size={22} />
+          <span className="text-[10px] mt-0.5 uppercase tracking-wider font-semibold">Help</span>
         </button>
       </div>
 
@@ -1084,29 +1129,29 @@ export default function DriverPage() {
 
       {/* Fare Collection Modal */}
       {showFareCollection && activeTrip && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar">
             <button 
               onClick={() => setShowFareCollection(false)}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors touch-manipulation"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <div className="text-center mb-6">
-              <h2 className="text-2xl font-black mb-1">Collect Fare</h2>
-              <p className="text-gray-500 text-sm">Collect payment directly from rider via cash or your own POS.</p>
+            <div className="text-center mb-5">
+              <h2 className="text-xl sm:text-2xl font-black mb-1">Collect Fare</h2>
+              <p className="text-gray-500 text-xs sm:text-sm">Collect payment directly from rider via cash or your own POS.</p>
             </div>
             
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6 mb-6 border border-green-100 dark:border-green-900/50 flex flex-col items-center">
-              <span className="text-green-800 dark:text-green-300 font-bold mb-1 uppercase tracking-wider text-xs">Total Amount Due</span>
-              <span className="font-black text-5xl text-green-600 dark:text-green-400">R{activeTrip.fare_amount}</span>
-              <span className="text-[11px] text-green-700 dark:text-green-400/80 font-medium mt-2">100% of this fare belongs to you (0% platform commission)</span>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-5 mb-5 border border-green-100 dark:border-green-900/50 flex flex-col items-center">
+              <span className="text-green-800 dark:text-green-300 font-bold mb-1 uppercase tracking-wider text-[11px]">Total Amount Due</span>
+              <span className="font-black text-4xl sm:text-5xl text-green-600 dark:text-green-400">R{activeTrip.fare_amount}</span>
+              <span className="text-[11px] text-green-700 dark:text-green-400/80 font-medium mt-2 text-center">100% of this fare belongs to you (0% platform commission)</span>
             </div>
 
             <div className="space-y-3">
               <button 
                 onClick={handleCashPayment}
-                className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95 text-base"
+                className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"
               >
                 Paid via Cash / Own POS
               </button>
@@ -1117,8 +1162,8 @@ export default function DriverPage() {
 
       {/* Subscription Payment Modal */}
       {showSubModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar">
             {(!isTrialExpired || isOwner) && (
               <button 
                 onClick={() => setShowSubModal(false)}

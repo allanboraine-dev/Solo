@@ -115,11 +115,11 @@ export function DriverBankSettlementModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-white space-y-5 shadow-2xl relative"
+        className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-5 sm:p-6 text-white space-y-5 shadow-2xl relative max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -274,7 +274,7 @@ export function DriverBankSettlementModal({
           <button
             type="submit"
             disabled={loading || !accountNumber}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-1.5"
+            className="w-full min-h-[48px] py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs sm:text-sm transition shadow-lg shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-1.5 touch-manipulation"
           >
             <CheckCircle2 size={16} />
             <span>{loading ? "Linking Bank Account..." : "Save Settlement Account"}</span>
