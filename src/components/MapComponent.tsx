@@ -161,12 +161,14 @@ const MapComponent = (props: MapProps) => {
   const tileConfig = getTileLayerConfig(isDark);
 
   return (
-    <div className="w-full h-full relative z-0">
+    <div className="w-full h-full relative z-0 select-none touch-pan-x touch-pan-y">
       <MapContainer 
         center={[centerLat, centerLng]} 
         zoom={14} 
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
+        tap={false}
+        bounceAtZoomLimits={false}
       >
         <TileLayer
           key={tileConfig.url}

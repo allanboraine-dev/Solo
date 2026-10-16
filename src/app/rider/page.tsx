@@ -572,7 +572,7 @@ export default function RiderPage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-64px)] md:h-[calc(100dvh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+    <div className="h-mobile-portal w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Map Background layer */}
       <div className="absolute inset-0 z-0">
         <MapComponent 
@@ -602,7 +602,7 @@ export default function RiderPage() {
       </div>
 
       {/* Top Header: Rider Profile or Phone Auth Button */}
-      <div className="absolute top-3 right-3 md:top-4 md:right-4 z-30 flex items-center gap-2">
+      <div className="absolute top-3 right-3 md:top-4 md:right-4 pt-safe z-30 flex items-center gap-2">
         {currentUser ? (
           <div className="flex items-center gap-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-3.5 md:py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
             <div className="flex items-center gap-2 pr-2 border-r border-gray-200 dark:border-zinc-800">
@@ -634,10 +634,10 @@ export default function RiderPage() {
       </div>
 
       {/* Floating UI Panel / Mobile Bottom Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 w-full md:bottom-auto md:right-auto md:top-4 md:left-6 md:w-96 flex flex-col z-20 md:max-h-[calc(100dvh-128px)]">
+      <div className="absolute bottom-0 left-0 right-0 w-full md:bottom-auto md:right-auto md:top-4 md:left-6 md:w-96 flex flex-col z-20 md:max-h-[calc(100vh-128px)] md:max-h-[calc(100dvh-128px)] gpu-composited">
         <div
           className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
-            isSheetMinimized ? 'max-h-[76px] md:max-h-full overflow-hidden' : 'max-h-[72dvh] md:max-h-full'
+            isSheetMinimized ? 'max-h-[76px] md:max-h-full overflow-hidden' : 'max-h-[72vh] max-h-[72dvh] md:max-h-full'
           }`}
         >
           {/* Mobile Sheet Handle / Minimize Toggle */}
@@ -650,7 +650,7 @@ export default function RiderPage() {
             <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
           </button>
 
-          <div className="p-4 pt-1 pb-6 md:p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col">
+          <div className="p-4 pt-1 pb-6 md:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 <div className="mb-3 md:mb-5 flex items-center justify-between gap-3">

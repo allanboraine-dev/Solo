@@ -514,7 +514,7 @@ export default function DriverPage() {
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
-    <div className="h-[calc(100dvh-64px)] md:h-[calc(100dvh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+    <div className="h-mobile-portal w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Real Map Background */}
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
@@ -531,7 +531,7 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Header */}
-      <div className="absolute top-2.5 md:top-4 left-3 right-3 md:left-8 md:right-auto md:w-96 z-10">
+      <div className="absolute top-2.5 md:top-4 pt-safe left-3 right-3 md:left-8 md:right-auto md:w-96 z-10">
         <div className="bg-white/85 dark:bg-zinc-950/85 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 p-3.5 md:p-5 flex justify-between items-center gap-2 transition-all">
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -573,9 +573,9 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Main Content Panel */}
-      <div className="absolute top-24 md:top-28 bottom-24 md:bottom-28 left-3 right-3 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
-        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto">
-          <div className="p-4 md:p-6 overflow-y-auto overscroll-contain custom-scrollbar flex-1 min-h-0 flex flex-col">
+      <div className="absolute top-24 md:top-28 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-28 left-3 right-3 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
+        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited">
+          <div className="p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col">
             {activeTab === 'home' && (
               activeTrip ? (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500 flex flex-col h-full">
@@ -955,7 +955,7 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Bottom Navigation */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border border-gray-200/50 dark:border-white/10 p-2 flex justify-around items-center rounded-3xl shadow-2xl z-[1000]">
+      <div className="absolute bottom-4 sm:bottom-6 mb-safe left-1/2 -translate-x-1/2 w-[calc(100vw-32px)] max-w-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border border-gray-200/50 dark:border-white/10 p-2 flex justify-around items-center rounded-3xl shadow-2xl z-[1000] gpu-composited">
         <button 
           onClick={() => setActiveTab('home')}
           className={`flex flex-col items-center p-3 rounded-2xl w-full transition-colors ${activeTab === 'home' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}

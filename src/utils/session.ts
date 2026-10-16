@@ -25,6 +25,39 @@ export const generateUuid = (): string => {
 };
 
 /**
+ * Resilient in-memory storage fallback for private browsing and restricted mobile WebViews
+ */
+const inMemoryStore: Record<string, string> = {};
+
+export const getSessionItem = (key: string): string | null => {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const val = window.sessionStorage.getItem(key);
+      if (val !== null) return val;
+    }
+  } catch {}
+  return inMemoryStore[key] ?? null;
+};
+
+export const setSessionItem = (key: string, value: string): void => {
+  inMemoryStore[key] = value;
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem(key, value);
+    }
+  } catch {}
+};
+
+export const removeSessionItem = (key: string): void => {
+  delete inMemoryStore[key];
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.removeItem(key);
+    }
+  } catch {}
+};
+
+/**
  * Resolves or creates a unique, isolated session ID for the rider.
  * Prefers authenticated user ID, then sessionStorage (for tab-level test isolation),
  * then localStorage (for device-level persistence).

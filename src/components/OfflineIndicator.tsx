@@ -41,7 +41,7 @@ export function OfflineIndicator() {
       <aside
         aria-live="polite"
         role="status"
-        className="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-semibold py-2 px-4 shadow-lg text-center flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300"
+        className="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-semibold pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 px-4 shadow-lg text-center flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300"
       >
         <WifiOff size={14} className="animate-pulse" />
         <span>Working Offline — Cellular connectivity interrupted. Cached maps & active ride data remain available.</span>
@@ -54,7 +54,7 @@ export function OfflineIndicator() {
       <aside
         aria-live="polite"
         role="status"
-        className="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold py-2 px-4 shadow-lg text-center flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300"
+        className="fixed top-0 inset-x-0 z-50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-semibold pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-2 px-4 shadow-lg text-center flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300"
       >
         <Wifi size={14} />
         <span>Connection Restored — Live ride telemetry synchronized.</span>
