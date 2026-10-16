@@ -348,7 +348,7 @@
   <div class="top-action-bar">
     <div class="brand-title">
       <span>SOLO</span>
-      <span class="brand-badge">SOP Manual v1.0</span>
+      <span class="brand-badge">SOP Manual v2.0</span>
       <span style="font-size: 13px; font-weight: 400; color: #94a3b8; margin-left: 8px;">Republic of South Africa</span>
     </div>
     <div class="action-buttons">
@@ -378,7 +378,7 @@
       </p>
       <div class="doc-meta">
         <span><strong>Jurisdiction:</strong> Republic of South Africa</span>
-        <span><strong>Release Version:</strong> 1.0 (Production Master)</span>
+        <span><strong>Release Version:</strong> 2.0 (High-Concurrency & Operational Master)</span>
         <span><strong>Regulatory Acts:</strong> NLTA (Act 5 of 2009), POPIA (Act 4 of 2013), SARS Sec 11(2)</span>
         <span><strong>Classification:</strong> Official Operational Standard</span>
       </div>
@@ -392,7 +392,7 @@
       </p>
 
       <div class="alert alert-success">
-        <strong>The SOLO Economic Formula:</strong> Drivers retain 100% of all rider fares. The platform charges no percentage cut, replacing it with a flat-rate R499.00/month SaaS subscription after an initial 7-day unrestricted trial.
+        <strong>The SOLO Economic Formula:</strong> Drivers retain 100% of all rider fares. The platform charges no percentage cut, replacing it with a flat-rate R499.00/month SaaS subscription after an initial 7-day unrestricted trial. Platform founder Allan Boraine (<code>allanboraine@gmail.com</code>) holds permanent lifetime free access.
       </div>
 
       <table>
@@ -432,10 +432,10 @@
           <span class="badge-section badge-rider">Section A</span>
           <strong>Rider Operations</strong>
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
-            <li><a href="#rider-auth">1.1 Phone Auth (+27 E.164)</a></li>
-            <li><a href="#rider-pwa">1.2 PWA Mobile Installation</a></li>
-            <li><a href="#rider-booking">1.3 Booking & Commercial Routing</a></li>
-            <li><a href="#rider-matching">1.4 15km PostGIS Driver Matching</a></li>
+            <li><a href="#rider-auth">1.1 WhatsApp Zero-Cost Auth (wa.me)</a></li>
+            <li><a href="#rider-pwa">1.2 PWA Installation (Android, Samsung, iOS)</a></li>
+            <li><a href="#rider-booking">1.3 Booking & Commercial Matrix Routing</a></li>
+            <li><a href="#rider-matching">1.4 15km PostGIS & Multi-Driver Decline Pool</a></li>
             <li><a href="#rider-pin">1.5 4-Digit Security PIN Safety</a></li>
             <li><a href="#rider-settlement">1.6 Paystack Settlement & Receipts</a></li>
             <li><a href="#rider-sos">1.7 Offline Dead Zones & SOS Hotlines</a></li>
@@ -446,12 +446,15 @@
           <strong>Driver Operations</strong>
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#driver-nlta">2.1 Statutory NLTA Compliance</a></li>
-            <li><a href="#driver-kyc">2.2 KYC Document Submission</a></li>
-            <li><a href="#driver-saas">2.3 7-Day Trial & R499/mo SaaS</a></li>
-            <li><a href="#driver-bank">2.4 SA Universal Branch Codes</a></li>
-            <li><a href="#driver-routine">2.5 Online Dispatch & Navigation</a></li>
-            <li><a href="#driver-pin">2.6 Arrival & PIN Verification</a></li>
-            <li><a href="#driver-sars">2.7 Driver SARS Tax Guidance</a></li>
+            <li><a href="#driver-kyc">2.2 Resilient KYC Document Upload</a></li>
+            <li><a href="#driver-saas">2.3 7-Day Trial & R499/mo (Founder Exemption)</a></li>
+            <li><a href="#driver-bank">2.4 SA Universal Clearing Branch Codes</a></li>
+            <li><a href="#driver-concurrency">2.5 Single-Device Active Concurrency</a></li>
+            <li><a href="#driver-routine">2.6 Daily Routine & Decline Handling</a></li>
+            <li><a href="#driver-tones">2.7 Custom Alert Tones & Silent Bypass</a></li>
+            <li><a href="#driver-mobile">2.8 Samsung Internet & Mobile UI</a></li>
+            <li><a href="#driver-pin">2.9 Arrival & PIN Verification</a></li>
+            <li><a href="#driver-sars">2.10 Driver SARS Tax Guidance</a></li>
           </ul>
         </div>
         <div>
@@ -460,7 +463,7 @@
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#admin-compliance">3.1 KYC Review Engine (/admin)</a></li>
             <li><a href="#admin-storage">3.2 1-Hour Ephemeral Signed URLs</a></li>
-            <li><a href="#admin-simulator">3.3 Dual-Window Simulator</a></li>
+            <li><a href="#admin-simulator">3.3 Dual-Window Simulator & TTL</a></li>
             <li><a href="#admin-webhooks">3.4 Paystack HMAC SHA512 Webhooks</a></li>
             <li><a href="#admin-postgis">3.5 PostGIS Proximity Algorithms</a></li>
             <li><a href="#admin-push">3.6 Web Push VAPID Protocols</a></li>
@@ -478,21 +481,21 @@
         Rider Operations & User Guide
       </h2>
 
-      <h3 id="rider-auth">1.1 Account Registration & Phone Verification</h3>
+      <h3 id="rider-auth">1.1 Account Registration & Zero-Cost WhatsApp Verification</h3>
       <p>
-        SOLO utilizes passwordless authentication anchored directly to the South African E.164 telecommunications standard. Riders register or sign in with their mobile telephone number:
+        SOLO utilizes instant passwordless authentication anchored directly to the South African E.164 telecommunications standard. Riders register or sign in with their mobile telephone number:
       </p>
       <ul>
         <li><strong>Accepted Formats:</strong> <code>082 123 4567</code>, <code>27821234567</code>, or <code>+27 82 123 4567</code>.</li>
-        <li><strong>Verification Flow:</strong> The mobile number is formatted into international E.164. A 6-digit One-Time PIN (OTP) is sent via SMS. Once verified, a persistent authenticated session token is stored.</li>
+        <li><strong>Zero-Cost WhatsApp Verification (<code>wa.me</code>):</strong> A 6-digit cryptographic verification passcode and a direct WhatsApp deep-link are generated instantly. Riders tap <strong>"Open WhatsApp & Auto-Fill Code"</strong> to verify identity over mobile data or Wi-Fi with zero SMS gateway costs or carrier delivery delays.</li>
       </ul>
 
-      <h3 id="rider-pwa">1.2 PWA Mobile Installation (Android & iOS)</h3>
+      <h3 id="rider-pwa">1.2 PWA Mobile Installation (Android, Samsung Internet & iOS)</h3>
       <p>
         SOLO is delivered as a Progressive Web Application (PWA). It requires no app store downloads and works in areas with constrained mobile bandwidth.
       </p>
       <ul>
-        <li><strong>Android Devices:</strong> Open the platform in Google Chrome. An automatic banner prompts <em>"Install SOLO App — Add to Home Screen"</em>. Tapping "Install Now" installs the app in standalone mode.</li>
+        <li><strong>Android & Samsung Internet:</strong> Open the platform in Google Chrome or Samsung Internet. An automatic banner prompts <em>"Install SOLO App — Add to Home Screen"</em>. Tapping "Install Now" installs the app in standalone mode. In Samsung Internet, drivers can also use Menu &rarr; "Add page to" &rarr; "App screen".</li>
         <li><strong>Apple iOS Devices:</strong> Open in Safari, tap the <strong>Share</strong> button (square with arrow up), scroll down and tap <strong>"Add to Home Screen"</strong>, then tap <strong>"Add"</strong>.</li>
       </ul>
 
@@ -505,10 +508,13 @@
         <em>Example:</em> A 6.2 km trip between Camps Bay and the V&A Waterfront costs exactly <strong>R82.00</strong>. There are no surprise surge pricing multipliers or booking surcharges.
       </p>
 
-      <h3 id="rider-matching">1.4 Driver Matching & The 15km PostGIS Radius</h3>
+      <h3 id="rider-matching">1.4 Driver Matching, 15km PostGIS Radius & Multi-Driver Decline Pool</h3>
       <p>
-        When you tap <strong>"Request SOLO Ride"</strong>, the PostGIS spatial engine scans for online, verified drivers within a <strong>15-kilometer radius</strong>. As soon as a driver accepts, you receive their name, vehicle model, color, registration number, and live tracking location on your map.
+        When you tap <strong>"Request SOLO Ride"</strong>, the PostGIS spatial engine scans for online, verified drivers within a <strong>15-kilometer radius</strong>.
       </p>
+      <div class="alert alert-info">
+        <strong>Multi-Driver Pool Availability:</strong> If an individual driver declines your ride request, your booking is NOT cancelled. The trip remains actively available in the dispatch pool for all other registered online drivers in your area until accepted.
+      </div>
 
       <h3 id="rider-pin">1.5 Boarding Safety & The Mandatory 4-Digit PIN</h3>
       <div class="alert alert-danger">
@@ -550,9 +556,9 @@
         <li><strong>Vehicle Registration (RC1) & Commercial Insurance:</strong> Proving the vehicle is legally registered and insured.</li>
       </ol>
 
-      <h3 id="driver-kyc">2.2 KYC Document Submission Protocol</h3>
+      <h3 id="driver-kyc">2.2 KYC Document Submission Protocol & System Resilience</h3>
       <p>
-        Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code>. Documents are stored in an encrypted, private storage bucket with strict access controls.
+        Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code>. Documents are stored in an encrypted, private storage bucket with strict access controls. The registration engine incorporates database-level user creation pre-emption to eliminate document upload errors.
       </p>
 
       <h3 id="driver-saas">2.3 SaaS Subscription Model (7-Day Trial & R499/mo)</h3>
@@ -562,6 +568,7 @@
       <ul>
         <li><strong>7-Day Free Trial:</strong> Once approved, you enjoy 7 full days of unlimited dispatches with zero platform fees.</li>
         <li><strong>R499.00 / month Flat SaaS Fee:</strong> After the trial, maintain full platform access for a flat R499/month billed through Paystack. You keep 100% of every ride fare you generate.</li>
+        <li><strong>Platform Founder Exemption:</strong> Platform founder Allan Boraine (<code>allanboraine@gmail.com</code>) holds lifetime free driver access with zero subscription charges and permanent 0% commission.</li>
       </ul>
 
       <h3 id="driver-bank">2.4 South African Banking Setup & Direct Settlement</h3>
@@ -589,17 +596,48 @@
         </tbody>
       </table>
 
-      <h3 id="driver-routine">2.5 Daily Operating Routine: Going Online & Navigation</h3>
+      <h3 id="driver-concurrency">2.5 Single-Device Active Concurrency Policy</h3>
+      <div class="alert alert-warning">
+        <strong>Strict 1-Device Rule:</strong> A driver account can only be active online on ONE device at a time. Every device generates a persistent hardware-backed ID. When going online on Device B, Device A is immediately preempted, deactivated with an on-screen notice, and barred from dispatch until re-authorized.
+      </div>
+
+      <h3 id="driver-routine">2.6 Daily Operating Routine & Decline Handling</h3>
       <p>
-        Open the SOLO Driver app and toggle <strong>"Go Online"</strong>. When a ride is booked within 15 km, your device will ring with an audio dispatch chime. You will see the pickup address, destination, route distance, and guaranteed gross Rand fare. Tap <strong>"Accept Trip"</strong> to receive navigation routing.
+        Open the SOLO Driver app and toggle <strong>"Go Online"</strong>. When a ride is booked within 15 km, your device sounds your selected tone. You see pickup address, destination, route distance, and guaranteed Rand fare. Tap <strong>"Accept Trip"</strong> to receive navigation routing. If you tap <strong>"Decline"</strong>, the trip is dismissed only from your screen while remaining active for other drivers in your area.
       </p>
 
-      <h3 id="driver-pin">2.6 Arrival & PIN Verification</h3>
+      <h3 id="driver-tones">2.7 Customizable Notification Alert Tones & Silent Mode Bypass</h3>
+      <p>
+        Drivers can select from 6 built-in electronic acoustic presets or upload custom audio files (MP3, WAV, M4A, OGG up to 10MB) directly from device storage:
+      </p>
+      <ul>
+        <li><strong>SOLO Harmony (Default):</strong> Crisp 3-tone ascending harmony (D5 &rarr; A5 &rarr; D6).</li>
+        <li><strong>Radar Sonar Ping:</strong> Double sonar sweep for high-speed dispatch awareness.</li>
+        <li><strong>Cash Register Payday:</strong> Metallic bell celebrating 100% fare retention.</li>
+        <li><strong>Priority Dispatch Siren:</strong> 4 rapid pulsating beeps for noisy vehicle environments.</li>
+        <li><strong>Hotel Reception Bell:</strong> Resonant reception desk chime with long natural decay.</li>
+        <li><strong>Staccato Sparkle:</strong> 4 rapid playful sparkle arpeggio notes.</li>
+      </ul>
+      <div class="alert alert-success">
+        <strong>Dual-Engine Audio Pipeline:</strong> Uses a persistent HTML5 Audio element routed to the media playback channel (<code>AVAudioSessionCategoryPlayback</code>). Incoming ride alerts sound clearly through vehicle speakers or Bluetooth <strong>even when the phone's hardware switch is set to silent or vibrate</strong>. Includes volume slider (0% to 100%) and haptic vibration pattern.
+      </div>
+
+      <h3 id="driver-mobile">2.8 Mobile Ergonomics & Samsung Internet Optimization</h3>
+      <p>
+        The driver interface is designed for one-handed in-vehicle dashboard mounting:
+      </p>
+      <ul>
+        <li><strong>Centered Navigation:</strong> Navigation bar icons and action buttons are centered for effortless thumb reach.</li>
+        <li><strong>Samsung Internet Compatibility:</strong> Uses dynamic viewport units (<code>dvh</code>) to prevent browser address bars and Samsung One UI navigation bars from covering bottom sheets or action buttons.</li>
+        <li><strong>Collapsible Dispatch Sheet:</strong> Swipe down to expand the real-time radar map, or swipe up to view earnings and settings.</li>
+      </ul>
+
+      <h3 id="driver-pin">2.9 Arrival & PIN Verification</h3>
       <p>
         When you arrive at the pickup point, tap <strong>"I Have Arrived"</strong> to alert the passenger. When the passenger enters your vehicle, ask for their 4-digit SOLO safety PIN and input it into your terminal. Once confirmed, tap <strong>"Start Trip"</strong>. At the destination, tap <strong>"Complete Trip"</strong> to immediately trigger payment settlement.
       </p>
 
-      <h3 id="driver-sars">2.7 Driver SARS Tax Guidance</h3>
+      <h3 id="driver-sars">2.10 Driver SARS Tax Guidance</h3>
       <div class="alert alert-info">
         <strong>Tax Transparency for Drivers:</strong> Because SOLO drivers receive 100% gross fares, drivers operate as independent contractors for SARS purposes. Fuel, vehicle maintenance, insurance, cell data, and your R499 monthly SOLO SaaS fee are legitimate tax-deductible business expenses. Drivers can consider registering for SARS Turnover Tax if annual turnover is under R1,000,000.
       </div>
@@ -639,6 +677,7 @@
       <ul>
         <li><strong>Metro Route Presets:</strong> Pre-programmed routes in Cape Town, Johannesburg, Durban, and Pretoria.</li>
         <li><strong>Speed Control:</strong> Execute journeys at 1x (real-time), 2x, or 5x speed multipliers.</li>
+        <li><strong>5-Minute TTL Driver Telematics:</strong> Real drivers only, with stale driver records expiring after 5 minutes of inactivity to prevent ghost markers.</li>
         <li><strong>Interactive PIN & Chat:</strong> Test the 4-digit anti-impersonation PIN verification and real-time messaging.</li>
         <li><strong>Live Telemetry Drawer:</strong> Inspect PostGIS 15km matching logs, Supabase WebSockets, VAPID Web Push payloads, and Paystack settlement events.</li>
       </ul>
@@ -711,7 +750,7 @@
       </table>
       <div style="text-align: center; margin-top: 40px; color: #94a3b8; font-size: 13px;">
         SOLO Mobility Technologies (Pty) Ltd — Republic of South Africa<br>
-        Standard Operating Procedures Manual v1.0. All rights reserved.
+        Standard Operating Procedures Manual v2.0. All rights reserved.
       </div>
     </section>
   </div>

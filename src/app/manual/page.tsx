@@ -22,7 +22,7 @@ export default function OperationalManualPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black tracking-tight text-white">SOLO Operational Manual</h1>
                 <span className="text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  SOP v1.0
+                  SOP v2.0
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -61,7 +61,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section A: Rider Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                South African mobile phone verification (+27), PWA installation, commercial routing, 4-digit safety PIN, and SARS-compliant receipt generation.
+                WhatsApp zero-cost verification, PWA installation, commercial matrix routing, multi-driver decline pool, 4-digit PIN safety, and SARS-compliant PDF receipts.
               </p>
             </div>
             <a
@@ -80,7 +80,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section B: Driver Partner Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                NLTA statutory compliance, 4 mandatory KYC documents (PrDP, CoR), 0% commission R499/mo SaaS model, and 6-digit retail bank branch codes.
+                NLTA compliance, 1-device active concurrency, customizable alert tones with silent bypass, Samsung Web optimization, and 0% commission R499/mo SaaS model.
               </p>
             </div>
             <a
@@ -99,7 +99,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section C: Admin Governance</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                KYC review dashboard, 1-hour signed document URLs (POPIA), rejection presets, dual simulator diagnostic workflows, and PostGIS matching.
+                KYC review engine, 1-hour signed URLs (POPIA), dual simulator diagnostic workflows with 5-minute TTL, PostGIS spatial queries, and Paystack audits.
               </p>
             </div>
             <a
