@@ -355,6 +355,58 @@ export const acceptTripAtomic = async (tripId: string): Promise<{ success: boole
 };
 
 /**
+ * Retrieves the set of trip IDs declined by the current driver
+ */
+export const getDeclinedTripIds = (driverId?: string | null): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const key = driverId ? `solo_declined_trips_${driverId}` : 'solo_declined_trips';
+    const raw = localStorage.getItem(key);
+    const globalRaw = localStorage.getItem('solo_declined_trips');
+    const ids: string[] = [
+      ...(raw ? JSON.parse(raw) : []),
+      ...(globalRaw ? JSON.parse(globalRaw) : []),
+    ];
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+};
+
+export const isTripDeclined = (tripId: string, driverId?: string | null): boolean => {
+  return getDeclinedTripIds(driverId).has(tripId);
+};
+
+/**
+ * Declines a rider trip request from the driver portal, persists the decline
+ * so the request will not re-appear for this driver, and updates/broadcasts the cancelled status.
+ */
+export const declineTrip = async (trip: MockTrip, driverId?: string | null): Promise<void> => {
+  if (typeof window !== 'undefined') {
+    try {
+      const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+      const current = Array.from(getDeclinedTripIds(resolvedDriverId));
+      if (!current.includes(trip.id)) {
+        current.push(trip.id);
+      }
+      localStorage.setItem('solo_declined_trips', JSON.stringify(current.slice(-200)));
+      if (resolvedDriverId) {
+        localStorage.setItem(`solo_declined_trips_${resolvedDriverId}`, JSON.stringify(current.slice(-200)));
+      }
+    } catch (e) {
+      console.error('Error recording declined trip locally:', e);
+    }
+  }
+
+  const cancelledTrip: MockTrip = {
+    ...trip,
+    status: 'cancelled',
+  };
+
+  await saveTrip(cancelledTrip);
+};
+
+/**
  * Atomic trip start with rider 4-digit verification PIN
  */
 export const startTripWithPin = async (tripId: string, pin: string): Promise<{ success: boolean; error?: string }> => {
@@ -657,12 +709,18 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
 export const getNearbyRequestedTrips = async (
   driverLat: number,
   driverLng: number,
-  radiusKm: number = 15
+  radiusKm: number = 15,
+  driverId?: string | null
 ): Promise<MockTrip[]> => {
   if (typeof window === 'undefined') return [];
 
+  const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+  const declinedIds = getDeclinedTripIds(resolvedDriverId);
+
   const allTrips = await getTrips();
-  const requestedTrips = allTrips.filter(t => t.status === 'requested' && !t.driver_id);
+  const requestedTrips = allTrips.filter(
+    t => t.status === 'requested' && !t.driver_id && !declinedIds.has(t.id)
+  );
 
   // 1. Try PostGIS RPC
   try {
@@ -673,21 +731,23 @@ export const getNearbyRequestedTrips = async (
     });
 
     if (data && !error && data.length > 0) {
-      const rpcTrips: MockTrip[] = data.map((t: any) => ({
-        id: t.id,
-        rider_id: t.rider_id,
-        pickup_location: t.pickup_location,
-        pickup_lat: t.pickup_lat,
-        pickup_lng: t.pickup_lng,
-        dropoff_location: t.dropoff_location,
-        dropoff_lat: t.dropoff_lat,
-        dropoff_lng: t.dropoff_lng,
-        fare_amount: Number(t.fare_amount),
-        status: t.status,
-        verification_pin: t.verification_pin,
-        scheduled_time: t.scheduled_time,
-        created_at: t.created_at,
-      }));
+      const rpcTrips: MockTrip[] = data
+        .filter((t: any) => !declinedIds.has(t.id))
+        .map((t: any) => ({
+          id: t.id,
+          rider_id: t.rider_id,
+          pickup_location: t.pickup_location,
+          pickup_lat: t.pickup_lat,
+          pickup_lng: t.pickup_lng,
+          dropoff_location: t.dropoff_location,
+          dropoff_lat: t.dropoff_lat,
+          dropoff_lng: t.dropoff_lng,
+          fare_amount: Number(t.fare_amount),
+          status: t.status,
+          verification_pin: t.verification_pin,
+          scheduled_time: t.scheduled_time,
+          created_at: t.created_at,
+        }));
       // Merge with any local requested trips not yet in PostGIS RPC result
       const seen = new Set(rpcTrips.map(r => r.id));
       requestedTrips.forEach(rt => {

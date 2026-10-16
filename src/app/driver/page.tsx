@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
@@ -174,27 +174,34 @@ export default function DriverPage() {
     const loadTrips = async () => {
       const trips = await getTrips();
       const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+      const declinedIds = getDeclinedTripIds(driverId);
+
       // Find active trips assigned to THIS driver
       const active = trips.find(
         t =>
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
-          (!t.driver_id || !driverId || t.driver_id === driverId)
+          (!t.driver_id || !driverId || t.driver_id === driverId) &&
+          !declinedIds.has(t.id)
       );
       
       if (active) {
         setActiveTrip(active);
         if (active.status === 'payment_pending') setIsWaitingForPayment(true);
       } else {
-        // Find requested trips (prioritizing within 15 km of driver's GPS, falling back to any active requested trip)
+        // Find requested trips (excluding any declined by this driver)
         let nearbyRequested: MockTrip[] = [];
         if (driverCoords) {
-          nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15);
+          nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15, driverId);
         }
         if (nearbyRequested.length === 0) {
-          nearbyRequested = trips.filter(t => t.status === 'requested' && !t.driver_id);
+          nearbyRequested = trips.filter(
+            t => t.status === 'requested' && !t.driver_id && !declinedIds.has(t.id)
+          );
         }
         if (nearbyRequested.length > 0) {
           setRequest(prev => prev?.id === nearbyRequested[0].id ? prev : nearbyRequested[0]);
+        } else {
+          setRequest(null);
         }
       }
     };
@@ -206,8 +213,9 @@ export default function DriverPage() {
       if (type === 'INSERT' || type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (!trip) return;
+        const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
 
-        if (trip.status === 'requested' && !activeTrip) {
+        if (trip.status === 'requested' && !activeTrip && !isTripDeclined(trip.id, driverId)) {
           setRequest(trip);
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
             new Notification('🚖 New Trip Request!', {
@@ -222,9 +230,13 @@ export default function DriverPage() {
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
           alert("Payment Received! Trip Completed.");
+        } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'cancelled') {
+          setActiveTrip(null);
+          setIsWaitingForPayment(false);
+          setShowFareCollection(false);
         } else if (activeTrip && trip.id === activeTrip.id) {
           setActiveTrip(trip);
-        } else if (trip.status !== 'requested') {
+        } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId)) {
           setRequest(prev => (prev && prev.id === trip.id ? null : prev));
         }
       }
@@ -353,8 +365,14 @@ export default function DriverPage() {
     }
   }
 
-  const handleDecline = () => {
-    setRequest(null)
+  const handleDecline = async () => {
+    if (!request) return;
+    const tripToDecline = request;
+    const driverId =
+      profile?.id ||
+      (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+    setRequest(null);
+    await declineTrip(tripToDecline, driverId);
   }
 
   const handleConfirmPickup = () => {

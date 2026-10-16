@@ -185,5 +185,33 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
       'Owner account must never be flagged as expired even 100 days later'
     );
   });
+
+  it('Scenario 5: Driver Declines Trip Request -> Trip Filtered Out and Marked Cancelled', () => {
+    const declinedTripIds = new Set<string>();
+    const trips = [
+      { id: 'trip-101', status: 'requested', fare_amount: 120 },
+      { id: 'trip-102', status: 'requested', fare_amount: 85 },
+    ];
+
+    // Simulate declineTrip('trip-101')
+    const declineTripSim = (tripId: string) => {
+      declinedTripIds.add(tripId);
+      const idx = trips.findIndex((t) => t.id === tripId);
+      if (idx >= 0) {
+        trips[idx] = { ...trips[idx], status: 'cancelled' };
+      }
+    };
+
+    declineTripSim('trip-101');
+
+    const remainingRequested = trips.filter(
+      (t) => t.status === 'requested' && !declinedTripIds.has(t.id)
+    );
+
+    assert.strictEqual(trips[0].status, 'cancelled', 'Declined trip should transition to cancelled status');
+    assert.strictEqual(declinedTripIds.has('trip-101'), true, 'Declined trip ID should be recorded');
+    assert.strictEqual(remainingRequested.length, 1, 'Only non-declined requested trips should remain visible');
+    assert.strictEqual(remainingRequested[0].id, 'trip-102');
+  });
 });
 

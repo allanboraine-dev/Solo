@@ -40,6 +40,7 @@ export default function RiderPage() {
   // Rating Modal state
   const [ratingTrip, setRatingTrip] = useState<MockTrip | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const [declineNotice, setDeclineNotice] = useState<string | null>(null)
 
   // Fetch active registered drivers in proximity to rider
   useEffect(() => {
@@ -114,15 +115,38 @@ export default function RiderPage() {
   }, []);
 
   useEffect(() => {
-    // Check if there is an active trip on mount
+    // Check if there is an active trip on mount and keep it synced with DB
     const loadTrips = async () => {
       const trips = await getTrips();
-      const active = trips.find(t => t.status !== 'completed');
+      if (activeTrip) {
+        const matched = trips.find(t => t.id === activeTrip.id);
+        if (matched) {
+          if (matched.status === 'cancelled') {
+            setActiveTrip(null);
+            setDriverCoords(null);
+            setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
+            return;
+          }
+          if (matched.status === 'completed') {
+            setRatingTrip(matched);
+            setShowRatingModal(true);
+            setActiveTrip(null);
+            setDriverCoords(null);
+            return;
+          }
+          if (matched.status !== activeTrip.status || matched.driver_id !== activeTrip.driver_id) {
+            setActiveTrip(matched);
+          }
+          return;
+        }
+      }
+      const active = trips.find(t => t.status !== 'completed' && t.status !== 'cancelled');
       if (active) {
         setActiveTrip(active);
       }
     };
     loadTrips();
+    const pollInterval = setInterval(loadTrips, 3000);
 
     const handleDriverLocationUpdate = (data: any) => {
       if (!data?.id && !data?.driverId) return;
@@ -174,7 +198,19 @@ export default function RiderPage() {
               tag: `rider-trip-${trip.id}`,
             });
           }
+        } else if (trip.status === 'cancelled') {
+          setActiveTrip(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification('Ride Request Declined', {
+              body: 'The driver was unable to accept your trip request. Please request another ride.',
+              icon: '/rider-icon-192.png',
+              tag: `rider-trip-${trip.id}`,
+            });
+          }
         } else {
+          setDeclineNotice(null);
           if (trip.status === 'accepted' && (!activeTrip || activeTrip.status === 'requested')) {
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
               new Notification('Driver Accepted Your Ride! 🚗', {
@@ -199,6 +235,7 @@ export default function RiderPage() {
     window.addEventListener('solo_driver_location_update', handleLocalEvent);
 
     return () => {
+      clearInterval(pollInterval);
       unsubscribeEvents();
       window.removeEventListener('solo_driver_location_update', handleLocalEvent);
     }
@@ -458,6 +495,22 @@ export default function RiderPage() {
                   </div>
                 </div>
                 <NotificationPermissionBanner role="rider" userId={currentUser?.id} className="mb-4" />
+                {declineNotice && (
+                  <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex-1">
+                      <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">Ride Request Declined</p>
+                      <p>{declineNotice}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDeclineNotice(null)}
+                      className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <BookingForm 
                   onLocationSelect={handleLocationSelect} 
                   currentUser={currentUser}
@@ -483,15 +536,31 @@ export default function RiderPage() {
                     {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
                     {activeTrip.status === 'in_progress' && 'Heading to destination...'}
                   </p>
-                  <a
-                    href={buildWhatsAppTripShareUrl(activeTrip)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
-                  >
-                    <MessageCircle size={14} />
-                    <span>Share Live Trip via WhatsApp</span>
-                  </a>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <a
+                      href={buildWhatsAppTripShareUrl(activeTrip)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
+                    >
+                      <MessageCircle size={14} />
+                      <span>Share Live Trip via WhatsApp</span>
+                    </a>
+                    {activeTrip.status === 'requested' && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
+                          await saveTrip(cancelled);
+                          setActiveTrip(null);
+                          setDriverCoords(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
+                      >
+                        <span>Cancel Request</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex-1 min-h-[300px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">
