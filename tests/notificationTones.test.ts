@@ -11,6 +11,7 @@ import {
   removeCustomTone,
   playTone,
   getPresetWavDataUri,
+  playPresetWithWebAudio,
 } from '../src/utils/notificationTones.ts';
 import { audioAlert } from '../src/utils/audioAlert.ts';
 
@@ -130,6 +131,72 @@ describe('Notification & Alert Tone System Suite', () => {
       assert.ok(uri.startsWith('data:audio/wav;base64,'), `Preset ${preset} must be a valid base64 WAV URI`);
       assert.ok(uri.length > 200, `Preset ${preset} must have non-empty audio payload`);
     });
+  });
+
+  it('synthesizes tones via playPresetWithWebAudio with scheduled oscillators and gain nodes', () => {
+    const presets = ['default', 'radar', 'cash', 'urgent', 'bell', 'chime_bright'] as const;
+
+    presets.forEach(preset => {
+      let oscillatorsCreated = 0;
+      let gainsCreated = 0;
+      let destinationConnected = false;
+
+      const mockCtx = {
+        currentTime: 10.0,
+        destination: { id: 'speaker_destination' },
+        createGain: () => {
+          gainsCreated++;
+          return {
+            gain: {
+              setValueAtTime: () => {},
+              linearRampToValueAtTime: () => {},
+              exponentialRampToValueAtTime: () => {},
+            },
+            connect: (target: any) => {
+              if (target?.id === 'speaker_destination') {
+                destinationConnected = true;
+              }
+            },
+          };
+        },
+        createOscillator: () => {
+          oscillatorsCreated++;
+          return {
+            type: 'sine',
+            frequency: {
+              setValueAtTime: () => {},
+              exponentialRampToValueAtTime: () => {},
+            },
+            connect: () => {},
+            start: () => {},
+            stop: () => {},
+          };
+        },
+      } as unknown as AudioContext;
+
+      playPresetWithWebAudio(mockCtx, preset, 0.85);
+
+      assert.ok(oscillatorsCreated > 0, `Preset ${preset} must schedule at least one oscillator`);
+      assert.ok(gainsCreated > 0, `Preset ${preset} must route through gain envelopes`);
+      assert.strictEqual(destinationConnected, true, `Preset ${preset} must connect to audio context destination`);
+    });
+  });
+
+  it('dispatches solo_tone_changed custom event on window when tone is set', () => {
+    let dispatchedEvent: any = null;
+    (globalThis as any).window = {
+      dispatchEvent: (e: any) => {
+        dispatchedEvent = e;
+      },
+    };
+
+    setSelectedTone('bell');
+    assert.strictEqual(getSelectedTone(), 'bell');
+    assert.ok(dispatchedEvent);
+    assert.strictEqual(dispatchedEvent.type, 'solo_tone_changed');
+    assert.strictEqual(dispatchedEvent.detail.toneId, 'bell');
+
+    delete (globalThis as any).window;
   });
 
   it('ensures playTone and audioAlert execute safely without crashing in SSR/Node', async () => {

@@ -69,6 +69,9 @@ export function NotificationToneModal({
   const handleSelectPreset = async (toneId: ToneId) => {
     setSelectedId(toneId);
     setSelectedTone(toneId);
+    const toneObj = PRESET_TONES.find((t) => t.id === toneId);
+    setUploadSuccess(`Alert tone set to "${toneObj?.name || toneId}"`);
+    setUploadError(null);
     if (onToneSaved) onToneSaved(toneId);
     await handlePlayPreview(toneId);
   };
@@ -81,8 +84,14 @@ export function NotificationToneModal({
     } catch (err) {
       console.warn('[NotificationToneModal] preview error:', err);
     } finally {
-      setTimeout(() => setIsPlaying(null), 700);
+      setTimeout(() => setIsPlaying(null), 850);
     }
+  };
+
+  const handleClose = () => {
+    setSelectedTone(selectedId);
+    if (onToneSaved) onToneSaved(selectedId);
+    onClose();
   };
 
   const handleTestFullAlert = () => {
@@ -377,7 +386,7 @@ export function NotificationToneModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="w-full py-3.5 px-4 min-h-[48px] bg-black dark:bg-white text-white dark:text-black font-black text-sm rounded-2xl transition shadow-lg active:scale-98 touch-manipulation flex items-center justify-center gap-2"
           >
             <Check size={16} />

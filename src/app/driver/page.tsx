@@ -629,6 +629,18 @@ export default function DriverPage() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowToneModal(true)}
+              className="flex items-center justify-center gap-1 px-2.5 sm:px-3 py-2 min-h-[42px] bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-2xl border border-gray-200/50 dark:border-white/5 transition active:scale-95 touch-manipulation shadow-sm"
+              title={`Notification Tone: ${activeToneId === 'custom' ? (customToneMeta?.name || 'Custom') : (PRESET_TONES.find(t => t.id === activeToneId)?.name || 'Default')}`}
+              aria-label="Notification Alert Tone Settings"
+            >
+              <Volume2 size={16} className="text-blue-500 shrink-0" />
+              <span className="text-[11px] font-bold hidden sm:inline max-w-[70px] truncate">
+                {activeToneId === 'custom' ? 'Custom' : (PRESET_TONES.find(t => t.id === activeToneId)?.name.split(' ')[0] || 'Tone')}
+              </span>
+            </button>
             <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5 h-10 w-10 flex items-center justify-center touch-manipulation" />
             <button 
               onClick={async () => {
@@ -806,8 +818,48 @@ export default function DriverPage() {
                     </div>
                   )}
 
-                  <div className="mt-6 text-left">
+                  <div className="mt-6 text-left space-y-3">
                     <NotificationPermissionBanner role="driver" userId={profile?.id} />
+
+                    <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200/80 dark:border-white/10 flex items-center justify-between gap-2 shadow-sm">
+                      <div 
+                        className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                        onClick={() => setShowToneModal(true)}
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                          <Volume2 size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                            Tone: {activeToneId === 'custom' && customToneMeta ? customToneMeta.name : (PRESET_TONES.find(t => t.id === activeToneId)?.name || 'Default')}
+                          </p>
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                            Tap to change or select device audio
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            audioAlert.playTripAlertChime();
+                          }}
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 text-xs font-bold rounded-lg flex items-center gap-1 transition touch-manipulation"
+                          title="Test Sound"
+                        >
+                          <Play size={11} className="fill-current" />
+                          <span>Test</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowToneModal(true)}
+                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-lg transition touch-manipulation"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )

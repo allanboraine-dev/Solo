@@ -481,70 +481,210 @@ export async function removeCustomTone(): Promise<void> {
 }
 
 // ==========================================
-// Playback Engine: HTML5 Audio + Web Audio
+// Playback Engine: Native Web Audio + Persistent HTML5 Audio
 // ==========================================
 
 let sharedAudioCtx: AudioContext | null = null;
 let isAudioUnlocked = false;
+let activeAudioElement: HTMLAudioElement | null = null;
+
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const AudioCtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtxClass) return null;
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioCtxClass();
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Proactively unlocks mobile audio restrictions on user gestures.
  */
 export function unlockAudio(): void {
-  if (isAudioUnlocked || typeof window === 'undefined') return;
-  isAudioUnlocked = true;
-
+  if (typeof window === 'undefined') return;
   try {
-    // Unlock HTML5 Audio
-    const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
-    silentAudio.volume = 0;
-    silentAudio.play().catch(() => {});
-  } catch {}
-
-  try {
-    // Unlock Web Audio
-    const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (AudioCtxClass) {
-      if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-        sharedAudioCtx = new AudioCtxClass();
-      }
-      if (sharedAudioCtx.state === 'suspended') {
-        sharedAudioCtx.resume().catch(() => {});
-      }
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
     }
   } catch {}
+
+  if (!isAudioUnlocked) {
+    isAudioUnlocked = true;
+    try {
+      const silentAudio = new Audio(
+        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=='
+      );
+      silentAudio.volume = 0;
+      silentAudio.play().catch(() => {});
+    } catch {}
+  }
 }
 
-async function playViaWebAudio(dataUri: string, volume: number): Promise<void> {
-  try {
-    const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtxClass) return;
+/**
+ * Native, zero-latency Web Audio API synthesis for all built-in presets.
+ * Direct node connection to the destination audio graph guarantees 100% audible playback
+ * with no base64 overhead, no decodeAudioData failures, and immunity from garbage collection.
+ */
+export function playPresetWithWebAudio(ctx: AudioContext, preset: ToneId, volume: number): void {
+  const now = ctx.currentTime;
+  const masterGain = ctx.createGain();
+  const clampedVol = Math.max(0, Math.min(1, volume));
+  masterGain.gain.setValueAtTime(clampedVol, now);
+  masterGain.connect(ctx.destination);
 
-    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-      sharedAudioCtx = new AudioCtxClass();
-    }
-    if (sharedAudioCtx.state === 'suspended') {
-      await sharedAudioCtx.resume();
+  switch (preset) {
+    case 'radar': {
+      // 2 sharp high-tech sonar pings
+      const pings = [
+        { start: 0.00, dur: 0.16, f1: 1200, f2: 1050 },
+        { start: 0.18, dur: 0.22, f1: 1600, f2: 1450 },
+      ];
+      pings.forEach(({ start, dur, f1, f2 }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f1, now + start);
+        osc.frequency.exponentialRampToValueAtTime(f2, now + start + dur);
+
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.linearRampToValueAtTime(0.55, now + start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      });
+      break;
     }
 
-    const base64 = dataUri.split(',')[1];
-    if (!base64) return;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    case 'cash': {
+      // Metallic cash register "Cha-Ching"
+      const osc1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(987.77, now); // B5
+      g1.gain.setValueAtTime(0.5, now);
+      g1.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      osc1.connect(g1);
+      g1.connect(masterGain);
+      osc1.start(now);
+      osc1.stop(now + 0.18);
+
+      [1318.51, 1975.53].forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now + 0.07);
+        g.gain.setValueAtTime(idx === 0 ? 0.6 : 0.3, now + 0.07);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start(now + 0.07);
+        osc.stop(now + 0.55);
+      });
+      break;
     }
 
-    const audioBuffer = await sharedAudioCtx.decodeAudioData(bytes.buffer.slice(0));
-    const source = sharedAudioCtx.createBufferSource();
-    const gain = sharedAudioCtx.createGain();
-    gain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), sharedAudioCtx.currentTime);
-    source.buffer = audioBuffer;
-    source.connect(gain);
-    gain.connect(sharedAudioCtx.destination);
-    source.start(0);
-  } catch (err) {
-    console.warn('[NotificationTones] Web Audio fallback failed:', err);
+    case 'urgent': {
+      // 4 rapid alternating high-priority dispatch beeps
+      for (let i = 0; i < 4; i++) {
+        const start = i * 0.11;
+        const dur = 0.09;
+        const freq = i % 2 === 0 ? 880 : 1150;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + start);
+
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.linearRampToValueAtTime(0.5, now + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      }
+      break;
+    }
+
+    case 'bell': {
+      // Service desk bell with rich natural decay
+      [
+        { freq: 1046.50, vol: 0.55, decay: 0.8 },
+        { freq: 2093.00, vol: 0.28, decay: 0.5 },
+        { freq: 3135.96, vol: 0.12, decay: 0.3 },
+      ].forEach(({ freq, vol, decay }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + decay);
+      });
+      break;
+    }
+
+    case 'chime_bright': {
+      // Staccato sparkle arpeggio (C5 -> E5 -> G5 -> C6)
+      const notes = [
+        { freq: 523.25, start: 0.00, dur: 0.12 },
+        { freq: 659.25, start: 0.09, dur: 0.12 },
+        { freq: 783.99, start: 0.18, dur: 0.14 },
+        { freq: 1046.50, start: 0.27, dur: 0.35 },
+      ];
+      notes.forEach(({ freq, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + start);
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.linearRampToValueAtTime(0.5, now + start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      });
+      break;
+    }
+
+    case 'default':
+    default: {
+      // SOLO Harmony (D5 -> A5 -> D6)
+      const notes = [
+        { freq: 587.33, start: 0.00, dur: 0.16 }, // D5
+        { freq: 880.00, start: 0.12, dur: 0.18 }, // A5
+        { freq: 1174.66, start: 0.26, dur: 0.45 }, // D6
+      ];
+      notes.forEach(({ freq, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + start);
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.linearRampToValueAtTime(0.5, now + start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      });
+      break;
+    }
   }
 }
 
@@ -559,29 +699,72 @@ export async function playTone(toneId?: ToneId): Promise<void> {
   const resolvedId: ToneId = toneId || getSelectedTone();
   const volume = getToneVolume();
 
+  // 1. If preset tone, use native Web Audio API synthesis FIRST (instant, zero latency, no GC cutoff)
+  if (resolvedId !== 'custom') {
+    const ctx = getSharedAudioContext();
+    if (ctx) {
+      try {
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+        playPresetWithWebAudio(ctx, resolvedId, volume);
+        return;
+      } catch (err) {
+        console.warn('[NotificationTones] Web Audio synthesis error, falling back to audio element:', err);
+      }
+    }
+  }
+
+  // 2. Custom device audio or fallback
   let audioSrc: string | null = null;
   if (resolvedId === 'custom') {
     audioSrc = await getCustomAudioFromDb();
   }
 
-  // If custom audio is missing or a preset was requested, get preset WAV data URI
+  // If custom audio is missing, fall back to default
   if (!audioSrc) {
+    if (resolvedId === 'custom') {
+      const ctx = getSharedAudioContext();
+      if (ctx) {
+        try {
+          if (ctx.state === 'suspended') await ctx.resume();
+          playPresetWithWebAudio(ctx, 'default', volume);
+          return;
+        } catch {}
+      }
+    }
     audioSrc = getPresetWavDataUri(resolvedId === 'custom' ? 'default' : resolvedId);
   }
 
-  // 1. Try HTML5 Audio element
+  // Play audioSrc via persistent HTMLAudioElement so garbage collection cannot cancel playback
   try {
+    if (activeAudioElement) {
+      activeAudioElement.pause();
+      activeAudioElement.currentTime = 0;
+    }
     const audio = new Audio(audioSrc);
     audio.volume = Math.max(0, Math.min(1, volume));
+    activeAudioElement = audio;
+
+    audio.onended = () => {
+      if (activeAudioElement === audio) activeAudioElement = null;
+    };
+    audio.onerror = () => {
+      if (activeAudioElement === audio) activeAudioElement = null;
+    };
+
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       await playPromise;
-      return;
     }
-  } catch (audioErr) {
-    console.warn('[NotificationTones] HTML5 Audio play error, trying Web Audio fallback:', audioErr);
+  } catch (err) {
+    console.warn('[NotificationTones] Audio element playback error, using Web Audio fallback:', err);
+    const ctx = getSharedAudioContext();
+    if (ctx) {
+      try {
+        if (ctx.state === 'suspended') await ctx.resume();
+        playPresetWithWebAudio(ctx, 'default', volume);
+      } catch {}
+    }
   }
-
-  // 2. Fallback to Web Audio buffer playback
-  await playViaWebAudio(audioSrc, volume);
 }
