@@ -4,6 +4,8 @@
  * and triggers physical haptic vibration patterns on supported mobile devices.
  */
 
+import { playTone, type ToneId } from './notificationTones.ts';
+
 class AudioAlertManager {
   private audioCtx: AudioContext | null = null;
 
@@ -24,9 +26,25 @@ class AudioAlertManager {
   }
 
   /**
-   * Plays a 3-tone ascending alert chime (D5 -> A5 -> D6)
+   * Plays the active notification tone (or a specific tone if provided).
+   * Supports custom device audio and all built-in presets.
    */
-  public playTripAlertChime(): void {
+  public playTripAlertChime(specificToneId?: ToneId): void {
+    if (typeof window === 'undefined') return;
+    try {
+      playTone(specificToneId).catch((err) => {
+        console.warn('[AudioAlert] Tone playback error, fallback to legacy chime:', err);
+        this.playLegacyChime();
+      });
+    } catch {
+      this.playLegacyChime();
+    }
+  }
+
+  /**
+   * Fallback 3-tone ascending alert chime (D5 -> A5 -> D6)
+   */
+  private playLegacyChime(): void {
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
