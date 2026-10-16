@@ -10,7 +10,7 @@ import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 
 // Dynamically import Map component to disable SSR
@@ -43,6 +43,7 @@ export default function RiderPage() {
   const [availableDrivers, setAvailableDrivers] = useState<LiveDriver[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [isSheetMinimized, setIsSheetMinimized] = useState(false)
   
   // Authentication State
   const [currentUser, setCurrentUser] = useState<{ id: string; fullName?: string; phone?: string } | null>(null)
@@ -488,7 +489,7 @@ export default function RiderPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+    <div className="h-[calc(100dvh-64px)] md:h-[calc(100dvh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Map Background layer */}
       <div className="absolute inset-0 z-0">
         <MapComponent 
@@ -518,16 +519,16 @@ export default function RiderPage() {
       </div>
 
       {/* Top Header: Rider Profile or Phone Auth Button */}
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+      <div className="absolute top-3 right-3 md:top-4 md:right-4 z-30 flex items-center gap-2">
         {currentUser ? (
-          <div className="flex items-center gap-2.5 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
-            <div className="flex items-center gap-2.5 pr-2.5 border-r border-gray-200 dark:border-zinc-800">
-              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                {currentUser.fullName ? currentUser.fullName.charAt(0) : <User size={15} />}
+          <div className="flex items-center gap-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-3.5 md:py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
+            <div className="flex items-center gap-2 pr-2 border-r border-gray-200 dark:border-zinc-800">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
+                {currentUser.fullName ? currentUser.fullName.charAt(0) : <User size={14} />}
               </div>
-              <div className="text-left hidden sm:block">
-                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white">{currentUser.fullName}</p>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">{currentUser.phone || 'Verified Rider'}</p>
+              <div className="text-left">
+                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white max-w-[110px] sm:max-w-none truncate">{currentUser.fullName}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight hidden sm:block">{currentUser.phone || 'Verified Rider'}</p>
               </div>
             </div>
             <button
@@ -535,13 +536,13 @@ export default function RiderPage() {
               className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition p-1"
               title="Sign Out"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
             </button>
           </div>
         ) : (
           <button
             onClick={() => setShowAuthModal(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-2xl shadow-lg shadow-blue-600/30 text-xs font-bold transition active:scale-95"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 md:px-4 md:py-2.5 rounded-2xl shadow-lg shadow-blue-600/30 text-xs font-bold transition active:scale-95"
           >
             <Phone size={14} />
             <span>Sign In</span>
@@ -549,99 +550,171 @@ export default function RiderPage() {
         )}
       </div>
 
-      {/* Floating UI Panel */}
-      <div className="absolute bottom-0 left-0 w-full md:bottom-auto md:top-28 md:left-8 md:w-96 flex flex-col z-10 md:max-h-[calc(100vh-140px)]">
-        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border border-white/40 dark:border-white/10 flex flex-col max-h-[85vh] md:max-h-full">
-          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-1 md:hidden"></div>
-          <div className={`p-6 pt-2 md:pt-6 flex-1 flex flex-col ${!activeTrip ? 'overflow-visible' : 'overflow-y-auto custom-scrollbar'}`}>
+      {/* Floating UI Panel / Mobile Bottom Sheet */}
+      <div className="absolute bottom-0 left-0 right-0 w-full md:bottom-auto md:right-auto md:top-4 md:left-6 md:w-96 flex flex-col z-20 md:max-h-[calc(100dvh-128px)]">
+        <div
+          className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
+            isSheetMinimized ? 'max-h-[76px] md:max-h-full overflow-hidden' : 'max-h-[72dvh] md:max-h-full'
+          }`}
+        >
+          {/* Mobile Sheet Handle / Minimize Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsSheetMinimized(prev => !prev)}
+            className="w-full pt-2.5 pb-1 flex flex-col items-center justify-center md:hidden focus:outline-none shrink-0"
+            aria-label={isSheetMinimized ? 'Expand booking panel' : 'Minimize booking panel to view map'}
+          >
+            <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
+          </button>
+
+          <div className="p-4 pt-1 pb-6 md:p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="mb-6 flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/30">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Where to?</h1>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                      <p className="text-xs font-semibold text-green-600 dark:text-green-400">
-                        {availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby
-                      </p>
+                <div className="mb-3 md:mb-5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 md:p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/30 shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+                    </div>
+                    <div>
+                      <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight">Where to?</h1>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+                          {availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetMinimized(prev => !prev)}
+                    className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0"
+                  >
+                    {isSheetMinimized ? (
+                      <>
+                        <span>Book</span>
+                        <ChevronUp size={14} />
+                      </>
+                    ) : (
+                      <>
+                        <span>Map</span>
+                        <ChevronDown size={14} />
+                      </>
+                    )}
+                  </button>
                 </div>
-                <NotificationPermissionBanner role="rider" userId={currentUser?.id} className="mb-4" />
-                {declineNotice && (
-                  <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-medium">
-                    <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                    <div className="flex-1">
-                      <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">Ride Request Declined</p>
-                      <p>{declineNotice}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDeclineNotice(null)}
-                      className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-1"
-                    >
-                      ✕
-                    </button>
-                  </div>
+
+                {!isSheetMinimized && (
+                  <>
+                    <NotificationPermissionBanner role="rider" userId={currentUser?.id} className="mb-3" />
+                    {declineNotice && (
+                      <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <div className="flex-1">
+                          <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">Ride Request Declined</p>
+                          <p>{declineNotice}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDeclineNotice(null)}
+                          className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                    <BookingForm 
+                      onLocationSelect={handleLocationSelect} 
+                      currentUser={currentUser}
+                      onRequireAuth={() => setShowAuthModal(true)}
+                    />
+                  </>
                 )}
-                <BookingForm 
-                  onLocationSelect={handleLocationSelect} 
-                  currentUser={currentUser}
-                  onRequireAuth={() => setShowAuthModal(true)}
-                />
               </div>
             ) : (
               <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500">
-                <h2 className="text-2xl font-bold mb-4 tracking-tight">Trip Status</h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-xl md:text-2xl font-bold tracking-tight">Trip Status</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetMinimized(prev => !prev)}
+                    className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800"
+                  >
+                    {isSheetMinimized ? (
+                      <>
+                        <span>Details</span>
+                        <ChevronUp size={14} />
+                      </>
+                    ) : (
+                      <>
+                        <span>Map</span>
+                        <ChevronDown size={14} />
+                      </>
+                    )}
+                  </button>
+                </div>
                 
-                <div className="p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl mb-6 border border-blue-100 dark:border-blue-800/50">
-                  <div className="font-bold text-lg capitalize mb-1 text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                    {activeTrip.status.replace('_', ' ')}
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                    {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
-                      <span className="block mb-1 text-blue-500">
-                        Scheduled for: {new Date(activeTrip.scheduled_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                    )}
-                    {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
-                    {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
-                    {activeTrip.status === 'in_progress' && 'Heading to destination...'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <a
-                      href={buildWhatsAppTripShareUrl(activeTrip)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
-                    >
-                      <MessageCircle size={14} />
-                      <span>Share Live Trip via WhatsApp</span>
-                    </a>
-                    {activeTrip.status === 'requested' && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
-                          updateActiveTripState(null);
-                          setDriverCoords(null);
-                          await saveTrip(cancelled);
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
-                      >
-                        <span>Cancel Request</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                {!isSheetMinimized && (
+                  <>
+                    <div className="p-4 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl mb-3 md:mb-5 border border-blue-100 dark:border-blue-800/50">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="font-bold text-base md:text-lg capitalize text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                          {activeTrip.status.replace('_', ' ')}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {activeTrip.verification_pin && (
+                            <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-blue-600 text-white shadow-sm">
+                              PIN: {activeTrip.verification_pin}
+                            </span>
+                          )}
+                          <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                            R{activeTrip.fare_amount}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 font-medium">
+                        {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
+                          <span className="block mb-1 text-blue-500">
+                            Scheduled for: {new Date(activeTrip.scheduled_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        )}
+                        {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
+                        {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
+                        {activeTrip.status === 'in_progress' && 'Heading to destination...'}
+                      </p>
+                      <div className="mt-2.5 md:mt-3 flex flex-wrap items-center gap-2">
+                        <a
+                          href={buildWhatsAppTripShareUrl(activeTrip)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
+                        >
+                          <MessageCircle size={14} />
+                          <span>Share Live Trip via WhatsApp</span>
+                        </a>
+                        {activeTrip.status === 'requested' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
+                              updateActiveTripState(null);
+                              setDriverCoords(null);
+                              await saveTrip(cancelled);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
+                          >
+                            <span>Cancel Request</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="flex-1 min-h-[300px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">
-                  <Chat tripId={activeTrip.id} role="rider" />
-                </div>
+                    <div className="flex-1 min-h-[190px] md:min-h-[280px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">
+                      <Chat tripId={activeTrip.id} role="rider" />
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

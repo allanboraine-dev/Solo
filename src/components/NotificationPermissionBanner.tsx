@@ -94,80 +94,80 @@ export function NotificationPermissionBanner({
 
   return (
     <div
-      className={`p-4 rounded-2xl border transition-all ${
+      className={`p-3 sm:p-4 rounded-2xl border transition-all ${
         status === "granted"
           ? "bg-zinc-900/60 border-zinc-800 text-zinc-300"
-          : "bg-gradient-to-r from-blue-950/40 to-indigo-950/40 border-blue-800/40 text-white"
+          : "bg-gradient-to-r from-blue-950/80 to-indigo-950/80 border-blue-800/50 text-white"
       } ${className}`}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+        <div className="flex items-center sm:items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
           <div
-            className={`p-2.5 rounded-xl shrink-0 ${
+            className={`p-2 sm:p-2.5 rounded-xl shrink-0 ${
               status === "granted"
                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                 : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
             }`}
           >
             {status === "granted" ? (
-              <BellRing size={20} className="text-emerald-400" />
+              <BellRing size={16} className="text-emerald-400 sm:w-5 sm:h-5" />
             ) : status === "denied" ? (
-              <BellOff size={20} className="text-red-400" />
+              <BellOff size={16} className="text-red-400 sm:w-5 sm:h-5" />
             ) : (
-              <Bell size={20} className="text-blue-400 animate-bounce" />
+              <Bell size={16} className="text-blue-400 animate-bounce sm:w-5 sm:h-5" />
             )}
           </div>
 
-          <div className="space-y-0.5">
-            <h4 className="text-sm font-bold flex items-center gap-1.5">
-              <span>{isDriver ? "Driver Dispatch Push Alerts" : "Live Ride Push Alerts"}</span>
+          <div className="space-y-0.5 min-w-0 flex-1">
+            <h4 className="text-xs sm:text-sm font-bold flex items-center gap-1.5 flex-wrap">
+              <span className="truncate">{isDriver ? "Dispatch Push Alerts" : "Live Ride Alerts"}</span>
               {status === "granted" && (
-                <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1">
                   <Check size={10} /> Active
                 </span>
               )}
             </h4>
-            <p className="text-xs text-zinc-400">
+            <p className="text-[11px] sm:text-xs text-zinc-300 sm:text-zinc-400 line-clamp-1 sm:line-clamp-2">
               {status === "granted"
                 ? isDriver
-                  ? "You'll receive sound & vibration alerts even when your phone screen is locked."
-                  : "You'll get notified immediately when your driver accepts, arrives, or finishes."
+                  ? "Sound & vibration alerts active even when locked."
+                  : "Instant alerts when your driver accepts or arrives."
                 : status === "denied"
-                ? "Notifications are blocked in your browser settings. Tap the lock icon in the URL bar to enable."
+                ? "Notifications blocked in browser settings."
                 : isDriver
-                ? "Never miss a ride request. Get instant push alerts with chime & vibration when nearby riders request a trip."
-                : "Get instant alerts when your driver accepts your ride, arrives at pickup, and settles payment."}
+                ? "Instant chime & vibration when nearby riders request a trip."
+                : "Get notified when your driver accepts & arrives."}
             </p>
             {errorMsg && (
-              <p className="text-xs text-red-400 flex items-center gap-1 pt-1">
+              <p className="text-[11px] text-red-400 flex items-center gap-1 pt-0.5">
                 <AlertCircle size={12} /> {errorMsg}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+        <div className="flex items-center gap-1.5 shrink-0">
           {status === "granted" ? (
             <button
               onClick={handleSendTestPush}
               disabled={testSent}
-              className="text-xs font-semibold py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl transition flex items-center gap-1.5 border border-zinc-700 active:scale-95"
+              className="text-[11px] sm:text-xs font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl transition flex items-center gap-1 border border-zinc-700 active:scale-95"
             >
-              <Send size={12} className={testSent ? "animate-spin" : ""} />
-              <span>{testSent ? "Alert Sent!" : "Test Alert"}</span>
+              <Send size={11} className={testSent ? "animate-spin" : ""} />
+              <span>{testSent ? "Sent!" : "Test"}</span>
             </button>
           ) : status !== "denied" ? (
             <button
               onClick={handleEnablePush}
               disabled={loading}
-              className={`text-xs font-bold py-2.5 px-4 rounded-xl shadow-md transition active:scale-95 flex items-center gap-1.5 text-white ${
+              className={`text-[11px] sm:text-xs font-bold py-2 px-3 sm:py-2.5 sm:px-4 rounded-xl shadow-md transition active:scale-95 flex items-center gap-1.5 text-white whitespace-nowrap ${
                 isDriver
                   ? "bg-emerald-600 hover:bg-emerald-500"
                   : "bg-blue-600 hover:bg-blue-500"
               }`}
             >
-              <Bell size={14} className={loading ? "animate-pulse" : ""} />
-              <span>{loading ? "Activating..." : "Enable Push Alerts"}</span>
+              <Bell size={13} className={loading ? "animate-pulse" : ""} />
+              <span>{loading ? "Enabling..." : "Enable"}</span>
             </button>
           ) : null}
         </div>

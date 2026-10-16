@@ -171,10 +171,10 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
   }
 
   return (
-    <div className="space-y-4 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-4">
-      <div className="space-y-3 relative z-10">
-        {/* Pickup Location Search + House/Building Detail */}
-        <div className="space-y-1.5">
+    <div className="space-y-3 md:space-y-4 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-2">
+      <div className="space-y-2.5 md:space-y-3 relative z-20">
+        {/* Pickup Location Search + House/Building Detail (z-30 so dropdown sits above Dropoff) */}
+        <div className="space-y-1.5 relative z-30">
           <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
             <div className="w-full">
               <CustomSearchInput 
@@ -194,7 +194,7 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
             <button 
               type="button"
               onClick={() => handleGetCurrentLocation()} 
-              className="absolute right-3 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
+              className="absolute right-2.5 md:right-3 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
               title="Use Current Location"
             >
               <LocateFixed size={18} />
@@ -208,14 +208,14 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
                 value={pickupDetail}
                 onChange={(e) => setPickupDetail(e.target.value)}
                 placeholder="Add house #, unit, complex, or gate note (optional)"
-                className="w-full bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+                className="w-full bg-transparent text-base sm:text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
               />
             </div>
           )}
         </div>
         
-        {/* Destination Location Search + House/Building Detail */}
-        <div className="space-y-1.5">
+        {/* Destination Location Search + House/Building Detail (z-20 so dropdown sits above Leave Now) */}
+        <div className="space-y-1.5 relative z-20">
           <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
             <div className="w-full">
               <CustomSearchInput 
@@ -240,40 +240,40 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
                 value={dropoffDetail}
                 onChange={(e) => setDropoffDetail(e.target.value)}
                 placeholder="Add destination house #, building, or entrance (optional)"
-                className="w-full bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+                className="w-full bg-transparent text-base sm:text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
               />
             </div>
           )}
         </div>
       </div>
 
-      <div className="relative flex items-center">
+      <div className="relative flex items-center z-10">
         <input 
           type="datetime-local" 
           value={pickupTime}
           onChange={(e) => setPickupTime(e.target.value)}
-          className={`w-full p-4 pl-12 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all outline-none font-medium text-[15px] shadow-sm ${!pickupTime ? 'text-transparent' : 'text-gray-700 dark:text-gray-300'}`} 
+          className={`w-full p-3.5 md:p-4 pl-11 md:pl-12 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 rounded-2xl transition-all outline-none font-medium text-base sm:text-[15px] shadow-sm ${!pickupTime ? 'text-transparent' : 'text-gray-700 dark:text-gray-300'}`} 
         />
-        <Clock className="absolute left-4 text-blue-500" size={18} />
-        {!pickupTime && <span className="absolute left-12 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-[15px] font-medium">Leave Now</span>}
+        <Clock className="absolute left-3.5 md:left-4 text-blue-500" size={18} />
+        {!pickupTime && <span className="absolute left-11 md:left-12 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-sm md:text-[15px] font-medium">Leave Now</span>}
       </div>
       
       {fare !== null && distanceKm !== null && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-3.5 md:p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
           <div>
             <div className="flex items-center gap-1.5 mb-0.5">
-              <p className="text-sm font-bold text-blue-900 dark:text-blue-100">Estimated Fare</p>
+              <p className="text-xs md:text-sm font-bold text-blue-900 dark:text-blue-100">Estimated Fare</p>
               {durationMinutes && (
                 <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/60 px-1.5 py-0.5 rounded">
                   Live Traffic
                 </span>
               )}
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-300 font-medium">
+            <p className="text-[11px] md:text-xs text-blue-600 dark:text-blue-300 font-medium">
               {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''}
             </p>
           </div>
-          <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
+          <div className="text-xl md:text-2xl font-black text-blue-600 dark:text-blue-400">
             R{fare}
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
       <button 
         onClick={handleBook}
         disabled={isBooking || fare === null}
-        className="w-full bg-black dark:bg-white text-white dark:text-black font-bold p-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-black/10 dark:shadow-white/5 flex justify-center items-center gap-2"
+        className="w-full bg-black dark:bg-white text-white dark:text-black font-bold p-3.5 md:p-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-black/10 dark:shadow-white/5 flex justify-center items-center gap-2"
       >
         {isBooking ? (
           <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />

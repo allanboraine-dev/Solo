@@ -89,7 +89,7 @@ export default function CustomSearchInput({
             if (results.length > 0) setIsOpen(true)
           }}
           placeholder={placeholder}
-          className={`w-full p-4 bg-transparent outline-none font-medium text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 ${
+          className={`w-full p-3.5 md:p-4 bg-transparent outline-none font-medium text-base sm:text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 ${
             hasRightAction ? 'pr-20' : 'pr-10'
           }`}
         />
@@ -116,7 +116,7 @@ export default function CustomSearchInput({
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute top-full mt-2 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto custom-scrollbar flex flex-col">
+        <div className="absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-56 md:max-h-72 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col">
           {results.map((place) => {
             const subLabel = [place.street, place.suburb, place.city]
               .filter(Boolean)
@@ -124,7 +124,7 @@ export default function CustomSearchInput({
             return (
               <div
                 key={place.id}
-                className="p-3.5 hover:bg-blue-50/60 dark:hover:bg-zinc-800/70 cursor-pointer border-b border-gray-100 dark:border-zinc-800/60 last:border-0 flex items-start gap-3 transition-colors"
+                className="p-3 md:p-3.5 hover:bg-blue-50/60 dark:hover:bg-zinc-800/70 active:bg-blue-100/60 dark:active:bg-zinc-800 cursor-pointer border-b border-gray-100 dark:border-zinc-800/60 last:border-0 flex items-start gap-2.5 md:gap-3 transition-colors"
                 onClick={() => {
                   suppressNextSearchRef.current = true
                   onSelect(place)
@@ -137,7 +137,7 @@ export default function CustomSearchInput({
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                    <span className="font-bold text-sm text-gray-900 dark:text-gray-100 leading-snug">
+                    <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-snug">
                       {place.name}
                     </span>
                     {place.houseNumber && (
@@ -151,7 +151,7 @@ export default function CustomSearchInput({
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                  <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
                     {place.display_name || subLabel}
                   </span>
                 </div>

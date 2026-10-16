@@ -514,7 +514,7 @@ export default function DriverPage() {
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
-    <div className="h-[calc(100vh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+    <div className="h-[calc(100dvh-64px)] md:h-[calc(100dvh-96px)] w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
       {/* Real Map Background */}
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
@@ -531,11 +531,11 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Header */}
-      <div className="absolute top-4 left-4 right-4 md:left-8 md:right-auto md:w-96 z-10">
-        <div className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 p-5 flex justify-between items-center transition-all">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight">Driver Portal</h1>
+      <div className="absolute top-2.5 md:top-4 left-3 right-3 md:left-8 md:right-auto md:w-96 z-10">
+        <div className="bg-white/85 dark:bg-zinc-950/85 backdrop-blur-2xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 p-3.5 md:p-5 flex justify-between items-center gap-2 transition-all">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="text-lg md:text-xl font-black tracking-tight">Driver Portal</h1>
               <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-400 font-bold text-[11px] shadow-sm">
                 <span>★</span>
                 <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
@@ -552,27 +552,27 @@ export default function DriverPage() {
                 <span className="bg-green-100/80 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider">7-Day Free Trial</span>
               )}
             </div>
-            <p className="text-sm text-gray-500 font-medium mt-1">Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}</p>
+            <p className="text-xs md:text-sm text-gray-500 font-medium mt-0.5 truncate">Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}</p>
           </div>
           <button 
             onClick={() => setIsOnline(!isOnline)}
             disabled={!!activeTrip}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl font-bold transition-all shadow-sm ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-sm shrink-0 ${
               isOnline 
                 ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 border border-green-200/50 dark:border-green-800/50 shadow-[0_0_20px_rgba(34,197,94,0.2)]' 
                 : 'bg-gray-200/50 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300'
             } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
           >
-            <Power size={18} />
+            <Power size={16} />
             {isOnline ? 'Online' : 'Offline'}
           </button>
         </div>
       </div>
 
       {/* Floating Main Content Panel */}
-      <div className="absolute top-28 bottom-4 left-4 right-4 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
+      <div className="absolute top-24 md:top-28 bottom-24 md:bottom-28 left-3 right-3 md:left-8 md:right-auto md:w-96 flex flex-col z-10 pointer-events-none">
         <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto">
-          <div className="p-6 overflow-y-auto custom-scrollbar flex-1 flex flex-col">
+          <div className="p-4 md:p-6 overflow-y-auto overscroll-contain custom-scrollbar flex-1 min-h-0 flex flex-col">
             {activeTab === 'home' && (
               activeTrip ? (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500 flex flex-col h-full">

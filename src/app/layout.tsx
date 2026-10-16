@@ -56,7 +56,7 @@ export default function RootLayout({
           <PWAProvider>
             <OfflineIndicator />
             <Navbar />
-            <main className="min-h-screen pt-24">
+            <main className="min-h-[100dvh] pt-16 md:pt-24">
               {children}
             </main>
           </PWAProvider>
