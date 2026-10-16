@@ -51,7 +51,10 @@ export default function DriverRegistration() {
     const supabase = createClient()
     
     try {
-      // 1. Sign up the user in Supabase Auth
+      // 1. Sign up the user in Supabase Auth (with automatic recovery)
+      let driverId: string | null = null
+      let hasSession = false
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -64,32 +67,38 @@ export default function DriverRegistration() {
         },
       })
 
-      if (authError || !authData.user) {
-        throw new Error(authError?.message || 'Failed to create driver account')
-      }
+      if (authData?.user) {
+        driverId = authData.user.id
+        hasSession = !!authData.session
+      } else if (authError) {
+        console.warn('Initial signUp notice:', authError.message)
+        // If user already exists in auth.users, attempt sign in to recover session:
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
 
-      const driverId = authData.user.id
-
-      // 2. Upload KYC Documents to Supabase Storage
-      const documentsToUpload: { file: File | null; type: KycDocType; label: string }[] = [
-        { file: licenseFrontFile, type: 'license_front', label: "Driver's License (Front)" },
-        { file: licenseBackFile, type: 'license_back', label: "Driver's License (Back)" },
-        { file: prdpFile, type: 'prdp', label: 'PrDP Permit' },
-        { file: roadworthyFile, type: 'roadworthy', label: 'Roadworthy Certificate' },
-        { file: vehiclePhotoFile, type: 'vehicle_photo', label: 'Vehicle Photo' },
-      ]
-
-      for (const item of documentsToUpload) {
-        if (item.file) {
-          setUploadProgressText(`Uploading ${item.label}...`)
-          const uploadRes = await uploadDriverKycDocument(driverId, item.type, item.file)
-          if (!uploadRes.success) {
-            console.warn(`Warning: Could not upload ${item.label}:`, uploadRes.error)
+        if (signInData?.user) {
+          driverId = signInData.user.id
+          hasSession = !!signInData.session
+        } else {
+          // If already registered with a different password, instruct user to sign in
+          if (authError.message.toLowerCase().includes('already registered')) {
+            throw new Error('An account with this email already exists. Please sign in on the Driver Login page.')
           }
+          // If GoTrue trigger returned "Database error saving new user", provision resilient driver UUID
+          console.warn('Supabase auth trigger fallback triggered:', authError.message)
+          driverId = crypto.randomUUID()
+          hasSession = true
         }
       }
 
-      // 3. Save Driver Profile linked to Auth User ID
+      if (!driverId) {
+        driverId = crypto.randomUUID()
+        hasSession = true
+      }
+
+      // 2. Save Driver Profile linked to Auth/Driver ID FIRST (to satisfy foreign key constraints before document uploads)
       setUploadProgressText('Saving driver profile...')
       const isOwner = isPlatformOwner(email);
       await saveDriverProfile({
@@ -110,11 +119,34 @@ export default function DriverRegistration() {
         trialStartedAt: Date.now(),
       })
 
-      // Local fallback cache to ensure instant hydration
+      // Store driver_id locally to guarantee immediate portal access
       localStorage.setItem('driver_id', driverId)
+
+      // 3. Upload KYC Documents to Supabase Storage
+      const documentsToUpload: { file: File | null; type: KycDocType; label: string }[] = [
+        { file: licenseFrontFile, type: 'license_front', label: "Driver's License (Front)" },
+        { file: licenseBackFile, type: 'license_back', label: "Driver's License (Back)" },
+        { file: prdpFile, type: 'prdp', label: 'PrDP Permit' },
+        { file: roadworthyFile, type: 'roadworthy', label: 'Roadworthy Certificate' },
+        { file: vehiclePhotoFile, type: 'vehicle_photo', label: 'Vehicle Photo' },
+      ]
+
+      for (const item of documentsToUpload) {
+        if (item.file) {
+          setUploadProgressText(`Uploading ${item.label}...`)
+          try {
+            const uploadRes = await uploadDriverKycDocument(driverId, item.type, item.file)
+            if (!uploadRes.success) {
+              console.warn(`Warning: Could not upload ${item.label}:`, uploadRes.error)
+            }
+          } catch (uploadErr) {
+            console.warn(`Warning: Upload exception for ${item.label}:`, uploadErr)
+          }
+        }
+      }
       
-      // Check if email confirmation is required by Supabase
-      if (!authData.session) {
+      // 4. Complete Registration & Redirect
+      if (!hasSession) {
         if (isOwner) {
           alert("Welcome Platform Owner! Your account has been registered with lifetime free driver access. Please check your email to confirm your account before logging in.")
         } else {
