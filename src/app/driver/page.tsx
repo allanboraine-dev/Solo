@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
+import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
@@ -39,6 +40,22 @@ export default function DriverPage() {
   const activeTripRef = useRef<MockTrip | null>(null)
   const driverCoordsRef = useRef<{lat: number, lng: number} | null>(null)
   const lastAlertedTripIdRef = useRef<string | null>(null)
+  const deviceIdRef = useRef<string>(typeof window !== 'undefined' ? getDriverDeviceId() : 'dev-default')
+  const [preemptedNotice, setPreemptedNotice] = useState<string | null>(null)
+
+  const handleGoOnlineOnThisDevice = async () => {
+    setPreemptedNotice(null)
+    const resolvedDriverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null)
+    if (resolvedDriverId) {
+      setDriverActiveSession(resolvedDriverId, deviceIdRef.current)
+    }
+    setIsOnline(true)
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        await registerForPushNotifications('driver', profile?.id)
+      } catch {}
+    }
+  }
 
   const updateActiveTripState = (next: MockTrip | null) => {
     activeTripRef.current = next
@@ -192,8 +209,15 @@ export default function DriverPage() {
     
     // Check pending/active trips on mount and via polling
     const loadTrips = async () => {
-      const trips = await getTrips();
       const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+      if (driverId && isDriverSessionPreempted(driverId, deviceIdRef.current)) {
+        setIsOnline(false);
+        setRequest(null);
+        setPreemptedNotice("Signed out of active duty: your driver account went online from another device. Drivers can only be active on 1 device at a time.");
+        return;
+      }
+
+      const trips = await getTrips();
       const declinedIds = getDeclinedTripIds(driverId);
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
@@ -279,6 +303,21 @@ export default function DriverPage() {
     const pollInterval = setInterval(loadTrips, 3000);
 
     const unsubscribe = subscribeToEvents((type, payload) => {
+      if (type === 'driver_session_preempted') {
+        const payloadData = payload as { driverId: string; deviceId: string } | null;
+        const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+        if (
+          payloadData &&
+          payloadData.driverId === driverId &&
+          payloadData.deviceId !== deviceIdRef.current
+        ) {
+          setIsOnline(false);
+          setRequest(null);
+          setPreemptedNotice("Signed out of active duty: your driver account went online from another device. Drivers can only be active on 1 device at a time.");
+          return;
+        }
+      }
+
       if (type === 'INSERT' || type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (!trip) return;
@@ -339,7 +378,7 @@ export default function DriverPage() {
   useEffect(() => {
     if (!isOnline) {
       if (profile?.id) {
-        updateDriverLocation(profile.id, 0, 0, false);
+        updateDriverLocation(profile.id, 0, 0, false, { deviceId: deviceIdRef.current });
       }
       return;
     }
@@ -360,6 +399,7 @@ export default function DriverPage() {
           vehicleModel: profile.vehicleModel,
           licensePlate: profile.licensePlate,
           tripId: activeTripRef.current?.id,
+          deviceId: deviceIdRef.current,
         });
       }
     };
@@ -400,7 +440,7 @@ export default function DriverPage() {
     // Offline cleanup when driver closes tab or navigates away
     const handleBeforeUnload = () => {
       if (profile?.id) {
-        updateDriverLocation(profile.id, 0, 0, false);
+        updateDriverLocation(profile.id, 0, 0, false, { deviceId: deviceIdRef.current });
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -412,7 +452,7 @@ export default function DriverPage() {
       window.removeEventListener('pagehide', handleBeforeUnload);
       navigator.geolocation.clearWatch(watchId);
       if (profile?.id) {
-        updateDriverLocation(profile.id, 0, 0, false);
+        updateDriverLocation(profile.id, 0, 0, false, { deviceId: deviceIdRef.current });
       }
     };
   }, [isOnline, profile]);
@@ -568,6 +608,12 @@ export default function DriverPage() {
             <button 
               onClick={async () => {
                 const nextOnline = !isOnline;
+                if (nextOnline) {
+                  setPreemptedNotice(null);
+                  if (profile?.id) {
+                    setDriverActiveSession(profile.id, deviceIdRef.current);
+                  }
+                }
                 setIsOnline(nextOnline);
                 if (nextOnline && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
                   try {
@@ -637,6 +683,36 @@ export default function DriverPage() {
                 </div>
               ) : (
                 <div className="text-center mt-6 animate-in fade-in duration-700">
+                  {preemptedNotice && (
+                    <div className="mb-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex flex-col gap-2.5 text-left text-amber-900 dark:text-amber-200 text-xs font-semibold animate-in fade-in shadow-md">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5">
+                          <Smartphone size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-amber-950 dark:text-amber-100 text-sm">Active On Another Device</p>
+                            <p className="mt-0.5 leading-relaxed text-amber-800 dark:text-amber-300">{preemptedNotice}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPreemptedNotice(null)}
+                          className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-1 text-sm"
+                          aria-label="Dismiss notice"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGoOnlineOnThisDevice}
+                        className="mt-1 w-full bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold py-2.5 px-3 rounded-xl transition-all shadow-sm text-center flex items-center justify-center gap-1.5"
+                      >
+                        <Power size={14} />
+                        <span>Switch Active Duty Back to This Device</span>
+                      </button>
+                    </div>
+                  )}
+
                   {completionNotice && (
                     <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-2.5 text-emerald-800 dark:text-emerald-300 text-xs font-bold animate-in fade-in">
                       <div className="flex items-center gap-2">

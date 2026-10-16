@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
+import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession } from '@/utils/session';
 
 export type MockTrip = {
   id: string; // UUID in Supabase
@@ -964,6 +965,7 @@ export type LiveDriver = {
   lng: number;
   isOnline: boolean;
   tripId?: string;
+  deviceId?: string;
   updatedAt: number;
 };
 
@@ -1196,9 +1198,31 @@ export const updateDriverLocation = async (
     vehicleModel?: string;
     licensePlate?: string;
     tripId?: string;
+    deviceId?: string;
   }
 ) => {
   if (typeof window === 'undefined') return;
+
+  const deviceId = metadata?.deviceId;
+
+  // Single-device online concurrency enforcement:
+  // A driver can only be active online on 1 device at a time.
+  if (isOnline && deviceId) {
+    setDriverActiveSession(driverId, deviceId);
+    // Broadcast preemption event so any other active device for this driver disconnects immediately
+    broadcastEvent('driver_session_preempted', {
+      driverId,
+      deviceId,
+      timestamp: Date.now(),
+    });
+  } else if (!isOnline) {
+    // If going offline, only clear active session if this device was the registered active device
+    clearDriverActiveSession(driverId, deviceId);
+    // If another device has already claimed active duty, do not overwrite their online status in DB/cache!
+    if (deviceId && isDriverSessionPreempted(driverId, deviceId)) {
+      return;
+    }
+  }
 
   const now = Date.now();
   const driverData: LiveDriver = {
@@ -1211,6 +1235,7 @@ export const updateDriverLocation = async (
     lng,
     isOnline,
     tripId: metadata?.tripId,
+    deviceId,
     updatedAt: now,
   };
 
@@ -1339,7 +1364,7 @@ export const getDriverRatingSummary = (driverId?: string): { average: number; co
 // ----------------------------------------
 // REAL-TIME BROADCASTS & SUBSCRIPTIONS
 // ----------------------------------------
-export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'INSERT' | 'UPDATE';
+export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'INSERT' | 'UPDATE';
 
 let globalTripsChannel: any = null;
 let globalMessagesChannel: any = null;
@@ -1434,6 +1459,16 @@ const initGlobalChannels = () => {
               };
           const synced = syncTripToLocalStorage(completedTrip);
           listeners.forEach(cb => cb('trip_updated', synced));
+        }
+      } catch {
+        // Ignore parse error
+      }
+    }
+    if (event.key && event.key.startsWith('solo_driver_active_session_') && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        if (parsed?.driverId && parsed?.deviceId) {
+          listeners.forEach(cb => cb('driver_session_preempted', parsed));
         }
       } catch {
         // Ignore parse error
@@ -1536,6 +1571,9 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'new_rating' }, (payload: any) => {
       listeners.forEach(cb => cb('new_rating', payload.payload));
+    })
+    .on('broadcast', { event: 'driver_session_preempted' }, (payload: any) => {
+      listeners.forEach(cb => cb('driver_session_preempted', payload.payload));
     })
     .subscribe();
 };

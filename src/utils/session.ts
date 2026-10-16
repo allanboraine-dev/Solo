@@ -157,3 +157,113 @@ export const isTripBelongingToRiderSession = (
   }
   return false;
 };
+
+// ============================================================================
+// DRIVER SINGLE-DEVICE ACTIVE ONLINE ENFORCEMENT
+// A driver must and can only be active online on 1 device at a time.
+// Going online on Device B automatically preempts and disconnects Device A.
+// ============================================================================
+
+export interface DriverOnlineSession {
+  driverId: string;
+  deviceId: string;
+  timestamp: number;
+}
+
+/**
+ * Returns a stable, persistent device ID for this browser / phone installation.
+ */
+export const getDriverDeviceId = (
+  customStorage?: { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void }
+): string => {
+  const storage = customStorage || (typeof window !== 'undefined' ? window.localStorage : undefined);
+  try {
+    const existing = storage?.getItem('solo_driver_device_id');
+    if (existing && existing.length > 5) {
+      return existing;
+    }
+    const newId = `dev-${generateUuid()}`;
+    storage?.setItem('solo_driver_device_id', newId);
+    return newId;
+  } catch {
+    return `dev-${generateUuid()}`;
+  }
+};
+
+/**
+ * Gets the current active device session for a given driver.
+ */
+export const getDriverActiveSession = (
+  driverId: string,
+  customStorage?: { getItem: (k: string) => string | null }
+): DriverOnlineSession | null => {
+  if (!driverId) return null;
+  const storage = customStorage || (typeof window !== 'undefined' ? window.localStorage : undefined);
+  try {
+    const raw = storage?.getItem(`solo_driver_active_session_${driverId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.deviceId) {
+        return parsed as DriverOnlineSession;
+      }
+    }
+  } catch {}
+  return null;
+};
+
+/**
+ * Claims active online duty on this device for the driver.
+ */
+export const setDriverActiveSession = (
+  driverId: string,
+  deviceId: string,
+  customStorage?: { setItem: (k: string, v: string) => void }
+): DriverOnlineSession => {
+  const session: DriverOnlineSession = {
+    driverId,
+    deviceId,
+    timestamp: Date.now(),
+  };
+  const storage = customStorage || (typeof window !== 'undefined' ? window.localStorage : undefined);
+  try {
+    storage?.setItem(`solo_driver_active_session_${driverId}`, JSON.stringify(session));
+  } catch {}
+  return session;
+};
+
+/**
+ * Clears the active device session when the driver goes offline voluntarily.
+ * Only clears if the calling device was indeed the currently registered active device.
+ */
+export const clearDriverActiveSession = (
+  driverId: string,
+  deviceId?: string,
+  customStorage?: { getItem: (k: string) => string | null; removeItem: (k: string) => void }
+): void => {
+  const storage = customStorage || (typeof window !== 'undefined' ? window.localStorage : undefined);
+  try {
+    if (deviceId) {
+      const current = getDriverActiveSession(driverId, storage);
+      if (current && current.deviceId !== deviceId) {
+        // Another device has already taken over; do not clear their session!
+        return;
+      }
+    }
+    storage?.removeItem(`solo_driver_active_session_${driverId}`);
+  } catch {}
+};
+
+/**
+ * Checks whether this device has been preempted by another device logging in as active driver.
+ */
+export const isDriverSessionPreempted = (
+  driverId: string,
+  myDeviceId: string,
+  customStorage?: { getItem: (k: string) => string | null }
+): boolean => {
+  if (!driverId || !myDeviceId) return false;
+  const active = getDriverActiveSession(driverId, customStorage);
+  if (!active) return false;
+  return active.deviceId !== myDeviceId;
+};
+
