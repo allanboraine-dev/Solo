@@ -10,6 +10,7 @@ import {
   saveCustomToneFile,
   removeCustomTone,
   playTone,
+  getPresetWavDataUri,
 } from '../src/utils/notificationTones.ts';
 import { audioAlert } from '../src/utils/audioAlert.ts';
 
@@ -120,6 +121,15 @@ describe('Notification & Alert Tone System Suite', () => {
     await removeCustomTone();
     assert.strictEqual(getCustomToneMeta(), null);
     assert.strictEqual(getSelectedTone(), 'default');
+  });
+
+  it('synthesizes valid PCM WAV Data URIs for all built-in presets', () => {
+    const presets = ['default', 'radar', 'cash', 'urgent', 'bell', 'chime_bright'] as const;
+    presets.forEach(preset => {
+      const uri = getPresetWavDataUri(preset);
+      assert.ok(uri.startsWith('data:audio/wav;base64,'), `Preset ${preset} must be a valid base64 WAV URI`);
+      assert.ok(uri.length > 200, `Preset ${preset} must have non-empty audio payload`);
+    });
   });
 
   it('ensures playTone and audioAlert execute safely without crashing in SSR/Node', async () => {

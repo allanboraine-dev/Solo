@@ -1,7 +1,8 @@
 /**
  * SOLO Notification & Alert Tone Manager
- * Supports Web Audio synthesized presets and custom device audio uploaded by the user.
- * Persists custom audio files using IndexedDB with localStorage fallback.
+ * Generates self-contained PCM WAV Data URIs for instant, zero-latency preset playback
+ * across all mobile browsers (iOS Safari, Android Chrome, WebViews).
+ * Also supports custom device audio uploaded by the user with IndexedDB & localStorage persistence.
  */
 
 export type ToneId = 'default' | 'radar' | 'cash' | 'urgent' | 'bell' | 'chime_bright' | 'custom';
@@ -18,7 +19,7 @@ export const PRESET_TONES: ToneOption[] = [
   {
     id: 'default',
     name: 'SOLO Harmony (Default)',
-    description: 'Crisp 3-tone ascending alert (D5 → A5 → D6)',
+    description: 'Crisp 3-tone ascending chime (D5 → A5 → D6)',
     badge: 'Popular',
   },
   {
@@ -74,7 +75,237 @@ const STORAGE_KEYS = {
   VOLUME: 'solo_tone_volume',
 };
 
-// IndexedDB Helper
+// ==========================================
+// Base64 & WAV Audio Synthesis
+// ==========================================
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(buffer).toString('base64');
+  }
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Builds a valid 16-bit Mono PCM WAV file Data URI from floating-point samples.
+ */
+function generateWavDataUri(sampleRate: number, samples: Float32Array): string {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  // RIFF Chunk
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + samples.length * 2, true);
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+
+  // Format Chunk
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+  view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+  view.setUint16(22, 1, true); // NumChannels (1 = mono)
+  view.setUint32(24, sampleRate, true); // SampleRate
+  view.setUint32(28, sampleRate * 2, true); // ByteRate (sampleRate * 1 * 2)
+  view.setUint16(32, 2, true); // BlockAlign (1 * 2)
+  view.setUint16(34, 16, true); // BitsPerSample (16 bits)
+
+  // Data Chunk
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+
+  return 'data:audio/wav;base64,' + bufferToBase64(buffer);
+}
+
+const presetWavCache: Partial<Record<ToneId, string>> = {};
+
+/**
+ * Synthesizes pure PCM waveform audio for built-in presets.
+ */
+export function getPresetWavDataUri(preset: ToneId): string {
+  if (presetWavCache[preset]) {
+    return presetWavCache[preset]!;
+  }
+
+  const sampleRate = 22050;
+  let uri = '';
+
+  switch (preset) {
+    case 'radar': {
+      // 2 sharp high-tech sonar pings
+      const duration = 0.5;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let s = 0;
+        // Ping 1: 0.00s to 0.18s @ 1200Hz
+        if (t < 0.18) {
+          const env = Math.exp(-t * 22);
+          s += Math.sin(2 * Math.PI * 1200 * t) * env * 0.7;
+        }
+        // Ping 2: 0.20s to 0.45s @ 1600Hz
+        if (t >= 0.20 && t < 0.45) {
+          const dt = t - 0.20;
+          const env = Math.exp(-dt * 18);
+          s += Math.sin(2 * Math.PI * 1600 * dt) * env * 0.8;
+        }
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+
+    case 'cash': {
+      // Metallic cash register "Cha-Ching"
+      const duration = 0.65;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let s = 0;
+        // First chime note: 987.77 Hz (B5) at 0.0s
+        if (t < 0.20) {
+          const env1 = Math.exp(-t * 18);
+          s += Math.sin(2 * Math.PI * 987.77 * t) * env1 * 0.55;
+        }
+        // Second chime note: 1318.51 Hz (E6) at 0.07s
+        if (t >= 0.07) {
+          const dt = t - 0.07;
+          const env2 = Math.exp(-dt * 8);
+          s += Math.sin(2 * Math.PI * 1318.51 * dt) * env2 * 0.6;
+          // Harmonic shimmer B6: 1975.53 Hz
+          s += Math.sin(2 * Math.PI * 1975.53 * dt) * env2 * 0.3;
+        }
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+
+    case 'urgent': {
+      // 4 rapid alternating high-priority dispatch beeps
+      const duration = 0.48;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let s = 0;
+        const segment = Math.floor(t / 0.11);
+        const subT = t % 0.11;
+        if (segment < 4 && subT < 0.09) {
+          const freq = segment % 2 === 0 ? 880 : 1150;
+          const sine = Math.sin(2 * Math.PI * freq * t);
+          const env = Math.exp(-subT * 12);
+          s = sine * env * 0.65;
+        }
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+
+    case 'bell': {
+      // Resonant reception desk bell with rich natural decay
+      const duration = 0.85;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const env1 = Math.exp(-t * 5);
+        const env2 = Math.exp(-t * 7);
+        const env3 = Math.exp(-t * 12);
+
+        const s =
+          Math.sin(2 * Math.PI * 1046.5 * t) * env1 * 0.55 +
+          Math.sin(2 * Math.PI * 2093.0 * t) * env2 * 0.28 +
+          Math.sin(2 * Math.PI * 3135.96 * t) * env3 * 0.12;
+
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+
+    case 'chime_bright': {
+      // Upbeat 4-note ascending staccato arpeggio (C5 -> E5 -> G5 -> C6)
+      const duration = 0.65;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+      const notes = [
+        { freq: 523.25, start: 0.00, dur: 0.12 },
+        { freq: 659.25, start: 0.09, dur: 0.12 },
+        { freq: 783.99, start: 0.18, dur: 0.14 },
+        { freq: 1046.50, start: 0.27, dur: 0.35 },
+      ];
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let s = 0;
+        for (const n of notes) {
+          if (t >= n.start && t < n.start + n.dur) {
+            const dt = t - n.start;
+            const env = Math.exp(-dt * 14);
+            s += Math.sin(2 * Math.PI * n.freq * dt) * env * 0.6;
+          }
+        }
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+
+    case 'default':
+    default: {
+      // Classic 3-tone ascending alert chime (D5 -> A5 -> D6)
+      const duration = 0.70;
+      const numSamples = Math.floor(sampleRate * duration);
+      const samples = new Float32Array(numSamples);
+      const notes = [
+        { freq: 587.33, start: 0.00, dur: 0.16 }, // D5
+        { freq: 880.00, start: 0.12, dur: 0.18 }, // A5
+        { freq: 1174.66, start: 0.26, dur: 0.42 }, // D6
+      ];
+
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let s = 0;
+        for (const n of notes) {
+          if (t >= n.start && t < n.start + n.dur) {
+            const dt = t - n.start;
+            const env = Math.exp(-dt * 10);
+            s += (Math.sin(2 * Math.PI * n.freq * dt) + 0.15 * Math.sin(4 * Math.PI * n.freq * dt)) * env * 0.55;
+          }
+        }
+        samples[i] = s;
+      }
+      uri = generateWavDataUri(sampleRate, samples);
+      break;
+    }
+  }
+
+  presetWavCache[preset] = uri;
+  return uri;
+}
+
+// ==========================================
+// IndexedDB & Storage
+// ==========================================
+
 function openToneDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
@@ -103,13 +334,10 @@ async function storeCustomAudioInDb(dataUrl: string): Promise<void> {
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    console.warn('[NotificationTones] IndexedDB put failed, attempting localStorage fallback:', err);
-    if (typeof window !== 'undefined' && dataUrl.length < 3 * 1024 * 1024) {
+    if (typeof localStorage !== 'undefined' && dataUrl.length < 3 * 1024 * 1024) {
       try {
         localStorage.setItem(STORAGE_KEYS.CUSTOM_TONE_DATA_FALLBACK, dataUrl);
-      } catch (localErr) {
-        console.warn('[NotificationTones] localStorage fallback also failed:', localErr);
-      }
+      } catch {}
     }
   }
 }
@@ -125,11 +353,9 @@ async function getCustomAudioFromDb(): Promise<string | null> {
       req.onerror = () => reject(req.error);
     });
     if (result) return result;
-  } catch (err) {
-    // Fall back to localStorage
-  }
+  } catch {}
 
-  if (typeof window !== 'undefined') {
+  if (typeof localStorage !== 'undefined') {
     return localStorage.getItem(STORAGE_KEYS.CUSTOM_TONE_DATA_FALLBACK);
   }
   return null;
@@ -152,21 +378,19 @@ async function deleteCustomAudioFromDb(): Promise<void> {
   }
 }
 
-/**
- * Returns the currently active Tone ID.
- */
+// ==========================================
+// Public Tone Preferences
+// ==========================================
+
 export function getSelectedTone(): ToneId {
   if (typeof localStorage === 'undefined') return 'default';
   const saved = localStorage.getItem(STORAGE_KEYS.SELECTED_TONE) as ToneId | null;
-  if (saved && PRESET_TONES.some(t => t.id === saved)) {
+  if (saved && PRESET_TONES.some((t) => t.id === saved)) {
     return saved;
   }
   return 'default';
 }
 
-/**
- * Updates the active tone ID.
- */
 export function setSelectedTone(toneId: ToneId): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(STORAGE_KEYS.SELECTED_TONE, toneId);
@@ -175,9 +399,6 @@ export function setSelectedTone(toneId: ToneId): void {
   }
 }
 
-/**
- * Gets metadata about the uploaded custom device tone (if any).
- */
 export function getCustomToneMeta(): { name: string; size: number; mimeType: string } | null {
   if (typeof localStorage === 'undefined') return null;
   const name = localStorage.getItem(STORAGE_KEYS.CUSTOM_TONE_NAME);
@@ -188,9 +409,6 @@ export function getCustomToneMeta(): { name: string; size: number; mimeType: str
   return { name, size, mimeType };
 }
 
-/**
- * Returns saved alert volume (0.0 to 1.0).
- */
 export function getToneVolume(): number {
   if (typeof localStorage === 'undefined') return 0.85;
   const saved = localStorage.getItem(STORAGE_KEYS.VOLUME);
@@ -201,33 +419,24 @@ export function getToneVolume(): number {
   return 0.85;
 }
 
-/**
- * Sets alert volume (0.0 to 1.0).
- */
 export function setToneVolume(volume: number): void {
   if (typeof localStorage === 'undefined') return;
   const clamped = Math.max(0, Math.min(1, volume));
   localStorage.setItem(STORAGE_KEYS.VOLUME, clamped.toString());
 }
 
-/**
- * Saves a custom audio file selected by the user from their device.
- */
 export async function saveCustomToneFile(file: File): Promise<{ success: boolean; error?: string; name: string }> {
-  // Max 10MB to avoid excessive browser memory usage
   const MAX_SIZE_BYTES = 10 * 1024 * 1024;
   if (file.size > MAX_SIZE_BYTES) {
     return { success: false, error: 'File is too large. Please select an audio file under 10MB.', name: file.name };
   }
 
-  // Verify audio MIME type or extension
   const isAudioType = (file.type && file.type.startsWith('audio/')) || /\.(mp3|wav|ogg|m4a|aac|weba|flac)$/i.test(file.name);
   if (!isAudioType) {
     return { success: false, error: 'Please choose a valid audio file (e.g., MP3, WAV, OGG, M4A, AAC).', name: file.name };
   }
 
   if (typeof FileReader === 'undefined') {
-    // If running in environment without FileReader (e.g. basic Node), still persist metadata
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TONE_NAME, file.name);
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TONE_SIZE, file.size.toString());
@@ -261,9 +470,6 @@ export async function saveCustomToneFile(file: File): Promise<{ success: boolean
   }
 }
 
-/**
- * Deletes the custom device tone and resets to default tone.
- */
 export async function removeCustomTone(): Promise<void> {
   await deleteCustomAudioFromDb();
   if (typeof localStorage !== 'undefined') {
@@ -274,198 +480,108 @@ export async function removeCustomTone(): Promise<void> {
   setSelectedTone('default');
 }
 
+// ==========================================
+// Playback Engine: HTML5 Audio + Web Audio
+// ==========================================
+
+let sharedAudioCtx: AudioContext | null = null;
+let isAudioUnlocked = false;
+
 /**
- * Synthesizes Web Audio presets or plays custom device audio.
+ * Proactively unlocks mobile audio restrictions on user gestures.
  */
-export async function playTone(toneId?: ToneId): Promise<void> {
-  if (typeof window === 'undefined') return;
+export function unlockAudio(): void {
+  if (isAudioUnlocked || typeof window === 'undefined') return;
+  isAudioUnlocked = true;
 
-  const resolvedId: ToneId = toneId || getSelectedTone();
-  const volume = getToneVolume();
+  try {
+    // Unlock HTML5 Audio
+    const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+    silentAudio.volume = 0;
+    silentAudio.play().catch(() => {});
+  } catch {}
 
-  if (resolvedId === 'custom') {
-    const customData = await getCustomAudioFromDb();
-    if (customData) {
-      try {
-        const audio = new Audio(customData);
-        audio.volume = volume;
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          await playPromise;
-        }
-        return;
-      } catch (err) {
-        console.warn('[NotificationTones] Custom audio playback failed, falling back to default:', err);
+  try {
+    // Unlock Web Audio
+    const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtxClass) {
+      if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+        sharedAudioCtx = new AudioCtxClass();
+      }
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => {});
       }
     }
-    // If no custom audio was found, fall back to default chime
-    playSynthesizedPreset('default', volume);
-    return;
-  }
-
-  playSynthesizedPreset(resolvedId, volume);
+  } catch {}
 }
 
-/**
- * Synthesizes built-in tones without external audio file requests.
- */
-function playSynthesizedPreset(preset: ToneId, volume: number): void {
+async function playViaWebAudio(dataUri: string, volume: number): Promise<void> {
   try {
     const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtxClass) return;
 
-    const ctx = new AudioCtxClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioCtxClass();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      await sharedAudioCtx.resume();
     }
 
-    const now = ctx.currentTime;
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(volume * 0.45, now);
-    masterGain.connect(ctx.destination);
-
-    switch (preset) {
-      case 'radar': {
-        // Dual high-tech sonar pings
-        const pings = [
-          { freq: 1150, start: 0.00, dur: 0.16 },
-          { freq: 1580, start: 0.20, dur: 0.24 },
-        ];
-        pings.forEach(({ freq, start, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now + start);
-          gain.gain.setValueAtTime(0, now + start);
-          gain.gain.linearRampToValueAtTime(0.7, now + start + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now + start);
-          osc.stop(now + start + dur);
-        });
-        break;
-      }
-
-      case 'cash': {
-        // Bright metallic "Cha-Ching"
-        const notes = [
-          { freq: 987.77, start: 0.00, dur: 0.15 }, // B5
-          { freq: 1318.51, start: 0.08, dur: 0.42 }, // E6
-          { freq: 1975.53, start: 0.12, dur: 0.38 }, // B6 (harmonic chime)
-        ];
-        notes.forEach(({ freq, start, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + start);
-          gain.gain.setValueAtTime(0, now + start);
-          gain.gain.linearRampToValueAtTime(0.65, now + start + 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now + start);
-          osc.stop(now + start + dur);
-        });
-        break;
-      }
-
-      case 'urgent': {
-        // Rapid alternating alert pulse
-        const beeps = [
-          { freq: 880, start: 0.00, dur: 0.10 },
-          { freq: 1100, start: 0.11, dur: 0.10 },
-          { freq: 880, start: 0.22, dur: 0.10 },
-          { freq: 1100, start: 0.33, dur: 0.18 },
-        ];
-        beeps.forEach(({ freq, start, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(freq, now + start);
-          gain.gain.setValueAtTime(0, now + start);
-          gain.gain.linearRampToValueAtTime(0.4, now + start + 0.01);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now + start);
-          osc.stop(now + start + dur);
-        });
-        break;
-      }
-
-      case 'bell': {
-        // Resonant service bell with harmonic overtones
-        const fundamentals = [
-          { freq: 1046.50, gainVal: 0.7, dur: 0.7 }, // C6
-          { freq: 2093.00, gainVal: 0.3, dur: 0.5 }, // C7
-          { freq: 3135.96, gainVal: 0.15, dur: 0.3 }, // G7
-        ];
-        fundamentals.forEach(({ freq, gainVal, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now);
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(gainVal, now + 0.008);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now);
-          osc.stop(now + dur);
-        });
-        break;
-      }
-
-      case 'chime_bright': {
-        // 4 rapid upbeat staccato notes (C5 -> E5 -> G5 -> C6)
-        const arpeggio = [
-          { freq: 523.25, start: 0.00, dur: 0.10 },
-          { freq: 659.25, start: 0.09, dur: 0.10 },
-          { freq: 783.99, start: 0.18, dur: 0.12 },
-          { freq: 1046.50, start: 0.27, dur: 0.32 },
-        ];
-        arpeggio.forEach(({ freq, start, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + start);
-          gain.gain.setValueAtTime(0, now + start);
-          gain.gain.linearRampToValueAtTime(0.55, now + start + 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now + start);
-          osc.stop(now + start + dur);
-        });
-        break;
-      }
-
-      case 'default':
-      default: {
-        // Classic 3-tone ascending alert chime (D5 -> A5 -> D6)
-        const notes = [
-          { freq: 587.33, start: 0.00, dur: 0.12 }, // D5
-          { freq: 880.00, start: 0.12, dur: 0.14 }, // A5
-          { freq: 1174.66, start: 0.26, dur: 0.35 }, // D6
-        ];
-        notes.forEach(({ freq, start, dur }) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + start);
-          gain.gain.setValueAtTime(0, now + start);
-          gain.gain.linearRampToValueAtTime(0.6, now + start + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-          osc.connect(gain);
-          gain.connect(masterGain);
-          osc.start(now + start);
-          osc.stop(now + start + dur);
-        });
-        break;
-      }
+    const base64 = dataUri.split(',')[1];
+    if (!base64) return;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
+
+    const audioBuffer = await sharedAudioCtx.decodeAudioData(bytes.buffer.slice(0));
+    const source = sharedAudioCtx.createBufferSource();
+    const gain = sharedAudioCtx.createGain();
+    gain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), sharedAudioCtx.currentTime);
+    source.buffer = audioBuffer;
+    source.connect(gain);
+    gain.connect(sharedAudioCtx.destination);
+    source.start(0);
   } catch (err) {
-    console.warn('[NotificationTones] Preset synthesis error:', err);
+    console.warn('[NotificationTones] Web Audio fallback failed:', err);
   }
+}
+
+/**
+ * Plays the specified tone (or active user selection) with reliable audible playback.
+ */
+export async function playTone(toneId?: ToneId): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  unlockAudio();
+
+  const resolvedId: ToneId = toneId || getSelectedTone();
+  const volume = getToneVolume();
+
+  let audioSrc: string | null = null;
+  if (resolvedId === 'custom') {
+    audioSrc = await getCustomAudioFromDb();
+  }
+
+  // If custom audio is missing or a preset was requested, get preset WAV data URI
+  if (!audioSrc) {
+    audioSrc = getPresetWavDataUri(resolvedId === 'custom' ? 'default' : resolvedId);
+  }
+
+  // 1. Try HTML5 Audio element
+  try {
+    const audio = new Audio(audioSrc);
+    audio.volume = Math.max(0, Math.min(1, volume));
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      await playPromise;
+      return;
+    }
+  } catch (audioErr) {
+    console.warn('[NotificationTones] HTML5 Audio play error, trying Web Audio fallback:', audioErr);
+  }
+
+  // 2. Fallback to Web Audio buffer playback
+  await playViaWebAudio(audioSrc, volume);
 }

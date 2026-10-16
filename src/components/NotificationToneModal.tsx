@@ -27,6 +27,7 @@ import {
   playTone,
   getToneVolume,
   setToneVolume,
+  unlockAudio,
 } from "@/utils/notificationTones";
 import { audioAlert } from "@/utils/audioAlert";
 
@@ -53,6 +54,9 @@ export function NotificationToneModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    try {
+      unlockAudio();
+    } catch {}
     setSelectedId(getSelectedTone());
     setCustomMeta(getCustomToneMeta());
     setVolumeState(getToneVolume());
@@ -62,10 +66,11 @@ export function NotificationToneModal({
 
   if (!isOpen) return null;
 
-  const handleSelectPreset = (toneId: ToneId) => {
+  const handleSelectPreset = async (toneId: ToneId) => {
     setSelectedId(toneId);
     setSelectedTone(toneId);
     if (onToneSaved) onToneSaved(toneId);
+    await handlePlayPreview(toneId);
   };
 
   const handlePlayPreview = async (toneId: ToneId, e?: React.MouseEvent) => {
@@ -73,8 +78,10 @@ export function NotificationToneModal({
     setIsPlaying(toneId);
     try {
       await playTone(toneId);
+    } catch (err) {
+      console.warn('[NotificationToneModal] preview error:', err);
     } finally {
-      setTimeout(() => setIsPlaying(null), 600);
+      setTimeout(() => setIsPlaying(null), 700);
     }
   };
 
