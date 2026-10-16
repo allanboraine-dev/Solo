@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { calculateFare, getTileLayerConfig } from '../src/utils/mapService.ts';
+import { calculateFare, getTileLayerConfig, parseHouseNumberFromQuery } from '../src/utils/mapService.ts';
 
 describe('Commercial Map & Fare Pricing Suite', () => {
   it('enforces a minimum base fare of R30 for short trips', () => {
@@ -25,4 +25,23 @@ describe('Commercial Map & Fare Pricing Suite', () => {
     const darkConfig = getTileLayerConfig(true);
     assert.ok(darkConfig.url.length > 0);
   });
+
+  it('extracts house numbers, unit suffixes, and stand/erf prefixes from street address queries', () => {
+    const parsed1 = parseHouseNumberFromQuery('14 Niobe Street, Kimberley');
+    assert.strictEqual(parsed1.houseNumber, '14');
+    assert.strictEqual(parsed1.remainder, 'Niobe Street, Kimberley');
+
+    const parsed2 = parseHouseNumberFromQuery('22B Memorial Road');
+    assert.strictEqual(parsed2.houseNumber, '22B');
+    assert.strictEqual(parsed2.remainder, 'Memorial Road');
+
+    const parsed3 = parseHouseNumberFromQuery('No. 108 Du Toitspan Road');
+    assert.strictEqual(parsed3.houseNumber, '108');
+    assert.strictEqual(parsed3.remainder, 'Du Toitspan Road');
+
+    const parsed4 = parseHouseNumberFromQuery('North Cape Mall');
+    assert.strictEqual(parsed4.houseNumber, undefined);
+    assert.strictEqual(parsed4.remainder, 'North Cape Mall');
+  });
 });
+

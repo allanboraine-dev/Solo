@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { LocateFixed, Clock, Navigation } from 'lucide-react'
+import { LocateFixed, Clock, Home, Building2 } from 'lucide-react'
 import { saveTrip, type MockTrip } from '@/lib/mockBackend'
-import { reverseGeocode, getRouteDirections, calculateFare } from '@/utils/mapService'
+import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
 import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
@@ -12,9 +12,32 @@ interface BookingFormProps {
   onRequireAuth?: () => void
 }
 
+function formatSelectedPlaceLabel(feature: SearchResultPlace): string {
+  const parts: string[] = [];
+  if (feature.name) parts.push(feature.name.trim());
+  if (feature.suburb && !parts.some(p => p.toLowerCase().includes(feature.suburb!.toLowerCase()))) {
+    parts.push(feature.suburb.trim());
+  }
+  if (feature.city && !parts.some(p => p.toLowerCase().includes(feature.city!.toLowerCase()))) {
+    parts.push(feature.city.trim());
+  }
+  if (parts.length >= 2) {
+    return parts.join(', ');
+  }
+  // Fallback to first 3 segments of display_name so house number + street + suburb are preserved
+  const displaySegments = (feature.display_name || feature.name || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  return displaySegments.join(', ') || feature.name;
+}
+
 export default function BookingForm({ onLocationSelect, currentUser, onRequireAuth }: BookingFormProps) {
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
+  const [pickupDetail, setPickupDetail] = useState('')
+  const [dropoffDetail, setDropoffDetail] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [fare, setFare] = useState<number | null>(null)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
@@ -40,7 +63,12 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
           try {
             const resolved = await reverseGeocode(coords.lat, coords.lng);
             if (resolved) {
-              address = resolved.split(',')[0] || resolved;
+              address = resolved
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
+                .slice(0, 3)
+                .join(', ') || resolved;
             }
           } catch (e) {
             console.error("Geocoder failed", e);
@@ -97,16 +125,23 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
       return;
     }
 
+    const fullPickupAddress = pickupDetail.trim()
+      ? `${pickupDetail.trim()} — ${pickup}`
+      : pickup;
+    const fullDropoffAddress = dropoffDetail.trim()
+      ? `${dropoffDetail.trim()} — ${dropoff}`
+      : dropoff;
+
     setIsBooking(true)
     try {
       const riderId = currentUser?.id || "00000000-0000-0000-0000-000000000000" 
       const tripData: MockTrip = {
         id: crypto.randomUUID(),
         rider_id: riderId,
-        pickup_location: pickup,
+        pickup_location: fullPickupAddress,
         pickup_lat: realPickupCoords.lat, 
         pickup_lng: realPickupCoords.lng,
-        dropoff_location: dropoff,
+        dropoff_location: fullDropoffAddress,
         dropoff_lat: realDropoffCoords.lat,
         dropoff_lng: realDropoffCoords.lng,
         fare_amount: fare,
@@ -136,47 +171,79 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
   }
 
   return (
-    <div className="space-y-6 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-4">
-      <div className="absolute left-6 top-8 bottom-[140px] w-0.5 bg-gray-200 dark:bg-zinc-800 z-0"></div>
-
-      <div className="space-y-4 relative z-10">
-        <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
-          <div className="w-full">
-            <CustomSearchInput 
-              placeholder="Search pickup location"
-              value={pickup}
-              onChange={setPickup}
-              onSelect={(feature) => {
-                const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
-                setRealPickupCoords(coords);
-                setPickup(feature.name || feature.display_name.split(',')[0]);
-                onLocationSelect('pickup', coords.lat, coords.lng);
-              }}
-            />
+    <div className="space-y-4 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-4">
+      <div className="space-y-3 relative z-10">
+        {/* Pickup Location Search + House/Building Detail */}
+        <div className="space-y-1.5">
+          <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
+            <div className="w-full">
+              <CustomSearchInput 
+                placeholder="Pickup: House no, building, or street"
+                value={pickup}
+                onChange={setPickup}
+                hasRightAction={true}
+                proximityCoords={realPickupCoords}
+                onSelect={(feature) => {
+                  const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
+                  setRealPickupCoords(coords);
+                  setPickup(formatSelectedPlaceLabel(feature));
+                  onLocationSelect('pickup', coords.lat, coords.lng);
+                }}
+              />
+            </div>
+            <button 
+              type="button"
+              onClick={() => handleGetCurrentLocation()} 
+              className="absolute right-3 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
+              title="Use Current Location"
+            >
+              <LocateFixed size={18} />
+            </button>
           </div>
-          <button 
-            onClick={() => handleGetCurrentLocation()} 
-            className="absolute right-4 text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition bg-blue-50 dark:bg-blue-900/30 p-2 rounded-full z-10"
-            title="Use Current Location"
-          >
-            <LocateFixed size={18} />
-          </button>
+          {realPickupCoords && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/70 dark:border-white/5 rounded-xl">
+              <Home size={14} className="text-blue-500 shrink-0" />
+              <input
+                type="text"
+                value={pickupDetail}
+                onChange={(e) => setPickupDetail(e.target.value)}
+                placeholder="Add house #, unit, complex, or gate note (optional)"
+                className="w-full bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+              />
+            </div>
+          )}
         </div>
         
-        <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
-          <div className="w-full">
-            <CustomSearchInput 
-              placeholder="Search destination"
-              value={dropoff}
-              onChange={setDropoff}
-              onSelect={(feature) => {
-                const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
-                setRealDropoffCoords(coords);
-                setDropoff(feature.name || feature.display_name.split(',')[0]);
-                onLocationSelect('dropoff', coords.lat, coords.lng);
-              }}
-            />
+        {/* Destination Location Search + House/Building Detail */}
+        <div className="space-y-1.5">
+          <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
+            <div className="w-full">
+              <CustomSearchInput 
+                placeholder="Dropoff: House no, building, or street"
+                value={dropoff}
+                onChange={setDropoff}
+                proximityCoords={realPickupCoords}
+                onSelect={(feature) => {
+                  const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
+                  setRealDropoffCoords(coords);
+                  setDropoff(formatSelectedPlaceLabel(feature));
+                  onLocationSelect('dropoff', coords.lat, coords.lng);
+                }}
+              />
+            </div>
           </div>
+          {realDropoffCoords && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/70 dark:border-white/5 rounded-xl">
+              <Building2 size={14} className="text-emerald-500 shrink-0" />
+              <input
+                type="text"
+                value={dropoffDetail}
+                onChange={(e) => setDropoffDetail(e.target.value)}
+                placeholder="Add destination house #, building, or entrance (optional)"
+                className="w-full bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+              />
+            </div>
+          )}
         </div>
       </div>
 
