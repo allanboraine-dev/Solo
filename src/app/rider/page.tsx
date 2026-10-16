@@ -9,7 +9,8 @@ import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import { createClient } from '@/utils/supabase/client'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle } from 'lucide-react'
+import { buildWhatsAppTripShareUrl } from '@/utils/phone'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 
 // Dynamically import Map component to disable SSR
@@ -52,6 +53,26 @@ export default function RiderPage() {
   // Monitor authenticated rider session
   useEffect(() => {
     const supabase = createClient();
+    const loadLocalWhatsAppRider = () => {
+      try {
+        const stored = localStorage.getItem('solo_verified_rider');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.id) {
+            setCurrentUser({
+              id: parsed.id,
+              fullName: parsed.fullName || 'Rider',
+              phone: parsed.phone,
+            });
+            return true;
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+      return false;
+    };
+
     const loadSession = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -59,9 +80,9 @@ export default function RiderPage() {
         setCurrentUser({
           id: user.id,
           fullName: profile?.full_name || user.user_metadata?.full_name || 'Rider',
-          phone: user.phone || profile?.phone,
+          phone: user.phone || profile?.phone || user.user_metadata?.phone,
         });
-      } else {
+      } else if (!loadLocalWhatsAppRider()) {
         setCurrentUser(null);
       }
     };
@@ -73,9 +94,9 @@ export default function RiderPage() {
         setCurrentUser({
           id: session.user.id,
           fullName: profile?.full_name || session.user.user_metadata?.full_name || 'Rider',
-          phone: session.user.phone || profile?.phone,
+          phone: session.user.phone || profile?.phone || session.user.user_metadata?.phone,
         });
-      } else {
+      } else if (!loadLocalWhatsAppRider()) {
         setCurrentUser(null);
       }
     });
@@ -179,6 +200,7 @@ export default function RiderPage() {
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    localStorage.removeItem('solo_verified_rider');
     setCurrentUser(null);
     if (activeTrip) {
       const updated = { ...activeTrip, status: 'completed' as const };
@@ -454,6 +476,15 @@ export default function RiderPage() {
                     {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
                     {activeTrip.status === 'in_progress' && 'Heading to destination...'}
                   </p>
+                  <a
+                    href={buildWhatsAppTripShareUrl(activeTrip)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
+                  >
+                    <MessageCircle size={14} />
+                    <span>Share Live Trip via WhatsApp</span>
+                  </a>
                 </div>
 
                 <div className="flex-1 min-h-[300px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">

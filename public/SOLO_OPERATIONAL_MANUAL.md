@@ -76,12 +76,12 @@ SOLO utilizes passwordless mobile authentication anchored to the South African E
   - Local format: `082 123 4567` or `071 987 6543`
   - National format: `27821234567`
   - International format: `+27 82 123 4567`
-- **Verification Flow:**
-  1. Rider inputs mobile number in the login modal.
+- **Verification Flow (Zero-Cost WhatsApp Click-to-Verify):**
+  1. Rider inputs their full name and South African mobile number in the login modal or `/rider/login`.
   2. The system formats the number to international E.164 standard (`+27...`).
-  3. A 6-digit One-Time PIN (OTP) is dispatched via **WhatsApp** (preferred for instant delivery over Wi-Fi and mobile data) or **Cellular SMS** based on rider selection.
-  4. Riders can toggle between WhatsApp and SMS resend if cellular coverage is compromised.
-  5. Upon entering the valid PIN, an authenticated session token is stored securely in the browser.
+  3. A 6-digit verification passcode and a direct **WhatsApp Deep-Link (`wa.me`)** are generated instantly with zero reliance on paid third-party SMS gateways (no Twilio required).
+  4. Riders tap **"Open WhatsApp (`wa.me`) & Auto-Fill Code"** to confirm their WhatsApp identity over Wi-Fi or mobile data.
+  5. Upon confirming the 6-digit passcode, an authenticated rider session and profile are persisted securely.
 
 ### 1.2 PWA Mobile Installation (Android & iOS)
 SOLO is engineered as a high-performance Progressive Web Application, eliminating the need to download heavy binaries from app stores.

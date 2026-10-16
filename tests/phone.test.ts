@@ -1,8 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { formatPhoneNumber, isValidSAPhone } from '../src/utils/phone.ts';
+import {
+  formatPhoneNumber,
+  isValidSAPhone,
+  generateWhatsAppOtpCode,
+  buildWhatsAppVerificationUrl,
+  buildWhatsAppTripShareUrl,
+} from '../src/utils/phone.ts';
 
-describe('South African Phone Number Authentication Suite', () => {
+describe('South African Phone Number & WhatsApp Deep-Link Authentication Suite', () => {
   it('formats standard local mobile numbers to E.164 format (+27...) ', () => {
     assert.strictEqual(formatPhoneNumber('0821234567'), '+27821234567');
     assert.strictEqual(formatPhoneNumber('071 234 5678'), '+27712345678');
@@ -36,28 +42,34 @@ describe('South African Phone Number Authentication Suite', () => {
     assert.strictEqual(isValidSAPhone('0000000000'), false); // Zero lead
   });
 
-  it('validates WhatsApp vs SMS OTP dispatch options payload', () => {
-    const buildOtpPayload = (phoneRaw: string, channel: 'whatsapp' | 'sms', fullName: string) => {
-      const e164 = formatPhoneNumber(phoneRaw);
-      return {
-        phone: e164,
-        options: {
-          channel,
-          data: {
-            full_name: fullName.trim(),
-            user_type: 'rider',
-          },
-        },
-      };
-    };
+  it('generates a 6-digit numeric WhatsApp verification passcode', () => {
+    const code = generateWhatsAppOtpCode();
+    assert.strictEqual(code.length, 6);
+    assert.match(code, /^\d{6}$/);
+  });
 
-    const whatsappPayload = buildOtpPayload('082 123 4567', 'whatsapp', 'Thabo Mbeki');
-    assert.strictEqual(whatsappPayload.phone, '+27821234567');
-    assert.strictEqual(whatsappPayload.options.channel, 'whatsapp');
-    assert.strictEqual(whatsappPayload.options.data.full_name, 'Thabo Mbeki');
+  it('builds a zero-cost WhatsApp Click-to-Verify (wa.me) deep-link URL without Twilio', () => {
+    const url = buildWhatsAppVerificationUrl('082 123 4567', 'Thabo Mbeki', '482910');
+    assert.ok(url.startsWith('https://wa.me/27821234567?text='));
+    const decoded = decodeURIComponent(url);
+    assert.ok(decoded.includes('Thabo Mbeki'));
+    assert.ok(decoded.includes('+27821234567'));
+    assert.ok(decoded.includes('*482910*'));
+  });
 
-    const smsPayload = buildOtpPayload('071 999 8888', 'sms', 'Lindiwe Sisulu');
-    assert.strictEqual(smsPayload.phone, '+27719998888');
-    assert.strictEqual(smsPayload.options.channel, 'sms');
+  it('builds a WhatsApp live trip safety share URL (wa.me)', () => {
+    const shareUrl = buildWhatsAppTripShareUrl({
+      id: 'trip-987654321',
+      pickup_location: 'Camps Bay, Cape Town',
+      dropoff_location: 'V&A Waterfront, Cape Town',
+      verification_pin: '4892',
+      fare_amount: 82,
+    });
+    assert.ok(shareUrl.startsWith('https://wa.me/?text='));
+    const decoded = decodeURIComponent(shareUrl);
+    assert.ok(decoded.includes('Camps Bay, Cape Town'));
+    assert.ok(decoded.includes('*4892*'));
+    assert.ok(decoded.includes('R82'));
   });
 });
+
