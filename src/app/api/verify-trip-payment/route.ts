@@ -45,8 +45,13 @@ async function verifyTransaction(reference: string, clientTripId?: string) {
   const resolvedTripId = txData.metadata?.trip_id || clientTripId
 
   if (resolvedTripId) {
-    // Mark trip completed in Supabase database
+    // Mark trip completed in Supabase database (both SECURITY DEFINER RPC + direct update)
     try {
+      await supabase.rpc('complete_trip', {
+        p_trip_id: resolvedTripId,
+        p_payment_method: 'cash',
+      })
+
       const { error: dbError } = await supabase
         .from('trips')
         .update({
@@ -59,7 +64,7 @@ async function verifyTransaction(reference: string, clientTripId?: string) {
         .eq('id', resolvedTripId)
 
       if (dbError) {
-        console.error('Failed to update trip record in Supabase:', dbError)
+        console.warn('Direct trip update warning after payment verification:', dbError.message)
       }
     } catch (dbErr) {
       console.error('Error updating trip after payment verification:', dbErr)

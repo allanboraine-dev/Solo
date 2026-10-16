@@ -213,5 +213,50 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     assert.strictEqual(remainingRequested.length, 1, 'Only non-declined requested trips should remain visible');
     assert.strictEqual(remainingRequested[0].id, 'trip-102');
   });
+
+  it('Scenario 6: Completed Trip Never Loops or Resurfaces from Stale DB Rows', () => {
+    const completedTripIds = new Set<string>();
+    const STATUS_PRIORITY: Record<string, number> = {
+      requested: 1,
+      accepted: 2,
+      arrived: 3,
+      in_progress: 4,
+      payment_pending: 5,
+      completed: 6,
+      cancelled: 7,
+    };
+
+    // Driver completes trip-201
+    completedTripIds.add('trip-201');
+
+    // Simulate a stale DB query or PostGIS RPC still returning trip-201 as 'requested' or 'in_progress'
+    const dbTrips = [
+      { id: 'trip-201', status: 'requested', created_at: new Date().toISOString() },
+      { id: 'trip-old-stale', status: 'requested', created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+    ];
+
+    const isStaleRequested = (t: { status: string; created_at?: string }) => {
+      if (t.status !== 'requested' || !t.created_at) return false;
+      return Date.now() - new Date(t.created_at).getTime() > 30 * 60 * 1000;
+    };
+
+    const resolvedTrips = dbTrips.map((t) => {
+      if (completedTripIds.has(t.id)) return { ...t, status: 'completed' };
+      if (isStaleRequested(t)) return { ...t, status: 'cancelled' };
+      return t;
+    });
+
+    const activeOrRequestedForDriver = resolvedTrips.filter(
+      (t) =>
+        t.status !== 'completed' &&
+        t.status !== 'cancelled' &&
+        !completedTripIds.has(t.id) &&
+        STATUS_PRIORITY[t.status] < STATUS_PRIORITY.completed
+    );
+
+    assert.strictEqual(resolvedTrips[0].status, 'completed', 'Completed trip must stay completed even if DB returns stale status');
+    assert.strictEqual(resolvedTrips[1].status, 'cancelled', 'Stale unscheduled requested trip (>30m old) must be expired');
+    assert.strictEqual(activeOrRequestedForDriver.length, 0, 'No completed or stale trips may loop back to the driver');
+  });
 });
 

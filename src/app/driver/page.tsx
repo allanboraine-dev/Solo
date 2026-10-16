@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
@@ -175,18 +175,20 @@ export default function DriverPage() {
       const trips = await getTrips();
       const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
       const declinedIds = getDeclinedTripIds(driverId);
+      const completedIds = getCompletedTripIds();
 
-      // Find active trips assigned to THIS driver
-      const active = trips.find(
-        t =>
-          (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
-          (!t.driver_id || !driverId || t.driver_id === driverId) &&
-          !declinedIds.has(t.id)
-      );
-      
       if (activeTrip) {
+        if (completedIds.has(activeTrip.id) || declinedIds.has(activeTrip.id)) {
+          setActiveTrip(null);
+          setIsWaitingForPayment(false);
+          setShowFareCollection(false);
+          return;
+        }
         const currentInDb = trips.find(t => t.id === activeTrip.id);
         if (currentInDb && (currentInDb.status === 'completed' || currentInDb.status === 'cancelled')) {
+          if (currentInDb.status === 'completed') {
+            markTripCompleted(currentInDb.id);
+          }
           setActiveTrip(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
@@ -194,18 +196,32 @@ export default function DriverPage() {
         }
       }
 
+      // Find active trips assigned to THIS driver
+      const active = trips.find(
+        t =>
+          (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
+          (!t.driver_id || !driverId || t.driver_id === driverId) &&
+          !declinedIds.has(t.id) &&
+          !completedIds.has(t.id)
+      );
+
       if (active) {
         setActiveTrip(active);
         if (active.status === 'payment_pending') setIsWaitingForPayment(true);
       } else {
-        // Find requested trips (excluding any declined by this driver)
+        // Find requested trips (excluding any declined, completed, or stale requests)
         let nearbyRequested: MockTrip[] = [];
         if (driverCoords) {
           nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15, driverId);
         }
         if (nearbyRequested.length === 0) {
           nearbyRequested = trips.filter(
-            t => t.status === 'requested' && !t.driver_id && !declinedIds.has(t.id)
+            t =>
+              t.status === 'requested' &&
+              !t.driver_id &&
+              !declinedIds.has(t.id) &&
+              !completedIds.has(t.id) &&
+              !isStaleRequestedTrip(t)
           );
         }
         if (nearbyRequested.length > 0) {
@@ -225,7 +241,17 @@ export default function DriverPage() {
         if (!trip) return;
         const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
 
-        if (trip.status === 'requested' && !activeTrip && !isTripDeclined(trip.id, driverId)) {
+        if (trip.status === 'completed') {
+          markTripCompleted(trip.id);
+        }
+
+        if (
+          trip.status === 'requested' &&
+          !activeTrip &&
+          !isTripDeclined(trip.id, driverId) &&
+          !isTripCompleted(trip.id) &&
+          !isStaleRequestedTrip(trip)
+        ) {
           setRequest(trip);
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
             new Notification('🚖 New Trip Request!', {
@@ -235,18 +261,22 @@ export default function DriverPage() {
             });
           }
         } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'completed') {
+          markTripCompleted(trip.id);
+          // Also persist completion using driver's authenticated session
+          completeTripAtomic(trip.id, 'cash', trip);
           setActiveTrip(null);
-          setDriverCoords(null);
+          setRequest(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
           alert("Payment Received! Trip Completed.");
         } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'cancelled') {
           setActiveTrip(null);
+          setRequest(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
-        } else if (activeTrip && trip.id === activeTrip.id) {
+        } else if (activeTrip && trip.id === activeTrip.id && !isTripCompleted(trip.id) && !isTripDeclined(trip.id, driverId)) {
           setActiveTrip(trip);
-        } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId)) {
+        } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id)) {
           setRequest(prev => (prev && prev.id === trip.id ? null : prev));
         }
       }
@@ -399,20 +429,25 @@ export default function DriverPage() {
 
   const handleCashPayment = async () => {
     if (activeTrip) {
-      await completeTripAtomic(activeTrip.id, 'cash');
+      const tripToComplete = activeTrip;
+      markTripCompleted(tripToComplete.id);
       setActiveTrip(null);
-      setDriverCoords(null);
+      setRequest(null);
+      setIsWaitingForPayment(false);
       setShowFareCollection(false);
-      alert("Trip Completed! Cash fare collected.");
+      await completeTripAtomic(tripToComplete.id, 'cash', tripToComplete);
+      await saveTrip({ ...tripToComplete, status: 'completed' });
+      alert("Trip Completed! Fare settled and trip closed.");
     }
   }
 
   const handleInAppPaymentRequest = async () => {
     if (activeTrip) {
-      await completeTripAtomic(activeTrip.id, 'in_app');
       const updated = { ...activeTrip, status: 'payment_pending' as const };
       setActiveTrip(updated);
       setIsWaitingForPayment(true);
+      await completeTripAtomic(activeTrip.id, 'in_app', activeTrip);
+      await saveTrip(updated);
     }
   }
 
@@ -889,7 +924,23 @@ export default function DriverPage() {
               <div className="text-center py-6">
                 <div className="w-16 h-16 border-4 border-gray-200 dark:border-gray-800 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
                 <h2 className="text-2xl font-black mb-2">Waiting for Rider...</h2>
-                <p className="text-gray-500">The rider is processing the payment of R{activeTrip.fare_amount} on their device.</p>
+                <p className="text-gray-500 mb-6 text-sm">
+                  The rider is processing the payment of R{activeTrip.fare_amount} on their device. The trip will close automatically once verified, or you can confirm payment below.
+                </p>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={handleCashPayment}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-green-600/25 active:scale-95"
+                  >
+                    Confirm Payment Received & End Trip
+                  </button>
+                  <button
+                    onClick={() => setIsWaitingForPayment(false)}
+                    className="w-full py-2.5 text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition"
+                  >
+                    Back to Payment Options
+                  </button>
+                </div>
               </div>
             ) : (
               <>

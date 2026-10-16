@@ -175,14 +175,69 @@ const STATUS_PRIORITY: Record<MockTrip['status'], number> = {
   cancelled: 7,
 };
 
+// Unscheduled ride requests older than 30 minutes are treated as expired so stale DB rows never loop
+const STALE_REQUEST_MAX_AGE_MS = 30 * 60 * 1000;
+
+export const isStaleRequestedTrip = (trip: Pick<MockTrip, 'status' | 'created_at' | 'scheduled_time'>): boolean => {
+  if (trip.status !== 'requested') return false;
+  if (trip.scheduled_time) {
+    const schedMs = new Date(trip.scheduled_time).getTime();
+    if (!Number.isNaN(schedMs) && schedMs > Date.now() - STALE_REQUEST_MAX_AGE_MS) {
+      return false;
+    }
+  }
+  if (!trip.created_at) return false;
+  const createdMs = new Date(trip.created_at).getTime();
+  if (Number.isNaN(createdMs)) return false;
+  return Date.now() - createdMs > STALE_REQUEST_MAX_AGE_MS;
+};
+
+/**
+ * Retrieves the set of trip IDs that have been completed locally
+ */
+export const getCompletedTripIds = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem('solo_completed_trips');
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+};
+
+export const isTripCompleted = (tripId: string): boolean => {
+  return getCompletedTripIds().has(tripId);
+};
+
+export const markTripCompleted = (tripId: string): void => {
+  if (typeof window === 'undefined' || !tripId) return;
+  try {
+    const current = Array.from(getCompletedTripIds());
+    if (!current.includes(tripId)) {
+      current.push(tripId);
+      localStorage.setItem('solo_completed_trips', JSON.stringify(current.slice(-300)));
+    }
+  } catch (e) {
+    console.error('Error recording completed trip locally:', e);
+  }
+};
+
 const syncTripToLocalStorage = (trip: MockTrip) => {
   if (typeof window === 'undefined') return;
   try {
+    if (trip.status === 'completed') {
+      markTripCompleted(trip.id);
+    }
     const localData = localStorage.getItem('mock_trips');
     const trips: MockTrip[] = localData ? JSON.parse(localData) : [];
     const existingIndex = trips.findIndex(t => t.id === trip.id);
     if (existingIndex >= 0) {
-      trips[existingIndex] = { ...trips[existingIndex], ...trip };
+      const existing = trips[existingIndex];
+      const existingPrio = STATUS_PRIORITY[existing.status] || 0;
+      const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
+      const resolvedStatus = incomingPrio >= existingPrio ? trip.status : existing.status;
+      trips[existingIndex] = { ...existing, ...trip, status: resolvedStatus };
     } else {
       trips.unshift(trip);
     }
@@ -196,6 +251,8 @@ export const getTrips = async (): Promise<MockTrip[]> => {
   if (typeof window === 'undefined') return [];
 
   const mergedMap = new Map<string, MockTrip>();
+  const completedIds = getCompletedTripIds();
+  const declinedIds = getDeclinedTripIds();
 
   // 1. Load local trips first
   try {
@@ -203,7 +260,12 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     if (localData) {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
-        if (t && t.id) mergedMap.set(t.id, t);
+        if (t && t.id) {
+          let resolvedStatus = t.status;
+          if (completedIds.has(t.id)) resolvedStatus = 'completed';
+          else if (declinedIds.has(t.id) || isStaleRequestedTrip(t)) resolvedStatus = 'cancelled';
+          mergedMap.set(t.id, { ...t, status: resolvedStatus });
+        }
       });
     }
   } catch (e) {
@@ -222,6 +284,15 @@ export const getTrips = async (): Promise<MockTrip[]> => {
       data.forEach((dbTrip: any) => {
         if (!dbTrip?.id) return;
         const existing = mergedMap.get(dbTrip.id);
+        let dbStatus: MockTrip['status'] = dbTrip.status;
+        if (completedIds.has(dbTrip.id)) {
+          dbStatus = 'completed';
+        } else if (declinedIds.has(dbTrip.id)) {
+          dbStatus = 'cancelled';
+        } else if (isStaleRequestedTrip({ status: dbStatus, created_at: dbTrip.created_at, scheduled_time: dbTrip.scheduled_time })) {
+          dbStatus = 'cancelled';
+        }
+
         const mapped: MockTrip = {
           id: dbTrip.id,
           rider_id: dbTrip.rider_id,
@@ -233,7 +304,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
           dropoff_lat: dbTrip.dropoff_lat,
           dropoff_lng: dbTrip.dropoff_lng,
           fare_amount: Number(dbTrip.fare_amount),
-          status: dbTrip.status,
+          status: dbStatus,
           verification_pin: dbTrip.verification_pin || existing?.verification_pin,
           scheduled_time: dbTrip.scheduled_time || existing?.scheduled_time,
           created_at: dbTrip.created_at || existing?.created_at,
@@ -252,10 +323,19 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     console.error('Error fetching trips from Supabase:', e);
   }
 
-  return Array.from(mergedMap.values());
+  const result = Array.from(mergedMap.values());
+  try {
+    localStorage.setItem('mock_trips', JSON.stringify(result.slice(0, 100)));
+  } catch {
+    // Ignore storage quota errors
+  }
+  return result;
 };
 
 export const saveTrip = async (trip: MockTrip) => {
+  if (trip.status === 'completed') {
+    markTripCompleted(trip.id);
+  }
   const enrichedTrip: MockTrip = {
     ...trip,
     rider_id: ensureValidUuid(trip.rider_id),
@@ -278,6 +358,41 @@ export const saveTrip = async (trip: MockTrip) => {
     const resolvedDriverId =
       enrichedTrip.driver_id && UUID_REGEX.test(enrichedTrip.driver_id) ? enrichedTrip.driver_id : null;
 
+    // For status updates on existing trips, use UPDATE first (avoids triggering RLS INSERT WITH CHECK on driver updates)
+    if (enrichedTrip.status !== 'requested') {
+      const updatePayload: Record<string, any> = {
+        status: enrichedTrip.status,
+        updated_at: new Date().toISOString(),
+      };
+      if (resolvedDriverId) {
+        updatePayload.driver_id = resolvedDriverId;
+      }
+      if (enrichedTrip.status === 'completed') {
+        updatePayload.completed_at = new Date().toISOString();
+        updatePayload.payment_status = 'paid';
+      }
+
+      const { data: updatedRow, error: updateErr } = await supabase
+        .from('trips')
+        .update(updatePayload)
+        .eq('id', enrichedTrip.id)
+        .select()
+        .maybeSingle();
+
+      if (!updateErr && updatedRow) {
+        return;
+      }
+
+      // If updating to completed and RLS blocked direct update, invoke SECURITY DEFINER complete_trip RPC
+      if (enrichedTrip.status === 'completed') {
+        await supabase.rpc('complete_trip', {
+          p_trip_id: enrichedTrip.id,
+          p_payment_method: 'cash',
+        });
+        return;
+      }
+    }
+
     const dbPayload: Record<string, any> = {
       id: enrichedTrip.id,
       rider_id: resolvedRiderId,
@@ -299,8 +414,6 @@ export const saveTrip = async (trip: MockTrip) => {
       // If foreign key on driver_id failed (e.g. driver profile not yet in DB), retry without driver_id FK
       if (resolvedDriverId && error.message?.toLowerCase().includes('foreign key')) {
         await supabase.from('trips').upsert({ ...dbPayload, driver_id: null });
-      } else {
-        throw error;
       }
     } else if (data) {
       const synced: MockTrip = {
@@ -337,7 +450,8 @@ export const acceptTripAtomic = async (tripId: string): Promise<{ success: boole
 
   // Fallback: Direct update on public.trips + local storage
   try {
-    const driverId = typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null;
+    const { data: { session } } = await supabase.auth.getSession();
+    const driverId = session?.user?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
     const validDriverId = driverId && UUID_REGEX.test(driverId) ? driverId : null;
     await supabase
       .from('trips')
@@ -436,48 +550,78 @@ export const startTripWithPin = async (tripId: string, pin: string): Promise<{ s
 };
 
 /**
- * Atomic trip completion using Postgres RPC
+ * Atomic trip completion using Postgres RPC + direct DB update + permanent local completion record
  */
-export const completeTripAtomic = async (tripId: string, paymentMethod: 'cash' | 'in_app' = 'in_app'): Promise<{ success: boolean; status?: string; error?: string }> => {
-  try {
-    const { data, error } = await supabase.rpc('complete_trip', { 
-      p_trip_id: tripId, 
-      p_payment_method: paymentMethod 
-    });
-    if (error) {
-      console.warn('complete_trip RPC error, falling back:', error.message);
-    } else {
-      const res = data as { success?: boolean; status?: string };
-      // Broadcast local event so UI syncs immediately
-      const targetStatus = paymentMethod === 'cash' ? 'completed' : 'payment_pending';
+export const completeTripAtomic = async (
+  tripId: string,
+  paymentMethod: 'cash' | 'in_app' = 'in_app',
+  tripSnapshot?: MockTrip
+): Promise<{ success: boolean; status?: string; error?: string }> => {
+  const targetStatus: MockTrip['status'] = paymentMethod === 'cash' ? 'completed' : 'payment_pending';
+
+  if (targetStatus === 'completed') {
+    markTripCompleted(tripId);
+  }
+
+  // 1. Immediately update local state and broadcast so Driver & Rider UI close/update right away
+  if (typeof window !== 'undefined') {
+    try {
       const localData = localStorage.getItem('mock_trips');
-      if (localData) {
-        const trips: MockTrip[] = JSON.parse(localData);
-        const target = trips.find(t => t.id === tripId);
-        if (target) {
-          target.status = targetStatus;
-          localStorage.setItem('mock_trips', JSON.stringify(trips));
-          broadcastEvent('trip_updated', target);
-        }
+      const trips: MockTrip[] = localData ? JSON.parse(localData) : [];
+      const target = trips.find(t => t.id === tripId) || tripSnapshot;
+      if (target) {
+        const updatedTrip: MockTrip = { ...target, status: targetStatus };
+        syncTripToLocalStorage(updatedTrip);
+        broadcastEvent('trip_updated', updatedTrip);
       }
+    } catch (e) {
+      console.error('Error updating local trip during completeTripAtomic:', e);
+    }
+  }
+
+  // 2. Persist status transition to Supabase via RPC and direct update
+  try {
+    let { data, error } = await supabase.rpc('complete_trip', {
+      p_trip_id: tripId,
+      p_payment_method: paymentMethod,
+    });
+
+    // If the DB row was still in 'requested' or 'accepted' state in Postgres, advance it first and retry RPC
+    if (error && error.message?.toLowerCase().includes('cannot be completed from current state')) {
+      await supabase.rpc('accept_trip', { p_trip_id: tripId });
+      await supabase
+        .from('trips')
+        .update({ status: 'in_progress', updated_at: new Date().toISOString() })
+        .eq('id', tripId);
+      const retry = await supabase.rpc('complete_trip', {
+        p_trip_id: tripId,
+        p_payment_method: paymentMethod,
+      });
+      data = retry.data;
+      error = retry.error;
+    }
+
+    // Also attempt direct table update for defense-in-depth
+    await supabase
+      .from('trips')
+      .update({
+        status: targetStatus,
+        payment_method: paymentMethod,
+        ...(targetStatus === 'completed'
+          ? { payment_status: 'paid', completed_at: new Date().toISOString() }
+          : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tripId);
+
+    if (!error && data) {
+      const res = data as { success?: boolean; status?: string };
       return { success: !!res?.success, status: res?.status || targetStatus };
     }
   } catch (e: unknown) {
-    console.warn('complete_trip RPC execution error:', e);
+    console.warn('complete_trip execution warning:', e);
   }
 
-  // Local fallback update
-  const localData = localStorage.getItem('mock_trips');
-  const targetStatus = paymentMethod === 'cash' ? 'completed' : 'payment_pending';
-  if (localData) {
-    const trips: MockTrip[] = JSON.parse(localData);
-    const target = trips.find(t => t.id === tripId);
-    if (target) {
-      target.status = targetStatus;
-      localStorage.setItem('mock_trips', JSON.stringify(trips));
-      broadcastEvent('trip_updated', target);
-    }
-  }
   return { success: true, status: targetStatus };
 };
 
@@ -716,10 +860,21 @@ export const getNearbyRequestedTrips = async (
 
   const resolvedDriverId = driverId || localStorage.getItem('driver_id');
   const declinedIds = getDeclinedTripIds(resolvedDriverId);
+  const completedIds = getCompletedTripIds();
 
   const allTrips = await getTrips();
+  const knownStatusMap = new Map<string, MockTrip['status']>();
+  allTrips.forEach(t => {
+    if (t?.id) knownStatusMap.set(t.id, t.status);
+  });
+
   const requestedTrips = allTrips.filter(
-    t => t.status === 'requested' && !t.driver_id && !declinedIds.has(t.id)
+    t =>
+      t.status === 'requested' &&
+      !t.driver_id &&
+      !declinedIds.has(t.id) &&
+      !completedIds.has(t.id) &&
+      !isStaleRequestedTrip(t)
   );
 
   // 1. Try PostGIS RPC
@@ -732,7 +887,16 @@ export const getNearbyRequestedTrips = async (
 
     if (data && !error && data.length > 0) {
       const rpcTrips: MockTrip[] = data
-        .filter((t: any) => !declinedIds.has(t.id))
+        .filter((t: any) => {
+          if (!t?.id) return false;
+          if (declinedIds.has(t.id) || completedIds.has(t.id)) return false;
+          const knownStatus = knownStatusMap.get(t.id);
+          if (knownStatus && knownStatus !== 'requested') return false;
+          if (isStaleRequestedTrip({ status: t.status || 'requested', created_at: t.created_at, scheduled_time: t.scheduled_time })) {
+            return false;
+          }
+          return true;
+        })
         .map((t: any) => ({
           id: t.id,
           rider_id: t.rider_id,

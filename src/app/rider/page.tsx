@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { useState, useEffect } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -118,7 +118,21 @@ export default function RiderPage() {
     // Check if there is an active trip on mount and keep it synced with DB
     const loadTrips = async () => {
       const trips = await getTrips();
+      const completedIds = getCompletedTripIds();
+      const declinedIds = getDeclinedTripIds();
+
       if (activeTrip) {
+        if (completedIds.has(activeTrip.id)) {
+          setActiveTrip(null);
+          setDriverCoords(null);
+          return;
+        }
+        if (declinedIds.has(activeTrip.id)) {
+          setActiveTrip(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
+          return;
+        }
         const matched = trips.find(t => t.id === activeTrip.id);
         if (matched) {
           if (matched.status === 'cancelled') {
@@ -128,6 +142,7 @@ export default function RiderPage() {
             return;
           }
           if (matched.status === 'completed') {
+            markTripCompleted(matched.id);
             setRatingTrip(matched);
             setShowRatingModal(true);
             setActiveTrip(null);
@@ -140,7 +155,15 @@ export default function RiderPage() {
           return;
         }
       }
-      const active = trips.find(t => t.status !== 'completed' && t.status !== 'cancelled');
+      const active = trips.find(
+        t =>
+          t.status !== 'completed' &&
+          t.status !== 'cancelled' &&
+          !completedIds.has(t.id) &&
+          !declinedIds.has(t.id) &&
+          !isStaleRequestedTrip(t) &&
+          (!currentUser?.id || !t.rider_id || t.rider_id === currentUser.id)
+      );
       if (active) {
         setActiveTrip(active);
       }
@@ -187,6 +210,7 @@ export default function RiderPage() {
       if (type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (trip.status === 'completed') {
+          markTripCompleted(trip.id);
           setRatingTrip(trip);
           setShowRatingModal(true);
           setActiveTrip(null);
@@ -209,7 +233,7 @@ export default function RiderPage() {
               tag: `rider-trip-${trip.id}`,
             });
           }
-        } else {
+        } else if (!isTripCompleted(trip.id) && !isTripDeclined(trip.id) && !isStaleRequestedTrip(trip)) {
           setDeclineNotice(null);
           if (trip.status === 'accepted' && (!activeTrip || activeTrip.status === 'requested')) {
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
@@ -239,7 +263,7 @@ export default function RiderPage() {
       unsubscribeEvents();
       window.removeEventListener('solo_driver_location_update', handleLocalEvent);
     }
-  }, [activeTrip]);
+  }, [activeTrip, currentUser?.id]);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -247,6 +271,7 @@ export default function RiderPage() {
     localStorage.removeItem('solo_verified_rider');
     setCurrentUser(null);
     if (activeTrip) {
+      markTripCompleted(activeTrip.id);
       const updated = { ...activeTrip, status: 'completed' as const };
       saveTrip(updated);
     }
@@ -283,6 +308,8 @@ export default function RiderPage() {
                 rider_id: currentUser?.id || '00000000-0000-0000-0000-000000000000',
               } as MockTrip;
               const completedTrip: MockTrip = { ...matched, status: 'completed' };
+              markTripCompleted(completedTrip.id);
+              completeTripAtomic(completedTrip.id, 'cash', completedTrip);
               saveTrip(completedTrip);
               setRatingTrip(completedTrip);
               setShowRatingModal(true);
@@ -347,6 +374,8 @@ export default function RiderPage() {
             .then((verifyData) => {
               if (verifyData.success) {
                 const updated: MockTrip = { ...currentTrip, status: 'completed' };
+                markTripCompleted(updated.id);
+                completeTripAtomic(updated.id, 'cash', updated);
                 saveTrip(updated);
                 setRatingTrip(updated);
                 setShowRatingModal(true);
