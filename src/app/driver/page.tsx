@@ -664,7 +664,7 @@ export default function DriverPage() {
       <div 
         className={`absolute left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 flex flex-col z-20 pointer-events-none transition-all duration-300 ${
           activeTab === 'home'
-            ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28 md:top-28 max-h-[72vh] md:max-h-none'
+            ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28 md:top-28 max-h-[72vh] max-h-[72dvh] md:max-h-none'
             : 'top-[76px] sm:top-[86px] md:top-28 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28'
         }`}
       >

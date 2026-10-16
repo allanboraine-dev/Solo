@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
+    "color-scheme": "light dark",
+    "supported-color-schemes": "light dark",
   },
   formatDetection: {
     telephone: true,
@@ -48,6 +50,7 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -57,6 +60,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          id="samsung-viewport-sync"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function syncViewport() {
+                  var vh = window.innerHeight * 0.01;
+                  document.documentElement.style.setProperty('--vh', vh + 'px');
+                }
+                syncViewport();
+                window.addEventListener('resize', syncViewport, { passive: true });
+                window.addEventListener('orientationchange', syncViewport, { passive: true });
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
         <ThemeProvider>
           <PWAProvider>

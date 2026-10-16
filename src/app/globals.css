@@ -3,13 +3,23 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light dark;
+  supported-color-schemes: light dark;
   --background: #ffffff;
   --foreground: #171717;
 }
 
 .dark {
+  color-scheme: dark;
+  supported-color-schemes: dark;
   --background: #0a0a0a;
   --foreground: #ededed;
+}
+
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -22,17 +32,31 @@ body {
   overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
 }
 
-/* Fast tap response & eliminate 300ms mobile touch delay */
+/* Fast tap response & eliminate 300ms mobile touch delay across Samsung Internet & WebKit */
 button,
 a,
 input,
 select,
 textarea,
+label,
 [role="button"] {
   touch-action: manipulation;
+}
+
+/* Prevent Samsung Internet forced auto-zoom on input focus */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 @layer utilities {
@@ -40,19 +64,24 @@ textarea,
     text-wrap: balance;
   }
 
-  /* Universal mobile dynamic & standard viewport fallbacks (supports older WebKit, UC, KaiOS, Opera Mini) */
+  /* Universal mobile dynamic & standard viewport fallbacks (supports Samsung Internet, older WebKit, UC, KaiOS, Opera Mini) */
   .h-mobile-screen {
     height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+    height: -webkit-fill-available;
     height: 100dvh;
   }
 
   .min-h-mobile-screen {
     min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+    min-height: -webkit-fill-available;
     min-height: 100dvh;
   }
 
   .h-mobile-portal {
     height: calc(100vh - 64px);
+    height: calc(var(--vh, 1vh) * 100 - 64px);
     height: calc(100dvh - 64px);
   }
 
@@ -86,16 +115,76 @@ textarea,
 @media (min-width: 768px) {
   .h-mobile-portal {
     height: calc(100vh - 96px);
+    height: calc(var(--vh, 1vh) * 100 - 96px);
     height: calc(100dvh - 96px);
   }
 }
 
-/* Prevent accidental text selection and jerky gestures on Leaflet maps */
+/* Explicit Samsung WebKit backdrop-filter blur definitions */
+@supports (-webkit-backdrop-filter: none) or (backdrop-filter: none) {
+  .backdrop-blur-sm {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+  }
+  .backdrop-blur-2xl {
+    -webkit-backdrop-filter: blur(40px);
+    backdrop-filter: blur(40px);
+  }
+  .backdrop-blur-3xl {
+    -webkit-backdrop-filter: blur(64px);
+    backdrop-filter: blur(64px);
+  }
+}
+
+/* Custom scrollbar styling for Samsung Internet, WebKit, and modern browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* Prevent accidental text selection, jerky gestures, and Samsung Dark Mode color inversion on Leaflet maps */
 .leaflet-container {
   -webkit-user-select: none;
   user-select: none;
   touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
   background-color: #09090b !important;
+  color-scheme: light;
+}
+
+.leaflet-tile-pane,
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-pane {
+  color-scheme: light;
 }
 
 /* Google Places Autocomplete Dropdown overrides */
