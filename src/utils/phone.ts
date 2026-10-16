@@ -40,6 +40,16 @@ export function generateWhatsAppOtpCode(): string {
 }
 
 /**
+ * Converts a phone number into a deterministic, valid RFC 4122 v4 UUID
+ * so Postgres UUID columns (e.g. public.trips.rider_id) always accept it.
+ */
+export function phoneToDeterministicUuid(phone: string): string {
+  const digits = formatPhoneNumber(phone).replace(/[^\d]/g, '');
+  const tail = digits.padStart(12, '0').slice(-12);
+  return `00000000-0000-4000-8000-${tail}`;
+}
+
+/**
  * Builds a zero-cost WhatsApp Deep-Link (wa.me) verification URL.
  * Removes any dependency on Twilio or paid third-party SMS gateways.
  */

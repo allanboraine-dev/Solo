@@ -6,6 +6,7 @@ import {
   formatPhoneNumber,
   isValidSAPhone,
   generateWhatsAppOtpCode,
+  phoneToDeterministicUuid,
   buildWhatsAppVerificationUrl,
 } from '@/utils/phone'
 import {
@@ -57,6 +58,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
     const cleanDigits = e164Phone.replace(/[^\d]/g, '')
     const riderEmail = `rider_${cleanDigits}@solorides.co.za`
     const riderPassword = `SoloWhatsAppAuth_${cleanDigits}_2026!`
+    const fallbackUuid = phoneToDeterministicUuid(e164Phone)
 
     let authenticatedUser: any = null
 
@@ -100,6 +102,17 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
           phone: e164Phone,
           user_type: 'rider',
         }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            'solo_verified_rider',
+            JSON.stringify({
+              id: authenticatedUser.id,
+              fullName: riderFullName,
+              phone: e164Phone,
+              verifiedVia: 'whatsapp_deeplink',
+            })
+          )
+        }
         return authenticatedUser
       }
     } catch {
@@ -107,7 +120,7 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
     }
 
     const fallbackUser = {
-      id: `wa-rider-${cleanDigits}`,
+      id: fallbackUuid,
       phone: e164Phone,
       email: riderEmail,
       user_metadata: {

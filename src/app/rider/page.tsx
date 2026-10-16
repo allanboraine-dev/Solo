@@ -9,7 +9,7 @@ import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import { createClient } from '@/utils/supabase/client'
-import { buildWhatsAppTripShareUrl } from '@/utils/phone'
+import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 
@@ -59,8 +59,15 @@ export default function RiderPage() {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed?.id) {
+            const validId = String(parsed.id).startsWith('wa-rider-')
+              ? phoneToDeterministicUuid(parsed.phone || parsed.id)
+              : parsed.id;
+            if (validId !== parsed.id) {
+              parsed.id = validId;
+              localStorage.setItem('solo_verified_rider', JSON.stringify(parsed));
+            }
             setCurrentUser({
-              id: parsed.id,
+              id: validId,
               fullName: parsed.fullName || 'Rider',
               phone: parsed.phone,
             });

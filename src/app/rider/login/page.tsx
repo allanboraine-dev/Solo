@@ -7,6 +7,7 @@ import {
   formatPhoneNumber,
   isValidSAPhone,
   generateWhatsAppOtpCode,
+  phoneToDeterministicUuid,
   buildWhatsAppVerificationUrl,
 } from '@/utils/phone'
 import {
@@ -60,6 +61,7 @@ export default function RiderLoginPage() {
     const cleanDigits = e164Phone.replace(/[^\d]/g, '')
     const riderEmail = `rider_${cleanDigits}@solorides.co.za`
     const riderPassword = `SoloWhatsAppAuth_${cleanDigits}_2026!`
+    let resolvedId = phoneToDeterministicUuid(e164Phone)
 
     try {
       let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -84,6 +86,7 @@ export default function RiderLoginPage() {
       }
 
       if (signInData?.user) {
+        resolvedId = signInData.user.id
         await supabase.from('profiles').upsert({
           id: signInData.user.id,
           full_name: riderFullName,
@@ -99,7 +102,7 @@ export default function RiderLoginPage() {
       localStorage.setItem(
         'solo_verified_rider',
         JSON.stringify({
-          id: `wa-rider-${cleanDigits}`,
+          id: resolvedId,
           fullName: riderFullName,
           phone: e164Phone,
           verifiedVia: 'whatsapp_deeplink',

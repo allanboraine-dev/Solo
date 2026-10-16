@@ -4,6 +4,7 @@ import {
   formatPhoneNumber,
   isValidSAPhone,
   generateWhatsAppOtpCode,
+  phoneToDeterministicUuid,
   buildWhatsAppVerificationUrl,
   buildWhatsAppTripShareUrl,
 } from '../src/utils/phone.ts';
@@ -48,6 +49,12 @@ describe('South African Phone Number & WhatsApp Deep-Link Authentication Suite',
     assert.match(code, /^\d{6}$/);
   });
 
+  it('converts phone numbers into deterministic RFC 4122 UUIDs for Postgres public.trips', () => {
+    const uuid = phoneToDeterministicUuid('082 123 4567');
+    assert.strictEqual(uuid, '00000000-0000-4000-8000-027821234567');
+    assert.match(uuid, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
   it('builds a zero-cost WhatsApp Click-to-Verify (wa.me) deep-link URL without Twilio', () => {
     const url = buildWhatsAppVerificationUrl('082 123 4567', 'Thabo Mbeki', '482910');
     assert.ok(url.startsWith('https://wa.me/27821234567?text='));
@@ -72,4 +79,3 @@ describe('South African Phone Number & WhatsApp Deep-Link Authentication Suite',
     assert.ok(decoded.includes('R82'));
   });
 });
-

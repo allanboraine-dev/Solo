@@ -170,35 +170,44 @@ export default function DriverPage() {
       return;
     }
     
-    // Check pending/active trips on mount
+    // Check pending/active trips on mount and via polling
     const loadTrips = async () => {
       const trips = await getTrips();
-      // Only find active trips assigned to THIS driver
-      const active = trips.find(t => (t.status === 'accepted' || t.status === 'in_progress' || t.status === 'payment_pending') && t.driver_id === profile?.id);
+      const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+      // Find active trips assigned to THIS driver
+      const active = trips.find(
+        t =>
+          (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
+          (!t.driver_id || !driverId || t.driver_id === driverId)
+      );
       
       if (active) {
         setActiveTrip(active);
         if (active.status === 'payment_pending') setIsWaitingForPayment(true);
       } else {
-        // Find requested trips within 15 km of driver's GPS location
+        // Find requested trips (prioritizing within 15 km of driver's GPS, falling back to any active requested trip)
         let nearbyRequested: MockTrip[] = [];
         if (driverCoords) {
           nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15);
-        } else {
-          nearbyRequested = trips.filter(t => t.status === 'requested');
         }
-        if (nearbyRequested.length > 0) setRequest(nearbyRequested[0]);
+        if (nearbyRequested.length === 0) {
+          nearbyRequested = trips.filter(t => t.status === 'requested' && !t.driver_id);
+        }
+        if (nearbyRequested.length > 0) {
+          setRequest(prev => prev?.id === nearbyRequested[0].id ? prev : nearbyRequested[0]);
+        }
       }
     };
-    if (profile?.id) {
-      loadTrips();
-    }
+
+    loadTrips();
+    const pollInterval = setInterval(loadTrips, 3000);
 
     const unsubscribe = subscribeToEvents((type, payload) => {
-      if (type === 'INSERT') {
+      if (type === 'INSERT' || type === 'trip_updated') {
         const trip = payload as MockTrip;
-        const inRadius = !driverCoords || isWithinRadiusKm(driverCoords.lat, driverCoords.lng, trip.pickup_lat, trip.pickup_lng, 15);
-        if (inRadius) {
+        if (!trip) return;
+
+        if (trip.status === 'requested' && !activeTrip) {
           setRequest(trip);
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
             new Notification('🚖 New Trip Request!', {
@@ -206,22 +215,6 @@ export default function DriverPage() {
               icon: '/driver-icon-192.png',
               tag: `trip-${trip.id}`,
             });
-          }
-        }
-      } else if (type === 'trip_updated') {
-        const trip = payload as MockTrip;
-        if (trip.status === 'requested' && !activeTrip) {
-          // Strictly filter by 15km radius from driver's current position
-          const inRadius = !driverCoords || isWithinRadiusKm(driverCoords.lat, driverCoords.lng, trip.pickup_lat, trip.pickup_lng, 15);
-          if (inRadius) {
-            setRequest(trip);
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-              new Notification('🚖 New Trip Request!', {
-                body: `R${trip.fare_amount} • Pickup: ${trip.pickup_location}`,
-                icon: '/driver-icon-192.png',
-                tag: `trip-${trip.id}`,
-              });
-            }
           }
         } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'completed') {
           setActiveTrip(null);
@@ -231,11 +224,14 @@ export default function DriverPage() {
           alert("Payment Received! Trip Completed.");
         } else if (activeTrip && trip.id === activeTrip.id) {
           setActiveTrip(trip);
+        } else if (trip.status !== 'requested') {
+          setRequest(prev => (prev && prev.id === trip.id ? null : prev));
         }
       }
-    })
+    });
     
     return () => {
+      clearInterval(pollInterval);
       unsubscribe();
     }
   }, [isOnline, activeTrip, profile?.id, driverCoords])
@@ -337,7 +333,12 @@ export default function DriverPage() {
   };
 
   const handleAccept = async () => {
-    if (request && profile?.id) {
+    if (request) {
+      const driverId =
+        profile?.id ||
+        (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null) ||
+        crypto.randomUUID();
+
       // Execute atomic database reservation to prevent race conditions
       const rpcResult = await acceptTripAtomic(request.id);
       if (!rpcResult.success) {
@@ -345,8 +346,8 @@ export default function DriverPage() {
         setRequest(null);
         return;
       }
-      const updated = { ...request, status: 'accepted' as const, driver_id: profile.id };
-      saveTrip(updated);
+      const updated = { ...request, status: 'accepted' as const, driver_id: driverId };
+      await saveTrip(updated);
       setActiveTrip(updated);
       setRequest(null);
     }
