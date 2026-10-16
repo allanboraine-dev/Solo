@@ -16,6 +16,8 @@ import { NotificationPermissionBanner } from '@/components/NotificationPermissio
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { audioAlert } from '@/utils/audioAlert'
+import { registerForPushNotifications } from '@/utils/pushClient'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -36,6 +38,7 @@ export default function DriverPage() {
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
   const activeTripRef = useRef<MockTrip | null>(null)
   const driverCoordsRef = useRef<{lat: number, lng: number} | null>(null)
+  const lastAlertedTripIdRef = useRef<string | null>(null)
 
   const updateActiveTripState = (next: MockTrip | null) => {
     activeTripRef.current = next
@@ -255,12 +258,19 @@ export default function DriverPage() {
         // Re-check activeTripRef after any async work so we never pop up a request while on a trip
         if (activeTripRef.current) {
           setRequest(null);
+          lastAlertedTripIdRef.current = null;
           return;
         }
         if (nearbyRequested.length > 0) {
-          setRequest(prev => prev?.id === nearbyRequested[0].id ? prev : nearbyRequested[0]);
+          const incoming = nearbyRequested[0];
+          setRequest(prev => prev?.id === incoming.id ? prev : incoming);
+          if (incoming.id !== lastAlertedTripIdRef.current) {
+            lastAlertedTripIdRef.current = incoming.id;
+            audioAlert.alertDriverOfTrip(incoming);
+          }
         } else {
           setRequest(null);
+          lastAlertedTripIdRef.current = null;
         }
       }
     };
@@ -287,12 +297,9 @@ export default function DriverPage() {
           !isStaleRequestedTrip(trip)
         ) {
           setRequest(prev => (prev?.id === trip.id ? prev : trip));
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('🚖 New Trip Request!', {
-              body: `R${trip.fare_amount} • Pickup: ${trip.pickup_location}`,
-              icon: '/driver-icon-192.png',
-              tag: `trip-${trip.id}`,
-            });
+          if (trip.id !== lastAlertedTripIdRef.current) {
+            lastAlertedTripIdRef.current = trip.id;
+            audioAlert.alertDriverOfTrip(trip);
           }
         } else if (currentActive && trip.id === currentActive.id && trip.status === 'completed') {
           markTripCompleted(trip.id);
@@ -456,6 +463,7 @@ export default function DriverPage() {
       recordTripStatusOverride(updated.id, 'accepted', driverId);
       updateActiveTripState(updated);
       setRequest(null);
+      lastAlertedTripIdRef.current = null;
 
       // Execute atomic database reservation to prevent race conditions
       const rpcResult = await acceptTripAtomic(tripToAccept.id, driverId);
@@ -475,6 +483,7 @@ export default function DriverPage() {
       profile?.id ||
       (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
     setRequest(null);
+    lastAlertedTripIdRef.current = null;
     await declineTrip(tripToDecline, driverId);
   }
 
@@ -557,7 +566,15 @@ export default function DriverPage() {
           <div className="flex items-center gap-1.5 shrink-0">
             <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5" />
             <button 
-              onClick={() => setIsOnline(!isOnline)}
+              onClick={async () => {
+                const nextOnline = !isOnline;
+                setIsOnline(nextOnline);
+                if (nextOnline && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+                  try {
+                    await registerForPushNotifications('driver', profile?.id);
+                  } catch {}
+                }
+              }}
               disabled={!!activeTrip}
               className={`flex items-center gap-1.5 px-3.5 py-2 md:px-4 md:py-2 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-sm ${
                 isOnline 

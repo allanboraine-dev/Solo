@@ -93,3 +93,47 @@ export async function unsubscribeFromPushNotifications(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Dispatches a Web Push notification to all online/registered drivers
+ * when a rider requests a trip.
+ */
+export async function dispatchRideRequestPush(params: {
+  tripId: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  fareZar: number;
+}): Promise<boolean> {
+  try {
+    const payload = {
+      title: '🚖 New Trip Request!',
+      body: `R${params.fareZar} • Pickup: ${params.pickupAddress}`,
+      role: 'driver' as const,
+      icon: '/driver-icon-192.png',
+      url: `/driver?tripId=${params.tripId}`,
+      tripId: params.tripId,
+      tag: `trip-request-${params.tripId}`,
+    };
+
+    const res = await fetch('/api/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: 'driver',
+        payload,
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn('[PushClient] Dispatch request returned status:', res.status);
+      return false;
+    }
+
+    const data = await res.json();
+    return !!data.success;
+  } catch (err) {
+    console.error('[PushClient] Failed to dispatch driver push notification:', err);
+    return false;
+  }
+}
+

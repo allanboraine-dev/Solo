@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendWebPushNotification, PushPayload } from '@/utils/webPush';
+import { getMemorySubscriptions, removeMemorySubscription } from '@/utils/pushStore';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock.supabase.co',
@@ -40,13 +41,31 @@ export async function POST(req: NextRequest) {
       query = query.eq('role', role);
     }
 
-    const { data: subscriptions, error } = await query;
+    let dbSubscriptions: any[] = [];
+    const { data, error } = await query;
     if (error) {
-      console.error('[PushSendAPI] Database query error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.warn('[PushSendAPI] Database query warning (falling back to memory store):', error.message);
+    } else if (data) {
+      dbSubscriptions = data;
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
+    // Retrieve matching subscriptions from in-memory fallback store
+    const memSubscriptions = getMemorySubscriptions(role, userId);
+
+    // Merge and deduplicate by endpoint
+    const subscriptionMap = new Map<string, any>();
+    for (const sub of dbSubscriptions) {
+      if (sub.endpoint) subscriptionMap.set(sub.endpoint, sub);
+    }
+    for (const sub of memSubscriptions) {
+      if (sub.endpoint && !subscriptionMap.has(sub.endpoint)) {
+        subscriptionMap.set(sub.endpoint, sub);
+      }
+    }
+
+    const subscriptions = Array.from(subscriptionMap.values());
+
+    if (subscriptions.length === 0) {
       return NextResponse.json({
         success: true,
         sentCount: 0,
@@ -81,6 +100,9 @@ export async function POST(req: NextRequest) {
 
     // Clean up stale/expired subscriptions
     if (staleEndpoints.length > 0) {
+      for (const ep of staleEndpoints) {
+        removeMemorySubscription(ep);
+      }
       await supabase
         .from('push_subscriptions')
         .delete()

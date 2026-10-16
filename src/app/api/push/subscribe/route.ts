@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { saveMemorySubscription } from '@/utils/pushStore';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock.supabase.co',
@@ -26,6 +27,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Always persist to in-memory store for instantaneous availability
+    saveMemorySubscription({
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+      role,
+      user_id: userId || null,
+      user_agent: userAgent || null,
+      updated_at: new Date().toISOString(),
+    });
 
     // Upsert into Supabase push_subscriptions table
     const { data, error } = await supabase

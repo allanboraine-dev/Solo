@@ -85,4 +85,47 @@ describe('Web Push Notification & Dispatch Suite', () => {
     const padding = '='.repeat((4 - (testString.length % 4)) % 4);
     assert.strictEqual((testString + padding).length % 4, 0);
   });
+
+  it('guarantees in-memory pushStore registers and retrieves driver subscriptions', async () => {
+    const { saveMemorySubscription, getMemorySubscriptions, removeMemorySubscription } = await import('../src/utils/pushStore.ts');
+    
+    const mockDriverSub = {
+      endpoint: 'https://updates.push.services.mozilla.com/wpush/v2/mock-driver-endpoint-1',
+      p256dh: 'BNcRdreALRF8FsEJKZdn5UGq7613sgKE-',
+      auth: 'tBHItJI5svbp5pG24h-1gQ',
+      role: 'driver' as const,
+      user_id: 'driver-test-uuid',
+      updated_at: new Date().toISOString(),
+    };
+
+    saveMemorySubscription(mockDriverSub);
+    const driverSubs = getMemorySubscriptions('driver');
+    assert.ok(driverSubs.some(s => s.endpoint === mockDriverSub.endpoint));
+
+    const specificDriverSubs = getMemorySubscriptions('driver', 'driver-test-uuid');
+    assert.strictEqual(specificDriverSubs.length, 1);
+    assert.strictEqual(specificDriverSubs[0].role, 'driver');
+
+    // Clean up
+    removeMemorySubscription(mockDriverSub.endpoint);
+    const remaining = getMemorySubscriptions('driver');
+    assert.ok(!remaining.some(s => s.endpoint === mockDriverSub.endpoint));
+  });
+
+  it('verifies audioAlert manager provides non-crashing alertDriverOfTrip method in SSR/Node environment', async () => {
+    const { audioAlert } = await import('../src/utils/audioAlert.ts');
+    assert.ok(audioAlert, 'audioAlert instance must be defined');
+    assert.strictEqual(typeof audioAlert.alertDriverOfTrip, 'function');
+    assert.strictEqual(typeof audioAlert.playTripAlertChime, 'function');
+    assert.strictEqual(typeof audioAlert.triggerDeviceVibration, 'function');
+
+    // Calling in Node.js (without window) should not throw
+    assert.doesNotThrow(() => {
+      audioAlert.alertDriverOfTrip({
+        id: 'test-trip-alert',
+        pickup_location: 'Du Toitspan Rd, Kimberley',
+        fare_amount: 55,
+      });
+    });
+  });
 });

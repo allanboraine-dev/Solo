@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { LocateFixed, Clock, Home, Building2 } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip } from '@/lib/mockBackend'
 import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
+import { dispatchRideRequestPush } from '@/utils/pushClient'
 import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
@@ -153,6 +154,15 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
       setRiderActiveTripId(tripData.id);
       await saveTrip(tripData);
       setActiveTripId(tripData.id);
+
+      // Trigger Web Push alert to all online/subscribed drivers across mobile and desktop
+      dispatchRideRequestPush({
+        tripId: tripData.id,
+        pickupAddress: tripData.pickup_location,
+        dropoffAddress: tripData.dropoff_location,
+        fareZar: tripData.fare_amount,
+      }).catch(err => console.warn('[BookingForm] Web push dispatch non-blocking error:', err));
+
       if (onTripCreated) {
         onTripCreated(tripData);
       }
