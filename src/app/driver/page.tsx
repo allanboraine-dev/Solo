@@ -198,7 +198,6 @@ export default function DriverPage() {
       if (currentActive) {
         if (completedIds.has(currentActive.id) || declinedIds.has(currentActive.id)) {
           updateActiveTripState(null);
-          setIsWaitingForPayment(false);
           setShowFareCollection(false);
           return;
         }
@@ -209,7 +208,6 @@ export default function DriverPage() {
               markTripCompleted(currentInDb.id);
             }
             updateActiveTripState(null);
-            setIsWaitingForPayment(false);
             setShowFareCollection(false);
             return;
           }
@@ -218,17 +216,16 @@ export default function DriverPage() {
           const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
           if (dbPrio > activePrio) {
             updateActiveTripState(currentInDb);
-            if (currentInDb.status === 'payment_pending') setIsWaitingForPayment(true);
           }
         }
         return;
       }
 
-      // No active trip currently in state: check if there is an active trip in storage/DB for this driver
+      // No active trip currently in state: check if there is an active trip in storage/DB strictly for THIS driver
       const active = trips.find(
         t =>
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
-          (!t.driver_id || !driverId || t.driver_id === driverId) &&
+          (driverId ? t.driver_id === driverId : false) &&
           !declinedIds.has(t.id) &&
           !completedIds.has(t.id)
       );
@@ -237,7 +234,6 @@ export default function DriverPage() {
         if (!activeTripRef.current) {
           updateActiveTripState(active);
           setRequest(null);
-          if (active.status === 'payment_pending') setIsWaitingForPayment(true);
         }
       } else {
         // Find requested trips (excluding any declined, completed, or stale requests)
@@ -303,13 +299,11 @@ export default function DriverPage() {
           completeTripAtomic(trip.id, 'cash', trip);
           updateActiveTripState(null);
           setRequest(null);
-          setIsWaitingForPayment(false);
           setShowFareCollection(false);
           alert("Payment Received! Trip Completed.");
         } else if (currentActive && trip.id === currentActive.id && trip.status === 'cancelled') {
           updateActiveTripState(null);
           setRequest(null);
-          setIsWaitingForPayment(false);
           setShowFareCollection(false);
         } else if (
           currentActive &&
@@ -321,7 +315,6 @@ export default function DriverPage() {
           const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
           if (incomingPrio > activePrio) {
             updateActiveTripState(trip);
-            if (trip.status === 'payment_pending') setIsWaitingForPayment(true);
           }
         } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id)) {
           setRequest(prev => (prev && prev.id === trip.id ? null : prev));

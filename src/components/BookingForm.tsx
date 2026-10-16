@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { LocateFixed, Clock, Home, Building2 } from 'lucide-react'
-import { saveTrip, type MockTrip } from '@/lib/mockBackend'
+import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip } from '@/lib/mockBackend'
 import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
 import CustomSearchInput from './CustomSearchInput'
 
@@ -10,6 +10,7 @@ interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
   currentUser?: { id: string; fullName?: string; phone?: string } | null
   onRequireAuth?: () => void
+  onTripCreated?: (trip: MockTrip) => void
 }
 
 function formatSelectedPlaceLabel(feature: SearchResultPlace): string {
@@ -33,7 +34,7 @@ function formatSelectedPlaceLabel(feature: SearchResultPlace): string {
   return displaySegments.join(', ') || feature.name;
 }
 
-export default function BookingForm({ onLocationSelect, currentUser, onRequireAuth }: BookingFormProps) {
+export default function BookingForm({ onLocationSelect, currentUser, onRequireAuth, onTripCreated }: BookingFormProps) {
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
   const [pickupDetail, setPickupDetail] = useState('')
@@ -134,7 +135,7 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
 
     setIsBooking(true)
     try {
-      const riderId = currentUser?.id || "00000000-0000-0000-0000-000000000000" 
+      const riderId = getRiderSessionId(currentUser?.id);
       const tripData: MockTrip = {
         id: crypto.randomUUID(),
         rider_id: riderId,
@@ -149,8 +150,12 @@ export default function BookingForm({ onLocationSelect, currentUser, onRequireAu
         scheduled_time: pickupTime || undefined,
       };
       
+      setRiderActiveTripId(tripData.id);
       await saveTrip(tripData);
       setActiveTripId(tripData.id);
+      if (onTripCreated) {
+        onTripCreated(tripData);
+      }
     } finally {
       setIsBooking(false)
     }

@@ -238,6 +238,13 @@ export const isStaleRequestedTrip = (trip: Pick<MockTrip, 'status' | 'created_at
   return Date.now() - createdMs > STALE_REQUEST_MAX_AGE_MS;
 };
 
+export {
+  getRiderSessionId,
+  getRiderActiveTripId,
+  setRiderActiveTripId,
+  isTripBelongingToRiderSession,
+} from '@/utils/session';
+
 /**
  * Retrieves the set of trip IDs that have been completed locally
  */

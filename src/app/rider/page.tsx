@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -34,6 +34,11 @@ export default function RiderPage() {
   const updateActiveTripState = (next: MockTrip | null) => {
     activeTripRef.current = next
     setActiveTrip(next)
+    if (next?.id) {
+      setRiderActiveTripId(next.id)
+    } else {
+      setRiderActiveTripId(null)
+    }
   }
 
   useEffect(() => {
@@ -155,8 +160,21 @@ export default function RiderPage() {
       const completedIds = getCompletedTripIds();
       const declinedIds = getDeclinedTripIds();
       const currentActive = activeTripRef.current;
+      const storedActiveTripId = getRiderActiveTripId();
+      const myRiderId = getRiderSessionId(currentUser?.id);
 
       if (currentActive) {
+        // Discard if current active does not belong to this session
+        if (
+          currentActive.id !== storedActiveTripId &&
+          currentActive.rider_id !== myRiderId &&
+          myRiderId !== '00000000-0000-0000-0000-000000000000'
+        ) {
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          return;
+        }
+
         if (completedIds.has(currentActive.id) || isTripCompleted(currentActive.id)) {
           setRatingTrip(currentActive);
           setShowRatingModal(true);
@@ -177,7 +195,7 @@ export default function RiderPage() {
           if (matched.status === 'cancelled') {
             updateActiveTripState(null);
             setDriverCoords(null);
-            setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
+            setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
             return;
           }
           if (matched.status === 'completed') {
@@ -225,6 +243,7 @@ export default function RiderPage() {
         return;
       }
 
+      // If no active trip, ONLY find active trips strictly belonging to THIS rider session
       const active = trips.find(
         t =>
           t.status !== 'completed' &&
@@ -232,7 +251,7 @@ export default function RiderPage() {
           !completedIds.has(t.id) &&
           !declinedIds.has(t.id) &&
           !isStaleRequestedTrip(t) &&
-          (!currentUser?.id || !t.rider_id || t.rider_id === currentUser.id)
+          (t.id === storedActiveTripId || (t.rider_id === myRiderId && myRiderId !== '00000000-0000-0000-0000-000000000000'))
       );
       if (active && !activeTripRef.current) {
         updateActiveTripState(active);
@@ -282,39 +301,48 @@ export default function RiderPage() {
         const trip = payload as MockTrip;
         if (!trip) return;
         const currentActive = activeTripRef.current || activeTrip;
+        const storedActiveTripId = getRiderActiveTripId();
+        const myRiderId = getRiderSessionId(currentUser?.id);
+
+        // ISOLATION GUARD: Is this trip relevant to this rider session?
+        const isMyTrip =
+          (currentActive && currentActive.id === trip.id) ||
+          (storedActiveTripId && storedActiveTripId === trip.id) ||
+          (trip.rider_id === myRiderId && myRiderId !== '00000000-0000-0000-0000-000000000000');
+
+        // If this trip belongs to another rider, ignore it entirely!
+        if (!isMyTrip) {
+          return;
+        }
 
         if (trip.status === 'completed') {
           markTripCompleted(trip.id);
-          if (!currentActive || currentActive.id === trip.id || isTripCompleted(currentActive.id)) {
-            const completedSnapshot: MockTrip = currentActive
-              ? { ...currentActive, ...trip, status: 'completed' }
-              : trip;
-            setRatingTrip(completedSnapshot);
-            setShowRatingModal(true);
-            updateActiveTripState(null);
-            setDriverCoords(null);
-            setIsProcessingPayment(false);
-            setPaymentError(null);
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-              new Notification('Trip Completed! 🎉', {
-                body: `Your trip has ended. Thank you for riding with SOLO!`,
-                icon: '/rider-icon-192.png',
-                tag: `rider-trip-${trip.id}`,
-              });
-            }
+          const completedSnapshot: MockTrip = currentActive
+            ? { ...currentActive, ...trip, status: 'completed' }
+            : trip;
+          setRatingTrip(completedSnapshot);
+          setShowRatingModal(true);
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          setIsProcessingPayment(false);
+          setPaymentError(null);
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification('Trip Completed! 🎉', {
+              body: `Your trip has ended. Thank you for riding with SOLO!`,
+              icon: '/rider-icon-192.png',
+              tag: `rider-trip-${trip.id}`,
+            });
           }
         } else if (trip.status === 'cancelled') {
-          if (!currentActive || currentActive.id === trip.id) {
-            updateActiveTripState(null);
-            setDriverCoords(null);
-            setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-              new Notification('Ride Request Declined', {
-                body: 'The driver was unable to accept your trip request. Please request another ride.',
-                icon: '/rider-icon-192.png',
-                tag: `rider-trip-${trip.id}`,
-              });
-            }
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+            new Notification('Ride Request Cancelled', {
+              body: 'The ride request was cancelled. Please request another ride.',
+              icon: '/rider-icon-192.png',
+              tag: `rider-trip-${trip.id}`,
+            });
           }
         } else if (!isTripCompleted(trip.id) && !isTripDeclined(trip.id) && !isStaleRequestedTrip(trip)) {
           if (!currentActive) {
@@ -685,6 +713,10 @@ export default function RiderPage() {
                       onLocationSelect={handleLocationSelect} 
                       currentUser={currentUser}
                       onRequireAuth={() => setShowAuthModal(true)}
+                      onTripCreated={(trip) => {
+                        updateActiveTripState(trip);
+                        setDeclineNotice(null);
+                      }}
                     />
                   </>
                 )}
@@ -755,6 +787,17 @@ export default function RiderPage() {
                           <button
                             type="button"
                             onClick={async () => {
+                              if (!activeTrip) return;
+                              const myRiderId = getRiderSessionId(currentUser?.id);
+                              const storedActiveTripId = getRiderActiveTripId();
+                              if (
+                                activeTrip.id !== storedActiveTripId &&
+                                activeTrip.rider_id !== myRiderId &&
+                                myRiderId !== '00000000-0000-0000-0000-000000000000'
+                              ) {
+                                console.warn('[Rider] Refusing to cancel trip belonging to another rider session');
+                                return;
+                              }
                               const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
                               updateActiveTripState(null);
                               setDriverCoords(null);
