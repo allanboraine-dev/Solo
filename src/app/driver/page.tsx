@@ -16,7 +16,7 @@ import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { NotificationToneModal } from '@/components/NotificationToneModal'
-import { getSelectedTone, getCustomToneMeta, PRESET_TONES, type ToneId } from '@/utils/notificationTones'
+import { getSelectedTone, getCustomToneMeta, PRESET_TONES, type ToneId, unlockAudio } from '@/utils/notificationTones'
 import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -47,6 +47,9 @@ export default function DriverPage() {
   const [preemptedNotice, setPreemptedNotice] = useState<string | null>(null)
 
   const handleGoOnlineOnThisDevice = async () => {
+    try {
+      unlockAudio();
+    } catch {}
     setPreemptedNotice(null)
     const resolvedDriverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null)
     if (resolvedDriverId) {
@@ -843,7 +846,7 @@ export default function DriverPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            audioAlert.playTripAlertChime();
+                            audioAlert.playTripAlertChime(activeToneId);
                           }}
                           className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 text-xs font-bold rounded-lg flex items-center gap-1 transition touch-manipulation"
                           title="Test Sound"
@@ -972,7 +975,7 @@ export default function DriverPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => audioAlert.playTripAlertChime()}
+                      onClick={() => audioAlert.playTripAlertChime(activeToneId)}
                       className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-800/50 text-blue-600 dark:text-blue-300 text-xs font-bold flex items-center gap-1 transition touch-manipulation"
                       title="Preview Current Alert Tone"
                     >

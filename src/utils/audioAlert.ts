@@ -4,25 +4,18 @@
  * and triggers physical haptic vibration patterns on supported mobile devices.
  */
 
-import { playTone, type ToneId } from './notificationTones.ts';
+import {
+  playTone,
+  type ToneId,
+  getSelectedTone,
+  getToneVolume,
+  getSharedAudioContext,
+  playPresetWithWebAudio,
+} from './notificationTones.ts';
 
 class AudioAlertManager {
-  private audioCtx: AudioContext | null = null;
-
   private getAudioContext(): AudioContext | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!this.audioCtx && AudioCtxClass) {
-        this.audioCtx = new AudioCtxClass();
-      }
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
-      return this.audioCtx;
-    } catch {
-      return null;
-    }
+    return getSharedAudioContext();
   }
 
   /**
@@ -31,13 +24,20 @@ class AudioAlertManager {
    */
   public playTripAlertChime(specificToneId?: ToneId): void {
     if (typeof window === 'undefined') return;
+    const targetTone: ToneId = specificToneId || getSelectedTone();
     try {
-      playTone(specificToneId).catch((err) => {
-        console.warn('[AudioAlert] Tone playback error, fallback to legacy chime:', err);
-        this.playLegacyChime();
+      playTone(targetTone).catch((err) => {
+        console.warn('[AudioAlert] Tone playback error, fallback to Web Audio synth:', err);
+        const ctx = this.getAudioContext();
+        if (ctx) {
+          playPresetWithWebAudio(ctx, targetTone === 'custom' ? 'default' : targetTone, getToneVolume());
+        }
       });
     } catch {
-      this.playLegacyChime();
+      const ctx = this.getAudioContext();
+      if (ctx) {
+        playPresetWithWebAudio(ctx, targetTone === 'custom' ? 'default' : targetTone, getToneVolume());
+      }
     }
   }
 

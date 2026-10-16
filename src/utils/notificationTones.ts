@@ -455,6 +455,7 @@ export async function saveCustomToneFile(file: File): Promise<{ success: boolean
     });
 
     await storeCustomAudioInDb(dataUrl);
+    cachedCustomAudioUrl = dataUrl;
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.CUSTOM_TONE_NAME, file.name);
@@ -471,6 +472,7 @@ export async function saveCustomToneFile(file: File): Promise<{ success: boolean
 }
 
 export async function removeCustomTone(): Promise<void> {
+  cachedCustomAudioUrl = null;
   await deleteCustomAudioFromDb();
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEYS.CUSTOM_TONE_NAME);
@@ -481,14 +483,15 @@ export async function removeCustomTone(): Promise<void> {
 }
 
 // ==========================================
-// Playback Engine: Native Web Audio + Persistent HTML5 Audio
+// Playback Engine: Dual-Engine (Persistent Media HTML5 Audio + Web Audio Synth)
 // ==========================================
 
 let sharedAudioCtx: AudioContext | null = null;
 let isAudioUnlocked = false;
-let activeAudioElement: HTMLAudioElement | null = null;
+let persistentAudio: HTMLAudioElement | null = null;
+let cachedCustomAudioUrl: string | null = null;
 
-function getSharedAudioContext(): AudioContext | null {
+export function getSharedAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   try {
     const AudioCtxClass =
@@ -504,11 +507,27 @@ function getSharedAudioContext(): AudioContext | null {
   }
 }
 
+export function getPersistentAudioElement(): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!persistentAudio) {
+    try {
+      persistentAudio = new Audio();
+      persistentAudio.preload = 'auto';
+      (persistentAudio as any).playsInline = true;
+    } catch {
+      return null;
+    }
+  }
+  return persistentAudio;
+}
+
 /**
  * Proactively unlocks mobile audio restrictions on user gestures.
+ * Primes both the shared Web Audio context and persistent media audio element.
  */
 export function unlockAudio(): void {
   if (typeof window === 'undefined') return;
+
   try {
     const ctx = getSharedAudioContext();
     if (ctx && ctx.state === 'suspended') {
@@ -519,13 +538,38 @@ export function unlockAudio(): void {
   if (!isAudioUnlocked) {
     isAudioUnlocked = true;
     try {
-      const silentAudio = new Audio(
-        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=='
-      );
-      silentAudio.volume = 0;
-      silentAudio.play().catch(() => {});
+      const audio = getPersistentAudioElement();
+      if (audio) {
+        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+        audio.volume = 0.001;
+        const p = audio.play();
+        if (p !== undefined) {
+          p.then(() => {
+            if (audio) {
+              audio.pause();
+              audio.currentTime = 0;
+            }
+          }).catch(() => {
+            isAudioUnlocked = false;
+          });
+        }
+      }
     } catch {}
   }
+}
+
+// Auto-attach unlock listeners on any early touch or interaction
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['touchstart', 'touchend', 'click', 'keydown', 'pointerdown'];
+  const handleUserGesture = () => {
+    unlockAudio();
+    unlockEvents.forEach((ev) => window.removeEventListener(ev, handleUserGesture));
+  };
+  unlockEvents.forEach((ev) => {
+    try {
+      window.addEventListener(ev, handleUserGesture, { passive: true, once: true });
+    } catch {}
+  });
 }
 
 /**
@@ -534,7 +578,7 @@ export function unlockAudio(): void {
  * with no base64 overhead, no decodeAudioData failures, and immunity from garbage collection.
  */
 export function playPresetWithWebAudio(ctx: AudioContext, preset: ToneId, volume: number): void {
-  const now = ctx.currentTime;
+  const now = (ctx.currentTime || 0) + 0.03; // Lookahead scheduling prevents hardware buffer quantum drop
   const masterGain = ctx.createGain();
   const clampedVol = Math.max(0, Math.min(1, volume));
   masterGain.gain.setValueAtTime(clampedVol, now);
@@ -690,6 +734,9 @@ export function playPresetWithWebAudio(ctx: AudioContext, preset: ToneId, volume
 
 /**
  * Plays the specified tone (or active user selection) with reliable audible playback.
+ * Dual-Engine strategy:
+ * 1. Primary: Persistent HTML5 Audio element on media playback channel (audible on mobile silent/vibrate)
+ * 2. Secondary/Fallback: Native Web Audio API synthesis for zero latency and hardware-level robustness
  */
 export async function playTone(toneId?: ToneId): Promise<void> {
   if (typeof window === 'undefined') return;
@@ -699,8 +746,43 @@ export async function playTone(toneId?: ToneId): Promise<void> {
   const resolvedId: ToneId = toneId || getSelectedTone();
   const volume = getToneVolume();
 
-  // 1. If preset tone, use native Web Audio API synthesis FIRST (instant, zero latency, no GC cutoff)
-  if (resolvedId !== 'custom') {
+  // Resolve audio payload
+  let audioSrc: string | null = null;
+  if (resolvedId === 'custom') {
+    if (cachedCustomAudioUrl) {
+      audioSrc = cachedCustomAudioUrl;
+    } else {
+      audioSrc = await getCustomAudioFromDb();
+      if (audioSrc) cachedCustomAudioUrl = audioSrc;
+    }
+  }
+
+  // If custom audio is missing or preset requested, resolve 16-bit PCM WAV data URI
+  if (!audioSrc) {
+    audioSrc = getPresetWavDataUri(resolvedId === 'custom' ? 'default' : resolvedId);
+  }
+
+  // 1. Primary: Play via persistent HTMLAudioElement (runs on media channel, audible even when phone is on silent/vibrate)
+  let htmlAudioPlayed = false;
+  const audio = getPersistentAudioElement();
+  if (audio && audioSrc) {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = audioSrc;
+      audio.volume = Math.max(0, Math.min(1, volume));
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        await playPromise;
+        htmlAudioPlayed = true;
+      }
+    } catch (err) {
+      console.warn('[NotificationTones] Persistent HTML Audio playback blocked or failed, using Web Audio synth fallback:', err);
+    }
+  }
+
+  // 2. Secondary/Fallback: If HTML audio was blocked or failed to play, synthesize via Web Audio
+  if (!htmlAudioPlayed && resolvedId !== 'custom') {
     const ctx = getSharedAudioContext();
     if (ctx) {
       try {
@@ -708,63 +790,9 @@ export async function playTone(toneId?: ToneId): Promise<void> {
           await ctx.resume();
         }
         playPresetWithWebAudio(ctx, resolvedId, volume);
-        return;
       } catch (err) {
-        console.warn('[NotificationTones] Web Audio synthesis error, falling back to audio element:', err);
+        console.warn('[NotificationTones] Web Audio synthesis fallback error:', err);
       }
-    }
-  }
-
-  // 2. Custom device audio or fallback
-  let audioSrc: string | null = null;
-  if (resolvedId === 'custom') {
-    audioSrc = await getCustomAudioFromDb();
-  }
-
-  // If custom audio is missing, fall back to default
-  if (!audioSrc) {
-    if (resolvedId === 'custom') {
-      const ctx = getSharedAudioContext();
-      if (ctx) {
-        try {
-          if (ctx.state === 'suspended') await ctx.resume();
-          playPresetWithWebAudio(ctx, 'default', volume);
-          return;
-        } catch {}
-      }
-    }
-    audioSrc = getPresetWavDataUri(resolvedId === 'custom' ? 'default' : resolvedId);
-  }
-
-  // Play audioSrc via persistent HTMLAudioElement so garbage collection cannot cancel playback
-  try {
-    if (activeAudioElement) {
-      activeAudioElement.pause();
-      activeAudioElement.currentTime = 0;
-    }
-    const audio = new Audio(audioSrc);
-    audio.volume = Math.max(0, Math.min(1, volume));
-    activeAudioElement = audio;
-
-    audio.onended = () => {
-      if (activeAudioElement === audio) activeAudioElement = null;
-    };
-    audio.onerror = () => {
-      if (activeAudioElement === audio) activeAudioElement = null;
-    };
-
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      await playPromise;
-    }
-  } catch (err) {
-    console.warn('[NotificationTones] Audio element playback error, using Web Audio fallback:', err);
-    const ctx = getSharedAudioContext();
-    if (ctx) {
-      try {
-        if (ctx.state === 'suspended') await ctx.resume();
-        playPresetWithWebAudio(ctx, 'default', volume);
-      } catch {}
     }
   }
 }

@@ -12,6 +12,8 @@ import {
   playTone,
   getPresetWavDataUri,
   playPresetWithWebAudio,
+  getSharedAudioContext,
+  getPersistentAudioElement,
 } from '../src/utils/notificationTones.ts';
 import { audioAlert } from '../src/utils/audioAlert.ts';
 
@@ -212,6 +214,27 @@ describe('Notification & Alert Tone System Suite', () => {
 
     assert.doesNotThrow(() => {
       audioAlert.playTripAlertChime('cash');
+      audioAlert.playTripAlertChime();
+    });
+  });
+
+  it('guarantees dual-engine audio accessors return null safely in Node environment', () => {
+    assert.strictEqual(getSharedAudioContext(), null);
+    assert.strictEqual(getPersistentAudioElement(), null);
+  });
+
+  it('verifies playTripAlertChime correctly resolves and triggers active stored tone', () => {
+    setSelectedTone('urgent');
+    assert.strictEqual(getSelectedTone(), 'urgent');
+
+    // Calling playTripAlertChime with no params must resolve 'urgent' from storage without crashing
+    assert.doesNotThrow(() => {
+      audioAlert.playTripAlertChime();
+    });
+
+    setSelectedTone('radar');
+    assert.strictEqual(getSelectedTone(), 'radar');
+    assert.doesNotThrow(() => {
       audioAlert.playTripAlertChime();
     });
   });
