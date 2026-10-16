@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -203,7 +203,6 @@ export default function RiderPage() {
     const loadTrips = async () => {
       const trips = await getTrips();
       const completedIds = getCompletedTripIds();
-      const declinedIds = getDeclinedTripIds();
       const currentActive = activeTripRef.current;
       const storedActiveTripId = getRiderActiveTripId();
       const myRiderId = getRiderSessionId(currentUser?.id);
@@ -227,12 +226,6 @@ export default function RiderPage() {
           setDriverCoords(null);
           setIsProcessingPayment(false);
           setPaymentError(null);
-          return;
-        }
-        if (declinedIds.has(currentActive.id)) {
-          updateActiveTripState(null);
-          setDriverCoords(null);
-          setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
           return;
         }
         const matched = trips.find(t => t.id === currentActive.id);
@@ -294,7 +287,6 @@ export default function RiderPage() {
           t.status !== 'completed' &&
           t.status !== 'cancelled' &&
           !completedIds.has(t.id) &&
-          !declinedIds.has(t.id) &&
           !isStaleRequestedTrip(t) &&
           (t.id === storedActiveTripId || (t.rider_id === myRiderId && myRiderId !== '00000000-0000-0000-0000-000000000000'))
       );
@@ -389,7 +381,7 @@ export default function RiderPage() {
               tag: `rider-trip-${trip.id}`,
             });
           }
-        } else if (!isTripCompleted(trip.id) && !isTripDeclined(trip.id) && !isStaleRequestedTrip(trip)) {
+        } else if (!isTripCompleted(trip.id) && !isStaleRequestedTrip(trip)) {
           if (!currentActive) {
             setDeclineNotice(null);
             updateActiveTripState(trip);

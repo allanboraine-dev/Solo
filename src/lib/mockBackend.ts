@@ -327,12 +327,10 @@ const resolveMonotonicStatus = (
   tripId: string,
   candidateStatus: MockTrip['status'],
   completedIds: Set<string>,
-  declinedIds: Set<string>,
   overrides: Record<string, TripStatusOverride>,
   tripMeta?: Pick<MockTrip, 'created_at' | 'scheduled_time'>
 ): MockTrip['status'] => {
   if (completedIds.has(tripId)) return 'completed';
-  if (declinedIds.has(tripId)) return 'cancelled';
 
   let bestStatus = candidateStatus;
   const override = overrides[tripId];
@@ -360,7 +358,6 @@ const syncTripToLocalStorage = (trip: MockTrip): MockTrip => {
     recordTripStatusOverride(trip.id, trip.status, trip.driver_id);
 
     const completedIds = getCompletedTripIds();
-    const declinedIds = getDeclinedTripIds();
     const overrides = getTripStatusOverrides();
 
     const localData = localStorage.getItem('mock_trips');
@@ -373,7 +370,7 @@ const syncTripToLocalStorage = (trip: MockTrip): MockTrip => {
       const existingPrio = STATUS_PRIORITY[existing.status] || 0;
       const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
       const baseStatus = incomingPrio >= existingPrio ? trip.status : existing.status;
-      const resolvedStatus = resolveMonotonicStatus(trip.id, baseStatus, completedIds, declinedIds, overrides, trip);
+      const resolvedStatus = resolveMonotonicStatus(trip.id, baseStatus, completedIds, overrides, trip);
       finalTrip = {
         ...existing,
         ...trip,
@@ -382,7 +379,7 @@ const syncTripToLocalStorage = (trip: MockTrip): MockTrip => {
       };
       trips[existingIndex] = finalTrip;
     } else {
-      const resolvedStatus = resolveMonotonicStatus(trip.id, trip.status, completedIds, declinedIds, overrides, trip);
+      const resolvedStatus = resolveMonotonicStatus(trip.id, trip.status, completedIds, overrides, trip);
       finalTrip = {
         ...trip,
         driver_id: trip.driver_id || overrides[trip.id]?.driver_id,
@@ -419,7 +416,6 @@ export const getTrips = async (): Promise<MockTrip[]> => {
   // 2. Read the FRESHEST local state AFTER the network await so in-flight clicks (Accept, Confirm Pickup, Complete) are never overwritten
   const mergedMap = new Map<string, MockTrip>();
   const completedIds = getCompletedTripIds();
-  const declinedIds = getDeclinedTripIds();
   const overrides = getTripStatusOverrides();
 
   try {
@@ -428,7 +424,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
         if (t && t.id) {
-          const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, declinedIds, overrides, t);
+          const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, overrides, t);
           const resolvedDriverId = t.driver_id || overrides[t.id]?.driver_id;
           mergedMap.set(t.id, { ...t, driver_id: resolvedDriverId, status: resolvedStatus });
         }
@@ -447,7 +443,6 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         dbTrip.id,
         dbTrip.status,
         completedIds,
-        declinedIds,
         overrides,
         { created_at: dbTrip.created_at, scheduled_time: dbTrip.scheduled_time }
       );
@@ -666,18 +661,18 @@ export const acceptTripAtomic = async (
 };
 
 /**
- * Retrieves the set of trip IDs declined by the current driver
+ * Retrieves the set of trip IDs declined by a specific driver.
+ * Declines are strictly scoped per driver so one driver declining
+ * never hides the trip from other registered drivers.
  */
 export const getDeclinedTripIds = (driverId?: string | null): Set<string> => {
   if (typeof window === 'undefined') return new Set();
   try {
-    const key = driverId ? `solo_declined_trips_${driverId}` : 'solo_declined_trips';
+    const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+    if (!resolvedDriverId) return new Set();
+    const key = `solo_declined_trips_${resolvedDriverId}`;
     const raw = localStorage.getItem(key);
-    const globalRaw = localStorage.getItem('solo_declined_trips');
-    const ids: string[] = [
-      ...(raw ? JSON.parse(raw) : []),
-      ...(globalRaw ? JSON.parse(globalRaw) : []),
-    ];
+    const ids: string[] = raw ? JSON.parse(raw) : [];
     return new Set(ids);
   } catch {
     return new Set();
@@ -689,32 +684,27 @@ export const isTripDeclined = (tripId: string, driverId?: string | null): boolea
 };
 
 /**
- * Declines a rider trip request from the driver portal, persists the decline
- * so the request will not re-appear for this driver, and updates/broadcasts the cancelled status.
+ * Declines a rider trip request from the driver portal for THIS specific driver.
+ * Records the decline under the driver's ID so this driver is not prompted again,
+ * while leaving the trip in 'requested' status so OTHER registered drivers using
+ * the SOLO driver app can still see and accept it.
  */
 export const declineTrip = async (trip: MockTrip, driverId?: string | null): Promise<void> => {
-  if (typeof window !== 'undefined') {
-    try {
-      const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+  if (typeof window === 'undefined' || !trip?.id) return;
+  try {
+    const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+    if (resolvedDriverId) {
       const current = Array.from(getDeclinedTripIds(resolvedDriverId));
       if (!current.includes(trip.id)) {
         current.push(trip.id);
       }
-      localStorage.setItem('solo_declined_trips', JSON.stringify(current.slice(-200)));
-      if (resolvedDriverId) {
-        localStorage.setItem(`solo_declined_trips_${resolvedDriverId}`, JSON.stringify(current.slice(-200)));
-      }
-    } catch (e) {
-      console.error('Error recording declined trip locally:', e);
+      localStorage.setItem(`solo_declined_trips_${resolvedDriverId}`, JSON.stringify(current.slice(-200)));
     }
+  } catch (e) {
+    console.error('Error recording declined trip locally:', e);
   }
-
-  const cancelledTrip: MockTrip = {
-    ...trip,
-    status: 'cancelled',
-  };
-
-  await saveTrip(cancelledTrip);
+  // NOTE: We intentionally do NOT mark trip status as 'cancelled'.
+  // The requested ride remains active in the pool for other registered drivers.
 };
 
 /**

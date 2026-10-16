@@ -186,32 +186,40 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     );
   });
 
-  it('Scenario 5: Driver Declines Trip Request -> Trip Filtered Out and Marked Cancelled', () => {
-    const declinedTripIds = new Set<string>();
+  it('Scenario 5: Driver Declines Trip Request -> Trip Filtered Out for Driver 1 but Remains Available for Other Registered Drivers', () => {
+    const driver1DeclinedIds = new Set<string>();
+    const driver2DeclinedIds = new Set<string>();
     const trips = [
       { id: 'trip-101', status: 'requested', fare_amount: 120 },
       { id: 'trip-102', status: 'requested', fare_amount: 85 },
     ];
 
-    // Simulate declineTrip('trip-101')
-    const declineTripSim = (tripId: string) => {
-      declinedTripIds.add(tripId);
-      const idx = trips.findIndex((t) => t.id === tripId);
-      if (idx >= 0) {
-        trips[idx] = { ...trips[idx], status: 'cancelled' };
-      }
+    // Simulate Driver 1 declining 'trip-101'
+    const declineTripSim = (tripId: string, driverDeclinedSet: Set<string>) => {
+      driverDeclinedSet.add(tripId);
+      // NOTE: Trip status is intentionally NOT changed to 'cancelled' so other drivers can accept it
     };
 
-    declineTripSim('trip-101');
+    declineTripSim('trip-101', driver1DeclinedIds);
 
-    const remainingRequested = trips.filter(
-      (t) => t.status === 'requested' && !declinedTripIds.has(t.id)
+    // Trip stays in 'requested' status in the system
+    assert.strictEqual(trips[0].status, 'requested', 'Declined trip must remain in requested status for other drivers');
+    assert.strictEqual(driver1DeclinedIds.has('trip-101'), true, 'Trip 101 must be recorded in Driver 1 declined set');
+
+    // Driver 1 view: trip-101 is filtered out
+    const driver1AvailableTrips = trips.filter(
+      (t) => t.status === 'requested' && !driver1DeclinedIds.has(t.id)
     );
+    assert.strictEqual(driver1AvailableTrips.length, 1, 'Only non-declined requested trips should remain visible to Driver 1');
+    assert.strictEqual(driver1AvailableTrips[0].id, 'trip-102');
 
-    assert.strictEqual(trips[0].status, 'cancelled', 'Declined trip should transition to cancelled status');
-    assert.strictEqual(declinedTripIds.has('trip-101'), true, 'Declined trip ID should be recorded');
-    assert.strictEqual(remainingRequested.length, 1, 'Only non-declined requested trips should remain visible');
-    assert.strictEqual(remainingRequested[0].id, 'trip-102');
+    // Driver 2 view: trip-101 is STILL available!
+    const driver2AvailableTrips = trips.filter(
+      (t) => t.status === 'requested' && !driver2DeclinedIds.has(t.id)
+    );
+    assert.strictEqual(driver2AvailableTrips.length, 2, 'Driver 2 must still see trip-101 as available');
+    assert.strictEqual(driver2AvailableTrips[0].id, 'trip-101');
+    assert.strictEqual(driver2AvailableTrips[1].id, 'trip-102');
   });
 
   it('Scenario 6: Completed Trip Never Loops or Resurfaces from Stale DB Rows', () => {
