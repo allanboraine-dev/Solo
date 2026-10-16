@@ -48,12 +48,6 @@ export default function Home() {
             <Link href="/manual" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
               📘 Download Operational Manual (SOP)
             </Link>
-            <Link href="/admin/simulator" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
-              🎮 Dual-Window Simulator
-            </Link>
-            <Link href="/admin/compliance" className="px-3.5 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 font-medium transition flex items-center gap-1.5 shadow-sm">
-              🛡️ Admin Compliance
-            </Link>
           </div>
         </div>
 
