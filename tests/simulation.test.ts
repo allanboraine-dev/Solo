@@ -258,5 +258,52 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     assert.strictEqual(resolvedTrips[1].status, 'cancelled', 'Stale unscheduled requested trip (>30m old) must be expired');
     assert.strictEqual(activeOrRequestedForDriver.length, 0, 'No completed or stale trips may loop back to the driver');
   });
+
+  it('Scenario 7: Confirm Pickup Workflow Never Loops Back to Accepted on Stale In-Flight DB Poll', () => {
+    const STATUS_PRIORITY: Record<string, number> = {
+      requested: 1,
+      accepted: 2,
+      arrived: 3,
+      in_progress: 4,
+      payment_pending: 5,
+      completed: 6,
+      cancelled: 7,
+    };
+
+    const statusOverrides: Record<string, string> = {};
+    const recordOverride = (tripId: string, status: string) => {
+      const prev = statusOverrides[tripId];
+      if (!prev || STATUS_PRIORITY[status] >= STATUS_PRIORITY[prev]) {
+        statusOverrides[tripId] = status;
+      }
+    };
+
+    // 1. Driver accepts trip-301
+    let activeTrip = { id: 'trip-301', status: 'accepted' };
+    recordOverride(activeTrip.id, 'accepted');
+    assert.strictEqual(activeTrip.status, 'accepted');
+
+    // 2. Driver clicks "Confirm Pickup" -> transitions to 'in_progress'
+    activeTrip = { ...activeTrip, status: 'in_progress' };
+    recordOverride(activeTrip.id, 'in_progress');
+    assert.strictEqual(activeTrip.status, 'in_progress');
+
+    // 3. Simulate an in-flight DB poll resolving with stale 'accepted' or 'requested' status
+    const stalePollResult = { id: 'trip-301', status: 'accepted' };
+    const resolvedDbStatus =
+      STATUS_PRIORITY[statusOverrides[stalePollResult.id]] > STATUS_PRIORITY[stalePollResult.status]
+        ? statusOverrides[stalePollResult.id]
+        : stalePollResult.status;
+
+    if (STATUS_PRIORITY[resolvedDbStatus] > STATUS_PRIORITY[activeTrip.status]) {
+      activeTrip = { ...activeTrip, status: resolvedDbStatus };
+    }
+
+    assert.strictEqual(
+      activeTrip.status,
+      'in_progress',
+      'Active trip must remain in_progress after Confirm Pickup and never revert to accepted'
+    );
+  });
 });
 

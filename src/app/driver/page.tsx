@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
@@ -33,6 +33,22 @@ export default function DriverPage() {
   const [request, setRequest] = useState<MockTrip | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
+  const activeTripRef = useRef<MockTrip | null>(null)
+  const driverCoordsRef = useRef<{lat: number, lng: number} | null>(null)
+
+  const updateActiveTripState = (next: MockTrip | null) => {
+    activeTripRef.current = next
+    setActiveTrip(next)
+  }
+
+  useEffect(() => {
+    activeTripRef.current = activeTrip
+  }, [activeTrip])
+
+  useEffect(() => {
+    driverCoordsRef.current = driverCoords
+  }, [driverCoords])
+
   const [profile, setProfile] = useState<MockDriverProfile | null>(null)
   const [completedTrips, setCompletedTrips] = useState<MockTrip[]>([])
   const [showSubModal, setShowSubModal] = useState(false)
@@ -176,27 +192,38 @@ export default function DriverPage() {
       const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
       const declinedIds = getDeclinedTripIds(driverId);
       const completedIds = getCompletedTripIds();
+      const currentActive = activeTripRef.current;
 
-      if (activeTrip) {
-        if (completedIds.has(activeTrip.id) || declinedIds.has(activeTrip.id)) {
-          setActiveTrip(null);
+      if (currentActive) {
+        if (completedIds.has(currentActive.id) || declinedIds.has(currentActive.id)) {
+          updateActiveTripState(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
           return;
         }
-        const currentInDb = trips.find(t => t.id === activeTrip.id);
-        if (currentInDb && (currentInDb.status === 'completed' || currentInDb.status === 'cancelled')) {
-          if (currentInDb.status === 'completed') {
-            markTripCompleted(currentInDb.id);
+        const currentInDb = trips.find(t => t.id === currentActive.id);
+        if (currentInDb) {
+          if (currentInDb.status === 'completed' || currentInDb.status === 'cancelled') {
+            if (currentInDb.status === 'completed') {
+              markTripCompleted(currentInDb.id);
+            }
+            updateActiveTripState(null);
+            setIsWaitingForPayment(false);
+            setShowFareCollection(false);
+            return;
           }
-          setActiveTrip(null);
-          setIsWaitingForPayment(false);
-          setShowFareCollection(false);
-          return;
+          // Only advance status monotonically (never regress 'in_progress' back to 'accepted')
+          const dbPrio = STATUS_PRIORITY[currentInDb.status] || 0;
+          const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
+          if (dbPrio > activePrio) {
+            updateActiveTripState(currentInDb);
+            if (currentInDb.status === 'payment_pending') setIsWaitingForPayment(true);
+          }
         }
+        return;
       }
 
-      // Find active trips assigned to THIS driver
+      // No active trip currently in state: check if there is an active trip in storage/DB for this driver
       const active = trips.find(
         t =>
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
@@ -206,13 +233,17 @@ export default function DriverPage() {
       );
 
       if (active) {
-        setActiveTrip(active);
-        if (active.status === 'payment_pending') setIsWaitingForPayment(true);
+        if (!activeTripRef.current) {
+          updateActiveTripState(active);
+          setRequest(null);
+          if (active.status === 'payment_pending') setIsWaitingForPayment(true);
+        }
       } else {
         // Find requested trips (excluding any declined, completed, or stale requests)
         let nearbyRequested: MockTrip[] = [];
-        if (driverCoords) {
-          nearbyRequested = await getNearbyRequestedTrips(driverCoords.lat, driverCoords.lng, 15, driverId);
+        const coords = driverCoordsRef.current;
+        if (coords) {
+          nearbyRequested = await getNearbyRequestedTrips(coords.lat, coords.lng, 15, driverId);
         }
         if (nearbyRequested.length === 0) {
           nearbyRequested = trips.filter(
@@ -223,6 +254,11 @@ export default function DriverPage() {
               !completedIds.has(t.id) &&
               !isStaleRequestedTrip(t)
           );
+        }
+        // Re-check activeTripRef after any async work so we never pop up a request while on a trip
+        if (activeTripRef.current) {
+          setRequest(null);
+          return;
         }
         if (nearbyRequested.length > 0) {
           setRequest(prev => prev?.id === nearbyRequested[0].id ? prev : nearbyRequested[0]);
@@ -240,6 +276,7 @@ export default function DriverPage() {
         const trip = payload as MockTrip;
         if (!trip) return;
         const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+        const currentActive = activeTripRef.current;
 
         if (trip.status === 'completed') {
           markTripCompleted(trip.id);
@@ -247,12 +284,12 @@ export default function DriverPage() {
 
         if (
           trip.status === 'requested' &&
-          !activeTrip &&
+          !currentActive &&
           !isTripDeclined(trip.id, driverId) &&
           !isTripCompleted(trip.id) &&
           !isStaleRequestedTrip(trip)
         ) {
-          setRequest(trip);
+          setRequest(prev => (prev?.id === trip.id ? prev : trip));
           if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
             new Notification('🚖 New Trip Request!', {
               body: `R${trip.fare_amount} • Pickup: ${trip.pickup_location}`,
@@ -260,22 +297,31 @@ export default function DriverPage() {
               tag: `trip-${trip.id}`,
             });
           }
-        } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'completed') {
+        } else if (currentActive && trip.id === currentActive.id && trip.status === 'completed') {
           markTripCompleted(trip.id);
-          // Also persist completion using driver's authenticated session
           completeTripAtomic(trip.id, 'cash', trip);
-          setActiveTrip(null);
+          updateActiveTripState(null);
           setRequest(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
           alert("Payment Received! Trip Completed.");
-        } else if (activeTrip && trip.id === activeTrip.id && trip.status === 'cancelled') {
-          setActiveTrip(null);
+        } else if (currentActive && trip.id === currentActive.id && trip.status === 'cancelled') {
+          updateActiveTripState(null);
           setRequest(null);
           setIsWaitingForPayment(false);
           setShowFareCollection(false);
-        } else if (activeTrip && trip.id === activeTrip.id && !isTripCompleted(trip.id) && !isTripDeclined(trip.id, driverId)) {
-          setActiveTrip(trip);
+        } else if (
+          currentActive &&
+          trip.id === currentActive.id &&
+          !isTripCompleted(trip.id) &&
+          !isTripDeclined(trip.id, driverId)
+        ) {
+          const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
+          const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
+          if (incomingPrio > activePrio) {
+            updateActiveTripState(trip);
+            if (trip.status === 'payment_pending') setIsWaitingForPayment(true);
+          }
         } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id)) {
           setRequest(prev => (prev && prev.id === trip.id ? null : prev));
         }
@@ -286,7 +332,7 @@ export default function DriverPage() {
       clearInterval(pollInterval);
       unsubscribe();
     }
-  }, [isOnline, activeTrip, profile?.id, driverCoords])
+  }, [isOnline, profile?.id])
 
   // Real-time GPS Tracking
   useEffect(() => {
@@ -303,6 +349,7 @@ export default function DriverPage() {
     }
 
     const broadcastCurrentLocation = (latitude: number, longitude: number) => {
+      driverCoordsRef.current = { lat: latitude, lng: longitude };
       setDriverCoords({ lat: latitude, lng: longitude });
 
       if (profile?.id) {
@@ -311,7 +358,7 @@ export default function DriverPage() {
           vehicleMake: profile.vehicleMake,
           vehicleModel: profile.vehicleModel,
           licensePlate: profile.licensePlate,
-          tripId: activeTrip?.id,
+          tripId: activeTripRef.current?.id,
         });
       }
     };
@@ -348,7 +395,7 @@ export default function DriverPage() {
         updateDriverLocation(profile.id, 0, 0, false);
       }
     };
-  }, [isOnline, activeTrip, profile]);
+  }, [isOnline, profile]);
 
   const handleSubscribe = async () => {
     if (!profile) return;
@@ -386,22 +433,25 @@ export default function DriverPage() {
 
   const handleAccept = async () => {
     if (request) {
+      const tripToAccept = request;
       const driverId =
         profile?.id ||
         (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null) ||
         crypto.randomUUID();
 
+      const updated: MockTrip = { ...tripToAccept, status: 'accepted', driver_id: driverId };
+      recordTripStatusOverride(updated.id, 'accepted', driverId);
+      updateActiveTripState(updated);
+      setRequest(null);
+
       // Execute atomic database reservation to prevent race conditions
-      const rpcResult = await acceptTripAtomic(request.id);
+      const rpcResult = await acceptTripAtomic(tripToAccept.id, driverId);
       if (!rpcResult.success) {
         alert("Trip is no longer available: " + (rpcResult.error || "Claimed by another driver."));
-        setRequest(null);
+        updateActiveTripState(null);
         return;
       }
-      const updated = { ...request, status: 'accepted' as const, driver_id: driverId };
       await saveTrip(updated);
-      setActiveTrip(updated);
-      setRequest(null);
     }
   }
 
@@ -415,11 +465,13 @@ export default function DriverPage() {
     await declineTrip(tripToDecline, driverId);
   }
 
-  const handleConfirmPickup = () => {
-    if (activeTrip) {
-      const updated = { ...activeTrip, status: 'in_progress' as const };
-      saveTrip(updated);
-      setActiveTrip(updated);
+  const handleConfirmPickup = async () => {
+    const current = activeTripRef.current || activeTrip;
+    if (current) {
+      const updated: MockTrip = { ...current, status: 'in_progress' };
+      recordTripStatusOverride(updated.id, 'in_progress', updated.driver_id);
+      updateActiveTripState(updated);
+      await saveTrip(updated);
     }
   }
 
@@ -428,10 +480,11 @@ export default function DriverPage() {
   }
 
   const handleCashPayment = async () => {
-    if (activeTrip) {
-      const tripToComplete = activeTrip;
+    const current = activeTripRef.current || activeTrip;
+    if (current) {
+      const tripToComplete = current;
       markTripCompleted(tripToComplete.id);
-      setActiveTrip(null);
+      updateActiveTripState(null);
       setRequest(null);
       setIsWaitingForPayment(false);
       setShowFareCollection(false);
@@ -442,11 +495,13 @@ export default function DriverPage() {
   }
 
   const handleInAppPaymentRequest = async () => {
-    if (activeTrip) {
-      const updated = { ...activeTrip, status: 'payment_pending' as const };
-      setActiveTrip(updated);
+    const current = activeTripRef.current || activeTrip;
+    if (current) {
+      const updated: MockTrip = { ...current, status: 'payment_pending' };
+      recordTripStatusOverride(updated.id, 'payment_pending', updated.driver_id);
+      updateActiveTripState(updated);
       setIsWaitingForPayment(true);
-      await completeTripAtomic(activeTrip.id, 'in_app', activeTrip);
+      await completeTripAtomic(current.id, 'in_app', current);
       await saveTrip(updated);
     }
   }

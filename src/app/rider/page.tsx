@@ -2,9 +2,9 @@
 
 import dynamic from 'next/dynamic'
 import Script from 'next/script'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, saveTripRating, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -28,6 +28,17 @@ export default function RiderPage() {
   const [pickupCoords, setPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [dropoffCoords, setDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
+  const activeTripRef = useRef<MockTrip | null>(null)
+
+  const updateActiveTripState = (next: MockTrip | null) => {
+    activeTripRef.current = next
+    setActiveTrip(next)
+  }
+
+  useEffect(() => {
+    activeTripRef.current = activeTrip
+  }, [activeTrip])
+
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
   const [availableDrivers, setAvailableDrivers] = useState<LiveDriver[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
@@ -120,23 +131,24 @@ export default function RiderPage() {
       const trips = await getTrips();
       const completedIds = getCompletedTripIds();
       const declinedIds = getDeclinedTripIds();
+      const currentActive = activeTripRef.current;
 
-      if (activeTrip) {
-        if (completedIds.has(activeTrip.id)) {
-          setActiveTrip(null);
+      if (currentActive) {
+        if (completedIds.has(currentActive.id)) {
+          updateActiveTripState(null);
           setDriverCoords(null);
           return;
         }
-        if (declinedIds.has(activeTrip.id)) {
-          setActiveTrip(null);
+        if (declinedIds.has(currentActive.id)) {
+          updateActiveTripState(null);
           setDriverCoords(null);
           setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
           return;
         }
-        const matched = trips.find(t => t.id === activeTrip.id);
+        const matched = trips.find(t => t.id === currentActive.id);
         if (matched) {
           if (matched.status === 'cancelled') {
-            setActiveTrip(null);
+            updateActiveTripState(null);
             setDriverCoords(null);
             setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
             return;
@@ -145,16 +157,23 @@ export default function RiderPage() {
             markTripCompleted(matched.id);
             setRatingTrip(matched);
             setShowRatingModal(true);
-            setActiveTrip(null);
+            updateActiveTripState(null);
             setDriverCoords(null);
             return;
           }
-          if (matched.status !== activeTrip.status || matched.driver_id !== activeTrip.driver_id) {
-            setActiveTrip(matched);
+          const matchedPrio = STATUS_PRIORITY[matched.status] || 0;
+          const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
+          if (
+            matchedPrio > activePrio ||
+            (matched.driver_id && matched.driver_id !== currentActive.driver_id)
+          ) {
+            updateActiveTripState(matched);
           }
           return;
         }
+        return;
       }
+
       const active = trips.find(
         t =>
           t.status !== 'completed' &&
@@ -164,8 +183,8 @@ export default function RiderPage() {
           !isStaleRequestedTrip(t) &&
           (!currentUser?.id || !t.rider_id || t.rider_id === currentUser.id)
       );
-      if (active) {
-        setActiveTrip(active);
+      if (active && !activeTripRef.current) {
+        updateActiveTripState(active);
       }
     };
     loadTrips();
@@ -174,9 +193,10 @@ export default function RiderPage() {
     const handleDriverLocationUpdate = (data: any) => {
       if (!data?.id && !data?.driverId) return;
       const driverId = data.id || data.driverId;
+      const currentActive = activeTripRef.current;
 
       // Update assigned driver coords if this driver is assigned to current trip
-      if (activeTrip && (data.tripId === activeTrip.id || driverId === activeTrip.driver_id)) {
+      if (currentActive && (data.tripId === currentActive.id || driverId === currentActive.driver_id)) {
         setDriverCoords({ lat: data.lat, lng: data.lng });
       }
 
@@ -209,42 +229,58 @@ export default function RiderPage() {
     const unsubscribeEvents = subscribeToEvents((type, payload) => {
       if (type === 'trip_updated') {
         const trip = payload as MockTrip;
+        if (!trip) return;
+        const currentActive = activeTripRef.current;
+
         if (trip.status === 'completed') {
           markTripCompleted(trip.id);
-          setRatingTrip(trip);
-          setShowRatingModal(true);
-          setActiveTrip(null);
-          setDriverCoords(null);
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('Trip Completed! 🎉', {
-              body: `Your trip has ended. Thank you for riding with SOLO!`,
-              icon: '/rider-icon-192.png',
-              tag: `rider-trip-${trip.id}`,
-            });
-          }
-        } else if (trip.status === 'cancelled') {
-          setActiveTrip(null);
-          setDriverCoords(null);
-          setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('Ride Request Declined', {
-              body: 'The driver was unable to accept your trip request. Please request another ride.',
-              icon: '/rider-icon-192.png',
-              tag: `rider-trip-${trip.id}`,
-            });
-          }
-        } else if (!isTripCompleted(trip.id) && !isTripDeclined(trip.id) && !isStaleRequestedTrip(trip)) {
-          setDeclineNotice(null);
-          if (trip.status === 'accepted' && (!activeTrip || activeTrip.status === 'requested')) {
+          if (!currentActive || currentActive.id === trip.id) {
+            setRatingTrip(trip);
+            setShowRatingModal(true);
+            updateActiveTripState(null);
+            setDriverCoords(null);
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-              new Notification('Driver Accepted Your Ride! 🚗', {
-                body: `Your driver is on the way! Trip PIN: ${trip.verification_pin || 'Check app'}`,
+              new Notification('Trip Completed! 🎉', {
+                body: `Your trip has ended. Thank you for riding with SOLO!`,
                 icon: '/rider-icon-192.png',
                 tag: `rider-trip-${trip.id}`,
               });
             }
           }
-          setActiveTrip(trip);
+        } else if (trip.status === 'cancelled') {
+          if (!currentActive || currentActive.id === trip.id) {
+            updateActiveTripState(null);
+            setDriverCoords(null);
+            setDeclineNotice('Your ride request was declined by the driver. You can request another ride below.');
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+              new Notification('Ride Request Declined', {
+                body: 'The driver was unable to accept your trip request. Please request another ride.',
+                icon: '/rider-icon-192.png',
+                tag: `rider-trip-${trip.id}`,
+              });
+            }
+          }
+        } else if (!isTripCompleted(trip.id) && !isTripDeclined(trip.id) && !isStaleRequestedTrip(trip)) {
+          if (!currentActive) {
+            setDeclineNotice(null);
+            updateActiveTripState(trip);
+          } else if (currentActive.id === trip.id) {
+            const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
+            const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
+            if (incomingPrio > activePrio || (trip.driver_id && trip.driver_id !== currentActive.driver_id)) {
+              setDeclineNotice(null);
+              if (trip.status === 'accepted' && currentActive.status === 'requested') {
+                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+                  new Notification('Driver Accepted Your Ride! 🚗', {
+                    body: `Your driver is on the way! Trip PIN: ${trip.verification_pin || 'Check app'}`,
+                    icon: '/rider-icon-192.png',
+                    tag: `rider-trip-${trip.id}`,
+                  });
+                }
+              }
+              updateActiveTripState(trip);
+            }
+          }
         }
       } else if (type === 'driver_location') {
         handleDriverLocationUpdate(payload);
@@ -263,7 +299,7 @@ export default function RiderPage() {
       unsubscribeEvents();
       window.removeEventListener('solo_driver_location_update', handleLocalEvent);
     }
-  }, [activeTrip, currentUser?.id]);
+  }, [currentUser?.id]);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -276,7 +312,7 @@ export default function RiderPage() {
       saveTrip(updated);
     }
     localStorage.removeItem('mock_trips');
-    setActiveTrip(null);
+    updateActiveTripState(null);
     setDriverCoords(null);
   };
 
@@ -313,7 +349,7 @@ export default function RiderPage() {
               saveTrip(completedTrip);
               setRatingTrip(completedTrip);
               setShowRatingModal(true);
-              setActiveTrip(null);
+              updateActiveTripState(null);
               setDriverCoords(null);
             });
             window.history.replaceState({}, '', '/rider');
@@ -379,7 +415,7 @@ export default function RiderPage() {
                 saveTrip(updated);
                 setRatingTrip(updated);
                 setShowRatingModal(true);
-                setActiveTrip(null);
+                updateActiveTripState(null);
                 setDriverCoords(null);
               } else {
                 setPaymentError(verifyData.error || 'Could not verify payment');
@@ -591,9 +627,9 @@ export default function RiderPage() {
                         type="button"
                         onClick={async () => {
                           const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
-                          await saveTrip(cancelled);
-                          setActiveTrip(null);
+                          updateActiveTripState(null);
                           setDriverCoords(null);
+                          await saveTrip(cancelled);
                         }}
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
                       >

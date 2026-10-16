@@ -165,7 +165,7 @@ const ensureValidUuid = (value?: string | null): string => {
   return '00000000-0000-4000-8000-000000000001';
 };
 
-const STATUS_PRIORITY: Record<MockTrip['status'], number> = {
+export const STATUS_PRIORITY: Record<MockTrip['status'], number> = {
   requested: 1,
   accepted: 2,
   arrived: 3,
@@ -173,6 +173,52 @@ const STATUS_PRIORITY: Record<MockTrip['status'], number> = {
   payment_pending: 5,
   completed: 6,
   cancelled: 7,
+};
+
+type TripStatusOverride = {
+  status: MockTrip['status'];
+  driver_id?: string;
+  updatedAt: number;
+};
+
+export const getTripStatusOverrides = (): Record<string, TripStatusOverride> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('solo_trip_status_map');
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const recordTripStatusOverride = (
+  tripId: string,
+  status: MockTrip['status'],
+  driverId?: string | null
+): void => {
+  if (typeof window === 'undefined' || !tripId) return;
+  try {
+    const map = getTripStatusOverrides();
+    const existing = map[tripId];
+    const existingPrio = existing ? STATUS_PRIORITY[existing.status] || 0 : 0;
+    const incomingPrio = STATUS_PRIORITY[status] || 0;
+    if (incomingPrio >= existingPrio) {
+      map[tripId] = {
+        status,
+        driver_id: driverId || existing?.driver_id || undefined,
+        updatedAt: Date.now(),
+      };
+      // Keep the 200 most recent entries
+      const keys = Object.keys(map);
+      if (keys.length > 200) {
+        const sorted = keys.sort((a, b) => (map[a]?.updatedAt || 0) - (map[b]?.updatedAt || 0));
+        sorted.slice(0, keys.length - 200).forEach(k => delete map[k]);
+      }
+      localStorage.setItem('solo_trip_status_map', JSON.stringify(map));
+    }
+  } catch (e) {
+    console.error('Error recording trip status override:', e);
+  }
 };
 
 // Unscheduled ride requests older than 30 minutes are treated as expired so stale DB rows never loop
@@ -213,6 +259,7 @@ export const isTripCompleted = (tripId: string): boolean => {
 export const markTripCompleted = (tripId: string): void => {
   if (typeof window === 'undefined' || !tripId) return;
   try {
+    recordTripStatusOverride(tripId, 'completed');
     const current = Array.from(getCompletedTripIds());
     if (!current.includes(tripId)) {
       current.push(tripId);
@@ -223,48 +270,114 @@ export const markTripCompleted = (tripId: string): void => {
   }
 };
 
-const syncTripToLocalStorage = (trip: MockTrip) => {
-  if (typeof window === 'undefined') return;
+const resolveMonotonicStatus = (
+  tripId: string,
+  candidateStatus: MockTrip['status'],
+  completedIds: Set<string>,
+  declinedIds: Set<string>,
+  overrides: Record<string, TripStatusOverride>,
+  tripMeta?: Pick<MockTrip, 'created_at' | 'scheduled_time'>
+): MockTrip['status'] => {
+  if (completedIds.has(tripId)) return 'completed';
+  if (declinedIds.has(tripId)) return 'cancelled';
+
+  let bestStatus = candidateStatus;
+  const override = overrides[tripId];
+  if (override && (STATUS_PRIORITY[override.status] || 0) > (STATUS_PRIORITY[bestStatus] || 0)) {
+    bestStatus = override.status;
+  }
+
+  if (
+    bestStatus === 'requested' &&
+    tripMeta &&
+    isStaleRequestedTrip({ status: bestStatus, created_at: tripMeta.created_at, scheduled_time: tripMeta.scheduled_time })
+  ) {
+    return 'cancelled';
+  }
+
+  return bestStatus;
+};
+
+const syncTripToLocalStorage = (trip: MockTrip): MockTrip => {
+  if (typeof window === 'undefined') return trip;
   try {
     if (trip.status === 'completed') {
       markTripCompleted(trip.id);
     }
+    recordTripStatusOverride(trip.id, trip.status, trip.driver_id);
+
+    const completedIds = getCompletedTripIds();
+    const declinedIds = getDeclinedTripIds();
+    const overrides = getTripStatusOverrides();
+
     const localData = localStorage.getItem('mock_trips');
     const trips: MockTrip[] = localData ? JSON.parse(localData) : [];
     const existingIndex = trips.findIndex(t => t.id === trip.id);
+    let finalTrip: MockTrip = trip;
+
     if (existingIndex >= 0) {
       const existing = trips[existingIndex];
       const existingPrio = STATUS_PRIORITY[existing.status] || 0;
       const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
-      const resolvedStatus = incomingPrio >= existingPrio ? trip.status : existing.status;
-      trips[existingIndex] = { ...existing, ...trip, status: resolvedStatus };
+      const baseStatus = incomingPrio >= existingPrio ? trip.status : existing.status;
+      const resolvedStatus = resolveMonotonicStatus(trip.id, baseStatus, completedIds, declinedIds, overrides, trip);
+      finalTrip = {
+        ...existing,
+        ...trip,
+        driver_id: trip.driver_id || existing.driver_id || overrides[trip.id]?.driver_id,
+        status: resolvedStatus,
+      };
+      trips[existingIndex] = finalTrip;
     } else {
-      trips.unshift(trip);
+      const resolvedStatus = resolveMonotonicStatus(trip.id, trip.status, completedIds, declinedIds, overrides, trip);
+      finalTrip = {
+        ...trip,
+        driver_id: trip.driver_id || overrides[trip.id]?.driver_id,
+        status: resolvedStatus,
+      };
+      trips.unshift(finalTrip);
     }
     localStorage.setItem('mock_trips', JSON.stringify(trips.slice(0, 100)));
+    return finalTrip;
   } catch (e) {
     console.error('Error syncing trip to localStorage:', e);
+    return trip;
   }
 };
 
 export const getTrips = async (): Promise<MockTrip[]> => {
   if (typeof window === 'undefined') return [];
 
+  // 1. Fetch from Supabase first so we never hold a stale pre-await localStorage snapshot
+  let dbRows: any[] | null = null;
+  try {
+    const { data, error } = await supabase
+      .from('trips')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (data && !error) {
+      dbRows = data;
+    }
+  } catch (e) {
+    console.error('Error fetching trips from Supabase:', e);
+  }
+
+  // 2. Read the FRESHEST local state AFTER the network await so in-flight clicks (Accept, Confirm Pickup, Complete) are never overwritten
   const mergedMap = new Map<string, MockTrip>();
   const completedIds = getCompletedTripIds();
   const declinedIds = getDeclinedTripIds();
+  const overrides = getTripStatusOverrides();
 
-  // 1. Load local trips first
   try {
     const localData = localStorage.getItem('mock_trips');
     if (localData) {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
         if (t && t.id) {
-          let resolvedStatus = t.status;
-          if (completedIds.has(t.id)) resolvedStatus = 'completed';
-          else if (declinedIds.has(t.id) || isStaleRequestedTrip(t)) resolvedStatus = 'cancelled';
-          mergedMap.set(t.id, { ...t, status: resolvedStatus });
+          const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, declinedIds, overrides, t);
+          const resolvedDriverId = t.driver_id || overrides[t.id]?.driver_id;
+          mergedMap.set(t.id, { ...t, driver_id: resolvedDriverId, status: resolvedStatus });
         }
       });
     }
@@ -272,55 +385,51 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     console.error('Error reading local trips:', e);
   }
 
-  // 2. Fetch from Supabase and merge with local trips
-  try {
-    const { data, error } = await supabase
-      .from('trips')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+  // 3. Merge Supabase rows with fresh local trips using monotonic STATUS_PRIORITY
+  if (dbRows) {
+    dbRows.forEach((dbTrip: any) => {
+      if (!dbTrip?.id) return;
+      const existing = mergedMap.get(dbTrip.id);
+      const dbStatus = resolveMonotonicStatus(
+        dbTrip.id,
+        dbTrip.status,
+        completedIds,
+        declinedIds,
+        overrides,
+        { created_at: dbTrip.created_at, scheduled_time: dbTrip.scheduled_time }
+      );
 
-    if (data && !error) {
-      data.forEach((dbTrip: any) => {
-        if (!dbTrip?.id) return;
-        const existing = mergedMap.get(dbTrip.id);
-        let dbStatus: MockTrip['status'] = dbTrip.status;
-        if (completedIds.has(dbTrip.id)) {
-          dbStatus = 'completed';
-        } else if (declinedIds.has(dbTrip.id)) {
-          dbStatus = 'cancelled';
-        } else if (isStaleRequestedTrip({ status: dbStatus, created_at: dbTrip.created_at, scheduled_time: dbTrip.scheduled_time })) {
-          dbStatus = 'cancelled';
-        }
+      const mapped: MockTrip = {
+        id: dbTrip.id,
+        rider_id: dbTrip.rider_id,
+        driver_id: dbTrip.driver_id || existing?.driver_id || overrides[dbTrip.id]?.driver_id,
+        pickup_location: dbTrip.pickup_location,
+        pickup_lat: dbTrip.pickup_lat,
+        pickup_lng: dbTrip.pickup_lng,
+        dropoff_location: dbTrip.dropoff_location,
+        dropoff_lat: dbTrip.dropoff_lat,
+        dropoff_lng: dbTrip.dropoff_lng,
+        fare_amount: Number(dbTrip.fare_amount),
+        status: dbStatus,
+        verification_pin: dbTrip.verification_pin || existing?.verification_pin,
+        scheduled_time: dbTrip.scheduled_time || existing?.scheduled_time,
+        created_at: dbTrip.created_at || existing?.created_at,
+      };
 
-        const mapped: MockTrip = {
-          id: dbTrip.id,
-          rider_id: dbTrip.rider_id,
-          driver_id: dbTrip.driver_id || existing?.driver_id,
-          pickup_location: dbTrip.pickup_location,
-          pickup_lat: dbTrip.pickup_lat,
-          pickup_lng: dbTrip.pickup_lng,
-          dropoff_location: dbTrip.dropoff_location,
-          dropoff_lat: dbTrip.dropoff_lat,
-          dropoff_lng: dbTrip.dropoff_lng,
-          fare_amount: Number(dbTrip.fare_amount),
-          status: dbStatus,
-          verification_pin: dbTrip.verification_pin || existing?.verification_pin,
-          scheduled_time: dbTrip.scheduled_time || existing?.scheduled_time,
-          created_at: dbTrip.created_at || existing?.created_at,
-        };
-
-        if (!existing) {
-          mergedMap.set(mapped.id, mapped);
-        } else {
-          const dbPrio = STATUS_PRIORITY[mapped.status] || 0;
-          const localPrio = STATUS_PRIORITY[existing.status] || 0;
-          mergedMap.set(mapped.id, dbPrio >= localPrio ? mapped : { ...mapped, ...existing });
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Error fetching trips from Supabase:', e);
+      if (!existing) {
+        mergedMap.set(mapped.id, mapped);
+      } else {
+        const dbPrio = STATUS_PRIORITY[mapped.status] || 0;
+        const localPrio = STATUS_PRIORITY[existing.status] || 0;
+        const winningStatus = dbPrio >= localPrio ? mapped.status : existing.status;
+        mergedMap.set(mapped.id, {
+          ...mapped,
+          ...existing,
+          driver_id: existing.driver_id || mapped.driver_id,
+          status: winningStatus,
+        });
+      }
+    });
   }
 
   const result = Array.from(mergedMap.values());
@@ -336,6 +445,8 @@ export const saveTrip = async (trip: MockTrip) => {
   if (trip.status === 'completed') {
     markTripCompleted(trip.id);
   }
+  recordTripStatusOverride(trip.id, trip.status, trip.driver_id);
+
   const enrichedTrip: MockTrip = {
     ...trip,
     rider_id: ensureValidUuid(trip.rider_id),
@@ -344,8 +455,15 @@ export const saveTrip = async (trip: MockTrip) => {
   };
 
   // 1. Save locally first for instant UI response & broadcast immediately across tabs/clients
-  syncTripToLocalStorage(enrichedTrip);
-  broadcastEvent('trip_updated', enrichedTrip);
+  const syncedLocal = syncTripToLocalStorage(enrichedTrip);
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solo_last_updated_trip', JSON.stringify({ trip: syncedLocal, ts: Date.now() }));
+    }
+  } catch {
+    // Ignore storage quota errors
+  }
+  broadcastEvent('trip_updated', syncedLocal);
 
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -358,7 +476,7 @@ export const saveTrip = async (trip: MockTrip) => {
     const resolvedDriverId =
       enrichedTrip.driver_id && UUID_REGEX.test(enrichedTrip.driver_id) ? enrichedTrip.driver_id : null;
 
-    // For status updates on existing trips, use UPDATE first (avoids triggering RLS INSERT WITH CHECK on driver updates)
+    // For status updates on existing trips, use UPDATE + SECURITY DEFINER RPCs (never fall through to INSERT/UPSERT which triggers rider-only RLS)
     if (enrichedTrip.status !== 'requested') {
       const updatePayload: Record<string, any> = {
         status: enrichedTrip.status,
@@ -383,14 +501,33 @@ export const saveTrip = async (trip: MockTrip) => {
         return;
       }
 
-      // If updating to completed and RLS blocked direct update, invoke SECURITY DEFINER complete_trip RPC
-      if (enrichedTrip.status === 'completed') {
+      // Fallback to SECURITY DEFINER RPCs when RLS blocks direct table UPDATE
+      if (enrichedTrip.status === 'accepted') {
+        await supabase.rpc('accept_trip', { p_trip_id: enrichedTrip.id });
+      } else if (enrichedTrip.status === 'in_progress') {
+        const { error: startErr } = await supabase.rpc('start_trip', {
+          p_trip_id: enrichedTrip.id,
+          p_pin: enrichedTrip.verification_pin || '',
+        });
+        if (startErr) {
+          await supabase.rpc('accept_trip', { p_trip_id: enrichedTrip.id });
+          await supabase.rpc('start_trip', {
+            p_trip_id: enrichedTrip.id,
+            p_pin: enrichedTrip.verification_pin || '',
+          });
+        }
+      } else if (enrichedTrip.status === 'payment_pending') {
+        await supabase.rpc('complete_trip', {
+          p_trip_id: enrichedTrip.id,
+          p_payment_method: 'in_app',
+        });
+      } else if (enrichedTrip.status === 'completed') {
         await supabase.rpc('complete_trip', {
           p_trip_id: enrichedTrip.id,
           p_payment_method: 'cash',
         });
-        return;
       }
+      return;
     }
 
     const dbPayload: Record<string, any> = {
@@ -421,8 +558,8 @@ export const saveTrip = async (trip: MockTrip) => {
         verification_pin: data.verification_pin || enrichedTrip.verification_pin,
         created_at: data.created_at || enrichedTrip.created_at,
       };
-      syncTripToLocalStorage(synced);
-      broadcastEvent('trip_updated', synced);
+      const finalSynced = syncTripToLocalStorage(synced);
+      broadcastEvent('trip_updated', finalSynced);
     }
   } catch (e) {
     console.error('Error saving trip to Supabase:', e);
@@ -432,7 +569,14 @@ export const saveTrip = async (trip: MockTrip) => {
 /**
  * Atomic trip acceptance using the hardened Postgres RPC with automatic fallback
  */
-export const acceptTripAtomic = async (tripId: string): Promise<{ success: boolean; error?: string }> => {
+export const acceptTripAtomic = async (
+  tripId: string,
+  driverIdOverride?: string | null
+): Promise<{ success: boolean; error?: string }> => {
+  const localDriverId =
+    driverIdOverride || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+  recordTripStatusOverride(tripId, 'accepted', localDriverId);
+
   try {
     const { data, error } = await supabase.rpc('accept_trip', { p_trip_id: tripId });
     if (!error && data) {
@@ -451,7 +595,7 @@ export const acceptTripAtomic = async (tripId: string): Promise<{ success: boole
   // Fallback: Direct update on public.trips + local storage
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    const driverId = session?.user?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+    const driverId = session?.user?.id || localDriverId;
     const validDriverId = driverId && UUID_REGEX.test(driverId) ? driverId : null;
     await supabase
       .from('trips')
@@ -1139,9 +1283,11 @@ const initGlobalChannels = () => {
         const data = event.data;
         if (data?.type) {
           if (data.type === 'trip_updated' && data.payload) {
-            syncTripToLocalStorage(data.payload as MockTrip);
+            const synced = syncTripToLocalStorage(data.payload as MockTrip);
+            listeners.forEach(cb => cb('trip_updated', synced));
+          } else {
+            listeners.forEach(cb => cb(data.type as EventType, data.payload));
           }
-          listeners.forEach(cb => cb(data.type as EventType, data.payload));
         }
       };
     } catch {
@@ -1149,13 +1295,14 @@ const initGlobalChannels = () => {
     }
   }
 
-  // Cross-tab localStorage event fallback
+  // Cross-tab localStorage event fallback (listens only to explicit saveTrip updates, never background getTrips polling writes)
   window.addEventListener('storage', (event) => {
-    if (event.key === 'mock_trips' && event.newValue) {
+    if (event.key === 'solo_last_updated_trip' && event.newValue) {
       try {
-        const trips: MockTrip[] = JSON.parse(event.newValue);
-        if (trips.length > 0) {
-          listeners.forEach(cb => cb('trip_updated', trips[0]));
+        const parsed = JSON.parse(event.newValue);
+        if (parsed?.trip) {
+          const synced = syncTripToLocalStorage(parsed.trip as MockTrip);
+          listeners.forEach(cb => cb('trip_updated', synced));
         }
       } catch {
         // Ignore parse error
@@ -1186,8 +1333,8 @@ const initGlobalChannels = () => {
         created_at: dbTrip.created_at,
       };
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        syncTripToLocalStorage(trip);
-        listeners.forEach(cb => cb('trip_updated', trip));
+        const synced = syncTripToLocalStorage(trip);
+        listeners.forEach(cb => cb('trip_updated', synced));
       }
     })
     .subscribe();
@@ -1220,9 +1367,9 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'trip_updated' }, (payload: any) => {
       if (payload.payload) {
-        syncTripToLocalStorage(payload.payload as MockTrip);
+        const synced = syncTripToLocalStorage(payload.payload as MockTrip);
+        listeners.forEach(cb => cb('trip_updated', synced));
       }
-      listeners.forEach(cb => cb('trip_updated', payload.payload));
     })
     .on('broadcast', { event: 'new_rating' }, (payload: any) => {
       listeners.forEach(cb => cb('new_rating', payload.payload));
