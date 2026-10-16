@@ -1,7 +1,4 @@
-/**
- * Commercial Map & Navigation Service (Mapbox + Fallback)
- * Powered by Mapbox Geocoding & Traffic Directions with automatic failover to OSRM/Nominatim
- */
+import { calculateDistanceKm } from './geo.ts';
 
 export interface SearchResultPlace {
   id: string | number;
@@ -222,8 +219,245 @@ function formatMapboxFeature(feat: any, userHouseNumber?: string): SearchResultP
   };
 }
 
+export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
+  {
+    id: 'poi-diamond-pavilion',
+    name: 'Diamond Pavilion Mall',
+    display_name: 'Diamond Pavilion Mall, Memorial Road, Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7562,
+    lon: 24.7645,
+    street: 'Memorial Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    buildingName: 'Diamond Pavilion Mall',
+    category: 'building',
+  },
+  {
+    id: 'poi-north-cape-mall',
+    name: 'North Cape Mall',
+    display_name: 'North Cape Mall, Memorial Road, Royldene, Kimberley, Northern Cape, 8301',
+    lat: -28.7618,
+    lon: 24.7621,
+    street: 'Memorial Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    buildingName: 'North Cape Mall',
+    category: 'building',
+  },
+  {
+    id: 'poi-big-hole',
+    name: 'The Big Hole & Mine Museum',
+    display_name: 'The Big Hole & Kimberley Mine Museum, Tucker Street, Kimberley, Northern Cape, 8301',
+    lat: -28.7383,
+    lon: 24.7578,
+    street: 'Tucker Street',
+    suburb: 'West End',
+    city: 'Kimberley',
+    buildingName: 'The Big Hole',
+    category: 'poi',
+  },
+  {
+    id: 'poi-spu-central',
+    name: 'Sol Plaatje University (SPU)',
+    display_name: 'Sol Plaatje University (Central Campus), Chapel Street / Luka Jantjie Street, Kimberley, Northern Cape, 8301',
+    lat: -28.7428,
+    lon: 24.7661,
+    street: 'Chapel Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    buildingName: 'Sol Plaatje University',
+    category: 'building',
+  },
+  {
+    id: 'poi-kimberley-hospital',
+    name: 'Robert Mangaliso Sobukwe Hospital',
+    display_name: 'Robert Mangaliso Sobukwe Hospital (Kimberley Hospital), Du Toitspan Road, Kimberley, Northern Cape, 8301',
+    lat: -28.7408,
+    lon: 24.7665,
+    street: 'Du Toitspan Road',
+    suburb: 'Civic Centre',
+    city: 'Kimberley',
+    buildingName: 'Kimberley Hospital',
+    category: 'building',
+  },
+  {
+    id: 'poi-kimberley-airport',
+    name: 'Kimberley Airport (KIM)',
+    display_name: 'Kimberley Airport (KIM), Diskobolos Road, Kimberley, Northern Cape, 8301',
+    lat: -28.8028,
+    lon: 24.7656,
+    street: 'Diskobolos Road',
+    suburb: 'Kimberley Airport',
+    city: 'Kimberley',
+    buildingName: 'Kimberley Airport',
+    category: 'poi',
+  },
+  {
+    id: 'poi-gariep-mediclinic',
+    name: 'Mediclinic Gariep',
+    display_name: 'Mediclinic Gariep, MacDougall Street, El Toro Park, Kimberley, Northern Cape, 8301',
+    lat: -28.7605,
+    lon: 24.7601,
+    street: 'MacDougall Street',
+    suburb: 'El Toro Park',
+    city: 'Kimberley',
+    buildingName: 'Mediclinic Gariep',
+    category: 'building',
+  },
+  {
+    id: 'poi-mcgregor-museum',
+    name: 'McGregor Museum',
+    display_name: 'McGregor Museum, Atlas Street, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7564,
+    lon: 24.7725,
+    street: 'Atlas Street',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    buildingName: 'McGregor Museum',
+    category: 'poi',
+  },
+  {
+    id: 'poi-new-park-centre',
+    name: 'New Park Shopping Centre',
+    display_name: 'New Park Shopping Centre, Bultfontein Road, New Park, Kimberley, Northern Cape, 8301',
+    lat: -28.7501,
+    lon: 24.7615,
+    street: 'Bultfontein Road',
+    suburb: 'New Park',
+    city: 'Kimberley',
+    buildingName: 'New Park Shopping Centre',
+    category: 'building',
+  },
+  {
+    id: 'poi-lenmed-royal',
+    name: 'Lenmed Royal Hospital',
+    display_name: 'Lenmed Royal Hospital and Heart Centre, Lennox Street, Kimberley, Northern Cape, 8301',
+    lat: -28.7441,
+    lon: 24.7672,
+    street: 'Lennox Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    buildingName: 'Lenmed Royal Hospital',
+    category: 'building',
+  },
+  {
+    id: 'street-du-toitspan',
+    name: 'Du Toitspan Road',
+    display_name: 'Du Toitspan Road, Civic Centre / Central, Kimberley, Northern Cape, 8301',
+    lat: -28.7415,
+    lon: 24.7670,
+    street: 'Du Toitspan Road',
+    suburb: 'Civic Centre',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-memorial-rd',
+    name: 'Memorial Road',
+    display_name: 'Memorial Road, Royldene / Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7610,
+    lon: 24.7618,
+    street: 'Memorial Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-de-beers',
+    name: 'De Beers Road',
+    display_name: 'De Beers Road, Kimberley, Northern Cape, 8301',
+    lat: -28.7360,
+    lon: 24.7660,
+    street: 'De Beers Road',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-barkly-rd',
+    name: 'Barkly Road',
+    display_name: 'Barkly Road, West End, Kimberley, Northern Cape, 8301',
+    lat: -28.7290,
+    lon: 24.7480,
+    street: 'Barkly Road',
+    suburb: 'West End',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-bultfontein-rd',
+    name: 'Bultfontein Road',
+    display_name: 'Bultfontein Road, New Park / Central, Kimberley, Northern Cape, 8301',
+    lat: -28.7490,
+    lon: 24.7620,
+    street: 'Bultfontein Road',
+    suburb: 'New Park',
+    city: 'Kimberley',
+    category: 'address',
+  },
+];
+
+/**
+ * Converts any string into Title Case (capitalizing the first letter of each word and unit numbers).
+ * Ensures case-insensitive searches seamlessly match official map records.
+ */
+export function toTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/\b([a-z])/gi, (char) => char.toUpperCase())
+    .replace(/\b(\d+)([a-z])\b/gi, (_, num, letter) => `${num}${letter.toUpperCase()}`);
+}
+
+/**
+ * Normalizes user queries for South African street names, handling:
+ * 1. Lowercase vs Uppercase typing
+ * 2. Compound Afrikaans/Dutch names (e.g. "dutoitspan" -> "Du Toitspan Road", "debeers" -> "De Beers Road")
+ * 3. Abbreviations (e.g. "rd" -> "Road", "st" -> "Street", "ave" -> "Avenue")
+ * 4. Common local landmarks (e.g. "spu" -> "Sol Plaatje University", "big hole" -> "The Big Hole")
+ */
+export function normalizeSearchQuery(raw: string): string {
+  let q = raw.trim();
+
+  const compoundReplacements: [RegExp, string][] = [
+    [/\b(?:dutoitspan|du\s+toitspan|dutoits\s*pan|dutoit)(?:\s+(?:road|rd))?\b/gi, 'Du Toitspan Road'],
+    [/\b(?:debeers|de\s+beers)(?:\s+(?:road|rd))?\b/gi, 'De Beers Road'],
+    [/\b(?:vandermerwe|van\s+der\s+merwe)(?:\s+(?:street|st))?\b/gi, 'Van Der Merwe Street'],
+    [/\b(?:vanderbijl|van\s+der\s+bijl)(?:\s+(?:street|st))?\b/gi, 'Van Der Bijl Street'],
+    [/\b(?:vanzyl|van\s+zyl)(?:\s+(?:street|st))?\b/gi, 'Van Zyl Street'],
+    [/\b(?:solplaatje|sol\s+plaatje)(?:\s+(?:drive|dr))?\b/gi, 'Sol Plaatje Drive'],
+    [/\b(?:phakamilemabija|phakamile\s+mabija)(?:\s+(?:road|rd))?\b/gi, 'Phakamile Mabija Road'],
+    [/\b(?:robertsobukwe|robert\s+sobukwe)(?:\s+(?:road|rd|hospital))?\b/gi, 'Robert Sobukwe Hospital'],
+    [/\b(?:jansmuts|jan\s+smuts)(?:\s+(?:street|st|boulevard|blvd))?\b/gi, 'Jan Smuts Boulevard'],
+    [/\b(?:bultfontein)(?:\s+(?:road|rd|street|st))?\b/gi, 'Bultfontein Road'],
+    [/\b(?:carter|carters)(?:\s+(?:road|rd|street|st))?\b/gi, 'Carters Road'],
+    [/\bspu\b/gi, 'Sol Plaatje University'],
+    [/\bbig\s*hole\b/gi, 'The Big Hole, Kimberley'],
+    [/\bdiamond\s*pavilion(?:\s*mall)?\b/gi, 'Diamond Pavilion Mall, Kimberley'],
+    [/\bnorth\s*cape(?:\s*mall)?\b/gi, 'North Cape Mall, Kimberley'],
+    [/\bkimberley\s*hospital\b/gi, 'Robert Mangaliso Sobukwe Hospital, Kimberley'],
+  ];
+
+  for (const [pattern, replacement] of compoundReplacements) {
+    q = q.replace(pattern, replacement);
+  }
+
+  // Suffix expansions
+  q = q
+    .replace(/\brd\.?\b/gi, 'Road')
+    .replace(/\bst\.?\b/gi, 'Street')
+    .replace(/\bave?\.?\b/gi, 'Avenue')
+    .replace(/\bcres?\.?\b/gi, 'Crescent')
+    .replace(/\bdr\.?\b/gi, 'Drive')
+    .replace(/\bcl\.?\b/gi, 'Close')
+    .replace(/\bln\.?\b/gi, 'Lane')
+    .replace(/\bpl\.?\b/gi, 'Place');
+
+  return toTitleCase(q);
+}
+
 /**
  * Forward Geocoding: Search South African house numbers, building/complex names, street addresses, landmarks, and POIs
+ * Completely case-insensitive with automatic title-case expansion, compound name resolution, and proximity sorting
  */
 export async function searchPlaces(
   query: string,
@@ -232,6 +466,7 @@ export async function searchPlaces(
   if (!query || query.trim().length < 2) return [];
 
   const cleanQuery = query.trim();
+  const normalizedQuery = normalizeSearchQuery(cleanQuery);
   const { houseNumber: parsedHouseNo, remainder: streetOrPlaceQuery } = parseHouseNumberFromQuery(cleanQuery);
   const prox = proximityCoords || DEFAULT_PROXIMITY;
 
@@ -247,49 +482,133 @@ export async function searchPlaces(
     }
   };
 
-  // 1. Query Mapbox Geocoding (with autocomplete, fuzzyMatch, and proximity bias)
-  if (MAPBOX_TOKEN) {
-    try {
-      const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-        cleanQuery
-      )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&types=address,poi,neighborhood,locality,place&limit=8&access_token=${MAPBOX_TOKEN}`;
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.features && Array.isArray(data.features)) {
-          data.features.forEach((feat: any) => {
-            addUniqueResult(formatMapboxFeature(feat, parsedHouseNo));
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Mapbox geocoding error, continuing with OpenStreetMap:', err);
+  // 1. Instant match against local/popular Kimberley landmarks & major streets (0ms response)
+  const lowerClean = cleanQuery.toLowerCase();
+  const lowerNormalized = normalizedQuery.toLowerCase();
+  const cleanNoSpace = lowerClean.replace(/[\s\-_]+/g, '');
+  const normalizedNoSpace = lowerNormalized.replace(/[\s\-_]+/g, '');
+
+  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
+  const normalizedRemainder = normalizeSearchQuery(streetOrPlaceQuery || '').toLowerCase();
+  const remainderNoSpace = cleanRemainder.replace(/[\s\-_]+/g, '');
+  const normRemainderNoSpace = normalizedRemainder.replace(/[\s\-_]+/g, '');
+
+  for (const popular of KIMBERLEY_POPULAR_PLACES) {
+    const popularNameLower = popular.name.toLowerCase();
+    const popularStreetLower = (popular.street || '').toLowerCase();
+    const popularBuildingLower = (popular.buildingName || '').toLowerCase();
+    const popularDisplayLower = popular.display_name.toLowerCase();
+
+    const popularNameNoSpace = popularNameLower.replace(/[\s\-_]+/g, '');
+    const popularStreetNoSpace = popularStreetLower.replace(/[\s\-_]+/g, '');
+    const popularBuildingNoSpace = popularBuildingLower.replace(/[\s\-_]+/g, '');
+    const popularDisplayNoSpace = popularDisplayLower.replace(/[\s\-_]+/g, '');
+
+    const isMatch =
+      popularNameLower.includes(lowerClean) ||
+      popularStreetLower.includes(lowerClean) ||
+      popularBuildingLower.includes(lowerClean) ||
+      popularDisplayLower.includes(lowerClean) ||
+      popularNameLower.includes(lowerNormalized) ||
+      popularStreetLower.includes(lowerNormalized) ||
+      popularDisplayLower.includes(lowerNormalized) ||
+      popularNameLower.includes(cleanRemainder) ||
+      popularStreetLower.includes(cleanRemainder) ||
+      popularBuildingLower.includes(cleanRemainder) ||
+      popularDisplayLower.includes(cleanRemainder) ||
+      popularNameLower.includes(normalizedRemainder) ||
+      popularStreetLower.includes(normalizedRemainder) ||
+      popularDisplayLower.includes(normalizedRemainder) ||
+      (cleanNoSpace.length >= 3 && (
+        popularNameNoSpace.includes(cleanNoSpace) ||
+        popularStreetNoSpace.includes(cleanNoSpace) ||
+        popularBuildingNoSpace.includes(cleanNoSpace) ||
+        popularDisplayNoSpace.includes(cleanNoSpace)
+      )) ||
+      (normalizedNoSpace.length >= 3 && (
+        popularNameNoSpace.includes(normalizedNoSpace) ||
+        popularStreetNoSpace.includes(normalizedNoSpace) ||
+        popularDisplayNoSpace.includes(normalizedNoSpace)
+      )) ||
+      (remainderNoSpace.length >= 3 && (
+        popularNameNoSpace.includes(remainderNoSpace) ||
+        popularStreetNoSpace.includes(remainderNoSpace) ||
+        popularBuildingNoSpace.includes(remainderNoSpace) ||
+        popularDisplayNoSpace.includes(remainderNoSpace)
+      )) ||
+      (normRemainderNoSpace.length >= 3 && (
+        popularNameNoSpace.includes(normRemainderNoSpace) ||
+        popularStreetNoSpace.includes(normRemainderNoSpace) ||
+        popularDisplayNoSpace.includes(normRemainderNoSpace)
+      ));
+
+    if (isMatch) {
+      const matchWithHouse = parsedHouseNo
+        ? {
+            ...popular,
+            id: `${popular.id}-${parsedHouseNo}`,
+            name: `${parsedHouseNo} ${popular.name}`,
+            display_name: `${parsedHouseNo} ${popular.display_name}`,
+            houseNumber: parsedHouseNo,
+          }
+        : popular;
+      addUniqueResult(matchWithHouse);
     }
   }
 
-  // 2. Query OpenStreetMap Nominatim with full addressdetails, namedetails & extratags for house numbers and buildings
+  // 2. Query Mapbox Geocoding with normalized Title Case and original variants
+  if (MAPBOX_TOKEN) {
+    const queryVariants = Array.from(new Set([normalizedQuery, cleanQuery])).filter(Boolean);
+
+    for (const qVar of queryVariants) {
+      try {
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+          qVar
+        )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetch(endpoint);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.features && Array.isArray(data.features)) {
+            data.features.forEach((feat: any) => {
+              addUniqueResult(formatMapboxFeature(feat, parsedHouseNo));
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Mapbox geocoding error:', err);
+      }
+      if (combinedResults.length >= 6) break;
+    }
+  }
+
+  // 3. Fallback: Query OpenStreetMap Nominatim with Title Case & full address details
   try {
-    const viewbox = `${prox.lng - 0.35},${prox.lat + 0.35},${prox.lng + 0.35},${prox.lat - 0.35}`;
-    const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
-      cleanQuery
-    )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&dedupe=0&viewbox=${viewbox}&bounded=0&limit=8`;
-    const res = await fetch(nomUrl, {
-      headers: { Accept: 'application/json' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        data.forEach((item: any) => {
-          addUniqueResult(formatNominatimResult(item, parsedHouseNo));
-        });
+    const viewbox = `${prox.lng - 0.4},${prox.lat + 0.4},${prox.lng + 0.4},${prox.lat - 0.4}`;
+    const nominatimQueries = Array.from(new Set([normalizedQuery, cleanQuery]));
+
+    for (const nomQuery of nominatimQueries) {
+      if (combinedResults.length >= 6) break;
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
+        nomQuery
+      )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&dedupe=0&viewbox=${viewbox}&bounded=0&limit=6`;
+      const res = await fetch(nomUrl, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach((item: any) => {
+            addUniqueResult(formatNominatimResult(item, parsedHouseNo));
+          });
+        }
       }
     }
 
-    // 3. If user typed a specific house number (e.g. "14 Niobe Street") and the exact house node wasn't indexed separately,
-    // also search the street/building remainder ("Niobe Street") and attach the house number so the exact street address is selectable
+    // 4. House number fallback: search street remainder if exact house node wasn't in DB
     if (parsedHouseNo && streetOrPlaceQuery.length >= 3 && combinedResults.length < 4) {
+      const streetNomQuery = normalizeSearchQuery(streetOrPlaceQuery);
       const streetUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
-        streetOrPlaceQuery
+        streetNomQuery
       )}&countrycodes=za&addressdetails=1&namedetails=1&dedupe=0&viewbox=${viewbox}&bounded=0&limit=5`;
       const streetRes = await fetch(streetUrl, {
         headers: { Accept: 'application/json' },
@@ -306,6 +625,13 @@ export async function searchPlaces(
   } catch (err) {
     console.error('Nominatim geocoding lookup error:', err);
   }
+
+  // 5. Prioritize local results: sort by distance from proximity point (Kimberley/current GPS)
+  combinedResults.sort((a, b) => {
+    const distA = calculateDistanceKm(prox.lat, prox.lng, a.lat, a.lon);
+    const distB = calculateDistanceKm(prox.lat, prox.lng, b.lat, b.lon);
+    return distA - distB;
+  });
 
   return combinedResults.slice(0, 10);
 }

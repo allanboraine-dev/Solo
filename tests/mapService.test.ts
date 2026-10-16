@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { calculateFare, getTileLayerConfig, parseHouseNumberFromQuery } from '../src/utils/mapService.ts';
+import {
+  calculateFare,
+  getTileLayerConfig,
+  parseHouseNumberFromQuery,
+  toTitleCase,
+  normalizeSearchQuery,
+  searchPlaces,
+} from '../src/utils/mapService.ts';
 
 describe('Commercial Map & Fare Pricing Suite', () => {
   it('enforces a minimum base fare of R30 for short trips', () => {
@@ -43,5 +50,44 @@ describe('Commercial Map & Fare Pricing Suite', () => {
     assert.strictEqual(parsed4.houseNumber, undefined);
     assert.strictEqual(parsed4.remainder, 'North Cape Mall');
   });
+
+  it('converts lowercase text into Title Case correctly', () => {
+    assert.strictEqual(toTitleCase('niobe street'), 'Niobe Street');
+    assert.strictEqual(toTitleCase('memorial road, kimberley'), 'Memorial Road, Kimberley');
+    assert.strictEqual(toTitleCase('14 niobe'), '14 Niobe');
+  });
+
+  it('normalizes compound Afrikaans/South African street names and abbreviations regardless of input case', () => {
+    // Lowercase compound street names
+    assert.strictEqual(normalizeSearchQuery('dutoitspan'), 'Du Toitspan Road');
+    assert.strictEqual(normalizeSearchQuery('dutoitspan rd'), 'Du Toitspan Road');
+    assert.strictEqual(normalizeSearchQuery('debeers'), 'De Beers Road');
+    assert.strictEqual(normalizeSearchQuery('14 niobe st'), '14 Niobe Street');
+    assert.strictEqual(normalizeSearchQuery('22b memorial rd'), '22B Memorial Road');
+    assert.strictEqual(normalizeSearchQuery('spu'), 'Sol Plaatje University');
+    assert.strictEqual(normalizeSearchQuery('big hole'), 'The Big Hole, Kimberley');
+  });
+
+  it('performs case-insensitive searches and resolves Kimberley landmarks without requiring uppercase typing', async () => {
+    // 1. Lowercase search for hospital/dutoitspan
+    const hospitalResults = await searchPlaces('dutoitspan');
+    assert.ok(hospitalResults.length > 0, 'Expected results for lowercase "dutoitspan"');
+    const hospitalMatch = hospitalResults.some((r) =>
+      r.name.toLowerCase().includes('du toitspan') ||
+      r.display_name.toLowerCase().includes('du toitspan')
+    );
+    assert.ok(hospitalMatch, 'Should find Du Toitspan Road or Robert Mangaliso Sobukwe Hospital');
+
+    // 2. Lowercase search for popular malls
+    const mallResults = await searchPlaces('diamond pavilion');
+    assert.ok(mallResults.length > 0, 'Expected results for lowercase "diamond pavilion"');
+    assert.ok(mallResults[0].name.includes('Diamond Pavilion Mall'));
+
+    // 3. Lowercase search with house number
+    const addressResults = await searchPlaces('14 diamond pavilion');
+    assert.ok(addressResults.length > 0);
+    assert.strictEqual(addressResults[0].houseNumber, '14');
+  });
 });
+
 
