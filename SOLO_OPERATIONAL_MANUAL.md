@@ -29,7 +29,7 @@
 2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly access fee of **R499.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking. Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access.
 3. **Single-Device Active Concurrency Policy:** Drivers must and can only be active online on ONE device at a time, enforcing physical driver authentication, preventing account credential sharing, and protecting passenger safety.
 4. **Multi-Driver Ride Availability on Decline:** When a driver declines a ride request, the trip remains in the active dispatch pool for all other nearby registered online drivers, ensuring riders are never stranded.
-5. **Customizable Alert Tones with Silent-Mode Media Channel Bypass:** Dual-Engine audio architecture (persistent HTML5 Media Audio + Web Audio synth) that reliably sounds incoming dispatches through phone speakers or car Bluetooth, even when mobile devices are set to silent or vibrate mode.
+5. **Native Device Notification Alerts & Dispatch Acoustic Chime:** Integrates with native mobile device notification settings allowing drivers to set their own alert tones directly on their smartphone, accompanied by synthesized acoustic chimes and tactile haptic vibration.
 6. **South African Banking Integration:** Direct bank payout recipient creation using standard 6-digit South African universal clearing branch codes (FNB, Standard Bank, Capitec, Nedbank, ABSA, Investec, TymeBank, African Bank, Discovery).
 7. **Mandatory 4-Digit Anti-Impersonation PIN:** Every trip requires real-time physical confirmation of a cryptographic 4-digit PIN between rider and driver before the trip state transitions to `in_progress`.
 8. **SARS Tax & NLTA Regulatory Transparency:** Built-in automated tax invoicing complying with SARS Section 11(2) statutory disclosures, and strict document verification matching South African National Land Transport regulations (PrDP and Roadworthy certification).
@@ -56,7 +56,7 @@
    - 2.4 South African Banking Setup & Universal Clearing Codes
    - 2.5 Single-Device Active Concurrency Enforcement
    - 2.6 Daily Operating Routine & Trip Rejection Handling
-   - 2.7 Driver Customizable Notification Alert Tones & Audio Engine
+   - 2.7 Driver Notification Alerts & Native Mobile Device Sound Customization
    - 2.8 Mobile Ergonomics & Samsung Internet Optimization
    - 2.9 Arrival, Rider Identification & PIN Validation
    - 2.10 Fare Structure & Zero Commission Economics
@@ -217,28 +217,21 @@ To prevent fraudulent account sharing, phantom driver tracking, and multi-phone 
    - Tap **"Accept Trip"** within 30 seconds to lock in the booking and receive turn-by-turn navigation.
    - **Decline Trip:** If you are unable to take the trip, tap **"Decline"**. The request will be dismissed from your screen immediately, while **remaining available in the dispatch pool for other registered drivers in your area**.
 
-### 2.7 Driver Customizable Notification Alert Tones & Audio Engine
-Drivers can customize their incoming trip alert chimes to suit their personal vehicle cabin acoustic preferences:
+### 2.7 Driver Notification Alerts & Native Mobile Device Sound Customization
+To provide drivers with maximum flexibility and reliable alert delivery in vehicle environments, SOLO integrates directly with your mobile device's native notification and audio system:
 
-#### Built-in Acoustic Presets:
-1. **SOLO Harmony (Default):** Crisp 3-tone ascending harmony (D5 $\rightarrow$ A5 $\rightarrow$ D6).
-2. **Radar Sonar Ping:** High-tech double sonar sweep for fast dispatch detection in traffic.
-3. **Cash Register Payday:** Bright metallic chime celebrating 100% direct fare retention.
-4. **Priority Dispatch Siren:** 4 rapid pulsating high-priority beeps for noisy vehicle environments.
-5. **Hotel Reception Bell:** Clear, resonant metallic desk chime with long natural acoustic decay.
-6. **Staccato Sparkle:** 4 rapid playful sparkle arpeggio notes (C5 $\rightarrow$ E5 $\rightarrow$ G5 $\rightarrow$ C6).
+1. **Native Mobile Device Notification Tones:**
+   - Drivers can choose and customize their alert sounds directly within their mobile operating system settings (Android Settings $\rightarrow$ Apps / Notifications $\rightarrow$ Chrome / Samsung Internet / SOLO $\rightarrow$ Notification sound, or iOS Settings $\rightarrow$ Notifications).
+   - Any ringtone, alert tone, or custom sound file saved on your phone can be designated as the SOLO dispatch tone by configuring your browser or PWA notification category.
 
-#### Custom Device Audio:
-- Drivers can choose any personal sound file directly from their phone storage (MP3, WAV, M4A, OGG up to 10MB).
-- Audio is persisted securely on the device using IndexedDB with instant zero-latency caching.
+2. **Foreground Acoustic Dispatch Chime:**
+   - When the SOLO Driver app is actively open in the foreground, incoming trips trigger a synthesized high-visibility chime (D5 $\rightarrow$ A5 $\rightarrow$ D6) generated via the device's hardware Web Audio API.
 
-#### Dual-Engine Audio & Silent Mode Bypass:
-> [!TIP]
-> **Mobile Silent/Vibrate Bypass:** Drivers frequently keep their smartphones on silent or vibrate. Unlike standard web audio that gets silenced by phone operating systems, SOLO uses a **Dual-Engine Audio Pipeline**:
-> - **Primary Media Channel:** A persistent HTML5 Audio element configured for media stream playback (`AVAudioSessionCategoryPlayback`). This outputs incoming trip alerts at full volume through phone speakers or car Bluetooth, **even if the physical mute/vibrate switch is on**.
-> - **Secondary Hardware Synth:** Native Web Audio API synthesis with 30ms lookahead scheduling to prevent audio buffer drops.
-> - **Volume & Vibration Control:** Includes an on-screen volume slider (0% to 100%) and device haptic vibration pattern (`[250ms vibrate, 100ms pause, 250ms vibrate, 100ms pause, 450ms vibrate]`).
-> - **Testing Tones:** Quick "Test Tone" buttons are accessible in the header bar, Home tab card, and Profile tab settings.
+3. **Tactile Haptic Vibration Pattern:**
+   - Every incoming trip dispatch activates a distinct tactile vibration pattern (`[250ms vibrate, 100ms pause, 250ms vibrate, 100ms pause, 450ms vibrate]`) on supported mobile devices to immediately alert the driver even in noisy road conditions.
+
+4. **Service Worker Push Notifications:**
+   - System dispatches are routed through high-priority Service Worker notifications (`requireInteraction: true`, `renotify: true`), ensuring your phone rings and vibrates with your chosen native notification sound even when the driver app is running in the background.
 
 ### 2.8 Mobile Ergonomics & Samsung Internet Optimization
 The SOLO Driver interface is optimized for in-vehicle mounting on modern smartphones:

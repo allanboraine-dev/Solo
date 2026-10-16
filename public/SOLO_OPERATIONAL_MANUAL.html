@@ -451,7 +451,7 @@
             <li><a href="#driver-bank">2.4 SA Universal Clearing Branch Codes</a></li>
             <li><a href="#driver-concurrency">2.5 Single-Device Active Concurrency</a></li>
             <li><a href="#driver-routine">2.6 Daily Routine & Decline Handling</a></li>
-            <li><a href="#driver-tones">2.7 Custom Alert Tones & Silent Bypass</a></li>
+            <li><a href="#driver-tones">2.7 Native Device Alert Tones & Chime</a></li>
             <li><a href="#driver-mobile">2.8 Samsung Internet & Mobile UI</a></li>
             <li><a href="#driver-pin">2.9 Arrival & PIN Verification</a></li>
             <li><a href="#driver-sars">2.10 Driver SARS Tax Guidance</a></li>
@@ -606,21 +606,16 @@
         Open the SOLO Driver app and toggle <strong>"Go Online"</strong>. When a ride is booked within 15 km, your device sounds your selected tone. You see pickup address, destination, route distance, and guaranteed Rand fare. Tap <strong>"Accept Trip"</strong> to receive navigation routing. If you tap <strong>"Decline"</strong>, the trip is dismissed only from your screen while remaining active for other drivers in your area.
       </p>
 
-      <h3 id="driver-tones">2.7 Customizable Notification Alert Tones & Silent Mode Bypass</h3>
+      <h3 id="driver-tones">2.7 Driver Notification Alerts & Native Mobile Device Sound Customization</h3>
       <p>
-        Drivers can select from 6 built-in electronic acoustic presets or upload custom audio files (MP3, WAV, M4A, OGG up to 10MB) directly from device storage:
+        SOLO integrates directly with your smartphone's native notification and audio system:
       </p>
       <ul>
-        <li><strong>SOLO Harmony (Default):</strong> Crisp 3-tone ascending harmony (D5 &rarr; A5 &rarr; D6).</li>
-        <li><strong>Radar Sonar Ping:</strong> Double sonar sweep for high-speed dispatch awareness.</li>
-        <li><strong>Cash Register Payday:</strong> Metallic bell celebrating 100% fare retention.</li>
-        <li><strong>Priority Dispatch Siren:</strong> 4 rapid pulsating beeps for noisy vehicle environments.</li>
-        <li><strong>Hotel Reception Bell:</strong> Resonant reception desk chime with long natural decay.</li>
-        <li><strong>Staccato Sparkle:</strong> 4 rapid playful sparkle arpeggio notes.</li>
+        <li><strong>Native Mobile Device Notification Tones:</strong> Drivers can set and customize their alert sound directly within their phone's operating system settings (Android Settings &rarr; Apps / Notifications &rarr; Chrome / Samsung Internet / SOLO &rarr; Notification sound, or iOS Settings &rarr; Notifications). Any ringtone or custom sound file saved on your phone can be chosen as the dispatch alert tone.</li>
+        <li><strong>Foreground Acoustic Dispatch Chime:</strong> When the app is open in the foreground, incoming dispatches sound an ascending acoustic chime (D5 &rarr; A5 &rarr; D6) synthesized via the Web Audio API.</li>
+        <li><strong>Tactile Haptic Vibration Pattern:</strong> Every incoming dispatch triggers a tactile vibration sequence (<code>[250ms, 100ms, 250ms, 100ms, 450ms]</code>) to alert drivers even in noisy traffic conditions.</li>
+        <li><strong>Service Worker Push Notifications:</strong> Dispatches use high-priority Service Worker notifications (<code>requireInteraction: true</code>, <code>renotify: true</code>), ensuring notifications play the user's selected native notification tone even when the app is in the background.</li>
       </ul>
-      <div class="alert alert-success">
-        <strong>Dual-Engine Audio Pipeline:</strong> Uses a persistent HTML5 Audio element routed to the media playback channel (<code>AVAudioSessionCategoryPlayback</code>). Incoming ride alerts sound clearly through vehicle speakers or Bluetooth <strong>even when the phone's hardware switch is set to silent or vibrate</strong>. Includes volume slider (0% to 100%) and haptic vibration pattern.
-      </div>
 
       <h3 id="driver-mobile">2.8 Mobile Ergonomics & Samsung Internet Optimization</h3>
       <p>

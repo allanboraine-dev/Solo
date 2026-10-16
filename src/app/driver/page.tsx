@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, Volume2, Music, Play } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
@@ -15,8 +15,6 @@ import { fetchDriverKycDocuments } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
-import { NotificationToneModal } from '@/components/NotificationToneModal'
-import { getSelectedTone, getCustomToneMeta, PRESET_TONES, type ToneId, unlockAudio } from '@/utils/notificationTones'
 import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -47,9 +45,6 @@ export default function DriverPage() {
   const [preemptedNotice, setPreemptedNotice] = useState<string | null>(null)
 
   const handleGoOnlineOnThisDevice = async () => {
-    try {
-      unlockAudio();
-    } catch {}
     setPreemptedNotice(null)
     const resolvedDriverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null)
     if (resolvedDriverId) {
@@ -86,20 +81,7 @@ export default function DriverPage() {
   const [showFareCollection, setShowFareCollection] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
   const [showBankModal, setShowBankModal] = useState(false)
-  const [showToneModal, setShowToneModal] = useState(false)
-  const [activeToneId, setActiveToneId] = useState<ToneId>('default')
-  const [customToneMeta, setCustomToneMeta] = useState<{ name: string; size: number; mimeType: string } | null>(null)
   const [completionNotice, setCompletionNotice] = useState<string | null>(null)
-
-  useEffect(() => {
-    const loadToneState = () => {
-      setActiveToneId(getSelectedTone())
-      setCustomToneMeta(getCustomToneMeta())
-    }
-    loadToneState()
-    window.addEventListener('solo_tone_changed', loadToneState)
-    return () => window.removeEventListener('solo_tone_changed', loadToneState)
-  }, [])
 
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
@@ -632,18 +614,6 @@ export default function DriverPage() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowToneModal(true)}
-              className="flex items-center justify-center gap-1 px-2.5 sm:px-3 py-2 min-h-[42px] bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-2xl border border-gray-200/50 dark:border-white/5 transition active:scale-95 touch-manipulation shadow-sm"
-              title={`Notification Tone: ${activeToneId === 'custom' ? (customToneMeta?.name || 'Custom') : (PRESET_TONES.find(t => t.id === activeToneId)?.name || 'Default')}`}
-              aria-label="Notification Alert Tone Settings"
-            >
-              <Volume2 size={16} className="text-blue-500 shrink-0" />
-              <span className="text-[11px] font-bold hidden sm:inline max-w-[70px] truncate">
-                {activeToneId === 'custom' ? 'Custom' : (PRESET_TONES.find(t => t.id === activeToneId)?.name.split(' ')[0] || 'Tone')}
-              </span>
-            </button>
             <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/50 dark:border-white/5 h-10 w-10 flex items-center justify-center touch-manipulation" />
             <button 
               onClick={async () => {
@@ -823,46 +793,6 @@ export default function DriverPage() {
 
                   <div className="mt-6 text-left space-y-3">
                     <NotificationPermissionBanner role="driver" userId={profile?.id} />
-
-                    <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200/80 dark:border-white/10 flex items-center justify-between gap-2 shadow-sm">
-                      <div 
-                        className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
-                        onClick={() => setShowToneModal(true)}
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                          <Volume2 size={16} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
-                            Tone: {activeToneId === 'custom' && customToneMeta ? customToneMeta.name : (PRESET_TONES.find(t => t.id === activeToneId)?.name || 'Default')}
-                          </p>
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                            Tap to change or select device audio
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            audioAlert.playTripAlertChime(activeToneId);
-                          }}
-                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 text-xs font-bold rounded-lg flex items-center gap-1 transition touch-manipulation"
-                          title="Test Sound"
-                        >
-                          <Play size={11} className="fill-current" />
-                          <span>Test</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowToneModal(true)}
-                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-xs font-bold rounded-lg transition touch-manipulation"
-                        >
-                          Change
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )
@@ -937,59 +867,6 @@ export default function DriverPage() {
                       )}
                     </span>
                   </div>
-                </div>
-
-                {/* Alert Sound & Notification Tones Card */}
-                <div className="mt-5 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2">
-                      <Volume2 size={18} className="text-blue-500" />
-                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">Notification Alert Tones</h3>
-                    </div>
-                    <button
-                      onClick={() => setShowToneModal(true)}
-                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline touch-manipulation"
-                    >
-                      Change
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-                    Customise incoming ride request chimes. Select preset electronic tones or upload your own audio file directly from your device.
-                  </p>
-
-                  <div className="p-3 bg-white dark:bg-zinc-950 rounded-xl border border-gray-200/80 dark:border-white/5 flex items-center justify-between gap-2 mb-3 shadow-sm">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <Music size={15} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">
-                          {activeToneId === 'custom' && customToneMeta
-                            ? customToneMeta.name
-                            : (PRESET_TONES.find(t => t.id === activeToneId)?.name || 'SOLO Harmony (Default)')}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          {activeToneId === 'custom' ? 'Custom Device Audio' : 'Active Preset Chime'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => audioAlert.playTripAlertChime(activeToneId)}
-                      className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/40 dark:hover:bg-blue-800/50 text-blue-600 dark:text-blue-300 text-xs font-bold flex items-center gap-1 transition touch-manipulation"
-                      title="Preview Current Alert Tone"
-                    >
-                      <Play size={12} className="fill-current" />
-                      <span>Test</span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => setShowToneModal(true)}
-                    className="w-full py-3 px-4 min-h-[44px] bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition active:scale-98 touch-manipulation"
-                  >
-                    <Smartphone size={15} /> Select Tone / Choose from Device
-                  </button>
                 </div>
 
                 {/* Bank Settlement & Direct Payouts Card */}
@@ -1409,16 +1286,6 @@ export default function DriverPage() {
         driverFullName={profile?.fullName || 'Driver'}
         isOpen={showBankModal}
         onClose={() => setShowBankModal(false)}
-      />
-
-      {/* Notification Tone Settings Modal */}
-      <NotificationToneModal
-        isOpen={showToneModal}
-        onClose={() => setShowToneModal(false)}
-        onToneSaved={(tone) => {
-          setActiveToneId(tone)
-          setCustomToneMeta(getCustomToneMeta())
-        }}
       />
     </div>
   )

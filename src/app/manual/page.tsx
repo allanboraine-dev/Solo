@@ -80,7 +80,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section B: Driver Partner Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                NLTA compliance, 1-device active concurrency, customizable alert tones with silent bypass, Samsung Web optimization, and 0% commission R499/mo SaaS model.
+                NLTA compliance, 1-device active concurrency, native device notification alerts & chimes, Samsung Web optimization, and 0% commission R499/mo SaaS model.
               </p>
             </div>
             <a
