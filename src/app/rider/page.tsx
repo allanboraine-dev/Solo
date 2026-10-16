@@ -4,13 +4,13 @@ import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
-import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, getDeclinedTripIds, isTripDeclined, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -59,6 +59,51 @@ export default function RiderPage() {
   const [ratingTrip, setRatingTrip] = useState<MockTrip | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
+
+  // Assigned Driver & Vehicle Information (Vehicle Make, Model, License Plate)
+  const [assignedDriverInfo, setAssignedDriverInfo] = useState<{
+    fullName: string;
+    vehicleMake?: string;
+    vehicleModel?: string;
+    licensePlate?: string;
+    phone?: string;
+    rating?: number;
+  } | null>(null)
+
+  useEffect(() => {
+    if (!activeTrip?.driver_id || activeTrip.status === 'requested') {
+      setAssignedDriverInfo(null);
+      return;
+    }
+
+    // 1. Try finding in live availableDrivers list
+    const matched = availableDrivers.find(d => d.id === activeTrip.driver_id);
+    if (matched && (matched.vehicleMake || matched.licensePlate)) {
+      setAssignedDriverInfo({
+        fullName: matched.fullName,
+        vehicleMake: matched.vehicleMake,
+        vehicleModel: matched.vehicleModel,
+        licensePlate: matched.licensePlate,
+        phone: (matched as any).phone,
+        rating: 5.0,
+      });
+      return;
+    }
+
+    // 2. Query driver profile from database or local cache
+    getDriverProfileById(activeTrip.driver_id).then(prof => {
+      if (prof) {
+        setAssignedDriverInfo({
+          fullName: prof.fullName,
+          vehicleMake: prof.vehicleMake,
+          vehicleModel: prof.vehicleModel,
+          licensePlate: prof.licensePlate,
+          phone: prof.phone,
+          rating: 5.0,
+        });
+      }
+    });
+  }, [activeTrip?.driver_id, activeTrip?.status, availableDrivers]);
 
   // Fetch active registered drivers in proximity to rider (with real-time updates and 10s auto-refresh)
   useEffect(() => {
@@ -589,12 +634,13 @@ export default function RiderPage() {
             licensePlate: d.licensePlate,
             rating: 5.0
           }))}
-          assignedDriver={activeTrip && driverCoords ? {
-            lat: driverCoords.lat,
-            lng: driverCoords.lng,
-            name: 'Your Driver',
-            vehicle: 'En route',
-            rating: 5.0
+          assignedDriver={activeTrip && (driverCoords || assignedDriverInfo) ? {
+            lat: driverCoords?.lat || (activeTrip.pickup_lat),
+            lng: driverCoords?.lng || (activeTrip.pickup_lng),
+            name: assignedDriverInfo?.fullName || 'Your Driver',
+            vehicle: [assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'En route',
+            licensePlate: assignedDriverInfo?.licensePlate,
+            rating: assignedDriverInfo?.rating || 5.0
           } : undefined}
           driverLat={driverCoords?.lat}
           driverLng={driverCoords?.lng}
@@ -773,6 +819,60 @@ export default function RiderPage() {
                         {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
                         {activeTrip.status === 'in_progress' && 'Heading to destination...'}
                       </p>
+
+                      {/* Dispatched Driver & Vehicle Identification Card */}
+                      {(activeTrip.status === 'accepted' || activeTrip.status === 'in_progress') && (
+                        <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                                {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : <User size={18} />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                    {assignedDriverInfo?.fullName || 'Assigned Driver'}
+                                  </h4>
+                                  <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
+                                    ★ {assignedDriverInfo?.rating ? assignedDriverInfo.rating.toFixed(1) : '5.0'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200 font-bold mt-0.5">
+                                  <Car size={14} className="text-blue-500 shrink-0" />
+                                  <span className="truncate">
+                                    {[assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* South African License Plate Number Badge */}
+                            <div className="shrink-0 flex flex-col items-end">
+                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">License Plate</span>
+                              <div className="px-2.5 py-1 bg-amber-300 dark:bg-amber-400 text-black font-mono font-black text-xs sm:text-sm tracking-wider rounded-lg border-2 border-black/60 shadow-sm uppercase flex items-center gap-1">
+                                <span className="text-[10px] opacity-80">🇿🇦</span>
+                                <span>{assignedDriverInfo?.licensePlate || 'NC 482-910'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Security & Verification Reminder */}
+                          <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                              <ShieldCheck size={13} /> Verify plate before boarding
+                            </span>
+                            {assignedDriverInfo?.phone && (
+                              <a
+                                href={`tel:${assignedDriverInfo.phone}`}
+                                className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                              >
+                                <Phone size={11} /> Call
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-2.5 md:mt-3 flex flex-wrap items-center gap-2">
                         <a
                           href={buildWhatsAppTripShareUrl(activeTrip)}

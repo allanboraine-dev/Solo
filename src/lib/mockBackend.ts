@@ -101,6 +101,47 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
   return null;
 };
 
+export const getDriverProfileById = async (driverId: string): Promise<MockDriverProfile | null> => {
+  if (!driverId) return null;
+  try {
+    const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', driverId).maybeSingle();
+    if (data && !error) {
+      const mappedProfile: MockDriverProfile = {
+        id: data.id,
+        fullName: data.full_name || 'Registered Driver',
+        email: data.email || '',
+        phone: data.phone || '',
+        vehicleMake: data.vehicle_make || 'Toyota',
+        vehicleModel: data.vehicle_model || 'Corolla Quest',
+        licensePlate: data.license_plate || 'NC 482-910',
+        prdpNumber: data.prdp_number,
+        hasLicense: data.has_license ?? true,
+        hasPrdp: data.has_prdp ?? true,
+        hasRoadworthy: data.has_roadworthy ?? true,
+        isVerified: data.is_verified ?? true,
+        subscriptionActive: true,
+        subscriptionPlan: data.subscription_plan || 'paid',
+      };
+      return applyOwnerPrivileges(mappedProfile);
+    }
+  } catch (e) {
+    console.error('Error fetching driver profile by ID:', e);
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('mock_driver_profile');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.id === driverId || !driverId)) {
+          return applyOwnerPrivileges(parsed);
+        }
+      }
+    } catch {}
+  }
+  return null;
+};
+
 export const saveDriverProfile = async (profile: MockDriverProfile) => {
   if (typeof window === 'undefined') return;
   

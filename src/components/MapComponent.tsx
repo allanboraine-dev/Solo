@@ -30,6 +30,7 @@ interface MapProps {
     lng: number;
     name?: string;
     vehicle?: string;
+    licensePlate?: string;
     rating?: number;
   };
 }
@@ -258,7 +259,15 @@ const MapComponent = (props: MapProps) => {
                     <span>{assignedDriver?.rating ? assignedDriver.rating.toFixed(1) : '5.0'}</span>
                   </div>
                 </div>
-                {assignedDriver?.vehicle && <div className="text-gray-600 mt-0.5">{assignedDriver.vehicle}</div>}
+                {assignedDriver?.vehicle && <div className="text-gray-700 dark:text-gray-200 font-semibold mt-0.5">{assignedDriver.vehicle}</div>}
+                {assignedDriver?.licensePlate && (
+                  <div className="mt-1">
+                    <span className="font-mono font-bold text-[10px] bg-amber-300 text-black px-1.5 py-0.5 rounded border border-black/40 uppercase tracking-wider inline-flex items-center gap-1 shadow-xs">
+                      <span>🇿🇦</span>
+                      <span>{assignedDriver.licensePlate}</span>
+                    </span>
+                  </div>
+                )}
                 <div className="text-blue-500 font-semibold mt-1">En route to your location</div>
               </div>
             </Popup>
