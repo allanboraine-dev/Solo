@@ -184,6 +184,16 @@ export default function DriverPage() {
           !declinedIds.has(t.id)
       );
       
+      if (activeTrip) {
+        const currentInDb = trips.find(t => t.id === activeTrip.id);
+        if (currentInDb && (currentInDb.status === 'completed' || currentInDb.status === 'cancelled')) {
+          setActiveTrip(null);
+          setIsWaitingForPayment(false);
+          setShowFareCollection(false);
+          return;
+        }
+      }
+
       if (active) {
         setActiveTrip(active);
         if (active.status === 'payment_pending') setIsWaitingForPayment(true);

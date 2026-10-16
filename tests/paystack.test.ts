@@ -74,4 +74,24 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
     assert.strictEqual(subscriptionMetadata.payment_type, 'solo_saas_subscription');
     assert.ok(subscriptionMetadata.driverId);
   });
+
+  it('ensures PaystackPop.setup callback is a standard synchronous [object Function] and never an AsyncFunction', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const riderPageSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'app', 'rider', 'page.tsx'),
+      'utf8'
+    );
+
+    assert.strictEqual(
+      /callback:\s*async\s+function/.test(riderPageSource),
+      false,
+      'PaystackPop.setup callback must not be an async function (Paystack v1 rejects [object AsyncFunction])'
+    );
+    assert.strictEqual(
+      /callback:\s*function\s*\(/.test(riderPageSource),
+      true,
+      'PaystackPop.setup callback must be a standard synchronous function'
+    );
+  });
 });

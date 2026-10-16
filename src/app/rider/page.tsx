@@ -330,28 +330,23 @@ export default function RiderPage() {
 
       // Check if Paystack Inline Pop script is loaded on window
       const win = window as any;
-      if (typeof window !== 'undefined' && win.PaystackPop) {
-        const handler = win.PaystackPop.setup({
-          key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-          email: riderEmail,
-          amount: Math.round(Number(activeTrip.fare_amount) * 100),
-          currency: 'ZAR',
-          ref: data.reference,
-          metadata: {
-            trip_id: activeTrip.id,
-            payment_type: 'solo_trip_fare',
-          },
-          callback: async function(res: { reference: string }) {
-            setIsProcessingPayment(true);
-            try {
-              const verifyRes = await fetch('/api/verify-trip-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reference: res.reference, tripId: activeTrip.id }),
-              });
-              const verifyData = await verifyRes.json();
+      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (typeof window !== 'undefined' && win.PaystackPop && publicKey) {
+        const currentTrip = activeTrip;
+        // NOTE: Paystack Inline v1 validates `Object.prototype.toString.call(callback) === '[object Function]'`.
+        // Passing an `async function` produces `'[object AsyncFunction]'` and throws:
+        // "Attribute callback must be a valid function". Always use a synchronous function here.
+        const verifyCompletedPayment = (reference: string) => {
+          setIsProcessingPayment(true);
+          fetch('/api/verify-trip-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference, tripId: currentTrip.id }),
+          })
+            .then((verifyRes) => verifyRes.json())
+            .then((verifyData) => {
               if (verifyData.success) {
-                const updated = { ...activeTrip, status: 'completed' as const };
+                const updated: MockTrip = { ...currentTrip, status: 'completed' };
                 saveTrip(updated);
                 setRatingTrip(updated);
                 setShowRatingModal(true);
@@ -360,11 +355,27 @@ export default function RiderPage() {
               } else {
                 setPaymentError(verifyData.error || 'Could not verify payment');
               }
-            } catch (err: any) {
-              setPaymentError(err.message || 'Payment verification failed');
-            } finally {
+            })
+            .catch((err: any) => {
+              setPaymentError(err?.message || 'Payment verification failed');
+            })
+            .finally(() => {
               setIsProcessingPayment(false);
-            }
+            });
+        };
+
+        const handler = win.PaystackPop.setup({
+          key: publicKey,
+          email: riderEmail,
+          amount: Math.round(Number(currentTrip.fare_amount) * 100),
+          currency: 'ZAR',
+          ref: data.reference,
+          metadata: {
+            trip_id: currentTrip.id,
+            payment_type: 'solo_trip_fare',
+          },
+          callback: function(res: { reference: string }) {
+            verifyCompletedPayment(res.reference);
           },
           onClose: function() {
             setIsProcessingPayment(false);
