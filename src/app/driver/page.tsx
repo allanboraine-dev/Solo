@@ -375,7 +375,7 @@ export default function DriverPage() {
       { enableHighAccuracy: true, timeout: 5000 }
     );
 
-    // Continuous watch position
+    // Continuous watch position on motion
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         broadcastCurrentLocation(position.coords.latitude, position.coords.longitude);
@@ -390,7 +390,26 @@ export default function DriverPage() {
       }
     );
 
+    // Periodic 30-second heartbeat to ensure stationary/parked drivers remain fresh within 5-min TTL
+    const heartbeatInterval = setInterval(() => {
+      if (driverCoordsRef.current && profile?.id) {
+        broadcastCurrentLocation(driverCoordsRef.current.lat, driverCoordsRef.current.lng);
+      }
+    }, 30000);
+
+    // Offline cleanup when driver closes tab or navigates away
+    const handleBeforeUnload = () => {
+      if (profile?.id) {
+        updateDriverLocation(profile.id, 0, 0, false);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
     return () => {
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
       navigator.geolocation.clearWatch(watchId);
       if (profile?.id) {
         updateDriverLocation(profile.id, 0, 0, false);

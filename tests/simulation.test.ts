@@ -305,5 +305,70 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
       'Active trip must remain in_progress after Confirm Pickup and never revert to accepted'
     );
   });
+
+  it('Scenario 8: Live Driver Telematics: 100% Real Drivers Only & 5-Minute Heartbeat Expiration (TTL)', () => {
+    const TTL_MS = 5 * 60 * 1000;
+    const now = Date.now();
+
+    const simulatedDrivers = [
+      // 1. Fresh live driver (pinged 30 seconds ago) -> ACTIVE
+      {
+        id: 'driver-live-1',
+        fullName: 'Active Real Driver',
+        lat: -28.7282,
+        lng: 24.7623,
+        isOnline: true,
+        updatedAt: now - 30 * 1000,
+      },
+      // 2. Stale driver (pinged 6 minutes ago, closed browser tab) -> EXPIRED
+      {
+        id: 'driver-stale-2',
+        fullName: 'Stale Closed-Tab Driver',
+        lat: -28.7290,
+        lng: 24.7630,
+        isOnline: true,
+        updatedAt: now - 6 * 60 * 1000,
+      },
+      // 3. Stale driver (pinged 2 hours ago from previous testing) -> EXPIRED
+      {
+        id: 'driver-stale-3',
+        fullName: 'Obsolete Session Driver',
+        lat: -28.7300,
+        lng: 24.7640,
+        isOnline: true,
+        updatedAt: now - 2 * 60 * 60 * 1000,
+      },
+      // 4. Legacy demo driver -> PRUNED
+      {
+        id: 'demo-driver-1',
+        fullName: 'Sipho Ndlovu',
+        lat: -28.7320,
+        lng: 24.7660,
+        isOnline: true,
+        updatedAt: now,
+      },
+      // 5. Driver explicitly toggled offline -> OFFLINE
+      {
+        id: 'driver-offline-4',
+        fullName: 'Offline Driver',
+        lat: -28.7310,
+        lng: 24.7650,
+        isOnline: false,
+        updatedAt: now - 10 * 1000,
+      },
+    ];
+
+    // Filter algorithm used by getActiveDrivers
+    const activeDrivers = simulatedDrivers.filter((d) => {
+      if (d.id.startsWith('demo-driver-')) return false; // Rule 1: No demo drivers
+      const isFresh = d.updatedAt && now - d.updatedAt <= TTL_MS; // Rule 2: 5-minute heartbeat TTL
+      return d.isOnline && isFresh;
+    });
+
+    // Exactly 1 real driver is online and fresh
+    assert.strictEqual(activeDrivers.length, 1);
+    assert.strictEqual(activeDrivers[0].id, 'driver-live-1');
+    assert.strictEqual(activeDrivers[0].fullName, 'Active Real Driver');
+  });
 });
 

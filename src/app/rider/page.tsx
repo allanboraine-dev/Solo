@@ -54,14 +54,35 @@ export default function RiderPage() {
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
 
-  // Fetch active registered drivers in proximity to rider
+  // Fetch active registered drivers in proximity to rider (with real-time updates and 10s auto-refresh)
   useEffect(() => {
     const lat = pickupCoords?.lat;
     const lng = pickupCoords?.lng;
-    getActiveDrivers(lat, lng, 25).then(drivers => {
-      setAvailableDrivers(drivers);
+
+    const refreshDrivers = () => {
+      getActiveDrivers(lat, lng, 25).then(drivers => {
+        setAvailableDrivers(drivers);
+      });
+    };
+
+    refreshDrivers();
+    const interval = setInterval(refreshDrivers, 10000);
+
+    const onDriverLocationUpdate = () => refreshDrivers();
+    window.addEventListener('solo_driver_location_update', onDriverLocationUpdate);
+
+    const unsubscribe = subscribeToEvents((type) => {
+      if (type === 'driver_location') {
+        refreshDrivers();
+      }
     });
-  }, [pickupCoords]);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('solo_driver_location_update', onDriverLocationUpdate);
+      unsubscribe();
+    };
+  }, [pickupCoords?.lat, pickupCoords?.lng]);
 
   // Monitor authenticated rider session
   useEffect(() => {

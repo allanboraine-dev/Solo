@@ -919,48 +919,15 @@ export type LiveDriver = {
   updatedAt: number;
 };
 
-// Default registered drivers in Kimberley area for instant test visibility if no real drivers online
-const DEFAULT_DEMO_DRIVERS: LiveDriver[] = [
-  {
-    id: 'demo-driver-1',
-    fullName: 'Sipho Ndlovu',
-    vehicleMake: 'Toyota',
-    vehicleModel: 'Corolla Quest',
-    licensePlate: 'NC 482-910',
-    lat: -28.7320,
-    lng: 24.7660,
-    isOnline: true,
-    updatedAt: Date.now(),
-  },
-  {
-    id: 'demo-driver-2',
-    fullName: 'Johan Van Der Merwe',
-    vehicleMake: 'Volkswagen',
-    vehicleModel: 'Polo Vivo',
-    licensePlate: 'NC 193-448',
-    lat: -28.7245,
-    lng: 24.7580,
-    isOnline: true,
-    updatedAt: Date.now(),
-  },
-  {
-    id: 'demo-driver-3',
-    fullName: 'Thabo Mokoena',
-    vehicleMake: 'Hyundai',
-    vehicleModel: 'Grand i10',
-    licensePlate: 'NC 774-209',
-    lat: -28.7390,
-    lng: 24.7530,
-    isOnline: true,
-    updatedAt: Date.now(),
-  }
-];
+// Maximum allowed age for a driver's GPS location ping before considering them offline (5 minutes TTL)
+export const DRIVER_HEARTBEAT_TTL_MS = 5 * 60 * 1000;
 
 import { calculateDistanceKm, isWithinRadiusKm } from '@/utils/geo';
 
 export const getActiveDrivers = async (userLat?: number, userLng?: number, radiusKm: number = 20): Promise<LiveDriver[]> => {
   if (typeof window === 'undefined') return [];
 
+  const now = Date.now();
   const driversMap = new Map<string, LiveDriver>();
 
   // 1. If coordinates provided, try PostGIS RPC
@@ -974,6 +941,10 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
 
       if (data && !error && data.length > 0) {
         data.forEach((d: any) => {
+          const updatedAtMs = d.updated_at ? new Date(d.updated_at).getTime() : now;
+          // Discard stale location records older than 5 minutes
+          if (now - updatedAtMs > DRIVER_HEARTBEAT_TTL_MS) return;
+
           driversMap.set(d.id, {
             id: d.id,
             fullName: d.full_name || 'Driver',
@@ -983,7 +954,7 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
             lat: d.current_lat,
             lng: d.current_lng,
             isOnline: true,
-            updatedAt: Date.now(),
+            updatedAt: updatedAtMs,
           });
         });
         return Array.from(driversMap.values());
@@ -1003,6 +974,12 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
     if (data && !error && data.length > 0) {
       data.forEach((d: any) => {
         if (d.current_lat && d.current_lng) {
+          const updatedAtMs = d.updated_at ? new Date(d.updated_at).getTime() : 0;
+          // Stale heartbeat check: Driver must have sent a GPS ping in the last 5 minutes
+          if (now - updatedAtMs > DRIVER_HEARTBEAT_TTL_MS) {
+            return;
+          }
+
           // If user coords provided, apply Haversine radius filter
           if (
             userLat !== undefined &&
@@ -1021,7 +998,7 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
             lat: d.current_lat,
             lng: d.current_lng,
             isOnline: true,
-            updatedAt: d.updated_at ? new Date(d.updated_at).getTime() : Date.now(),
+            updatedAt: updatedAtMs,
           });
         }
       });
@@ -1030,13 +1007,21 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
     console.error('Error fetching online drivers from Supabase:', e);
   }
 
-  // 3. Read local cache
+  // 3. Read local cache (enforcing 5-minute heartbeat TTL and auto-pruning stale/demo sessions)
   try {
     const raw = localStorage.getItem('solo_live_drivers');
     if (raw) {
       const cached = JSON.parse(raw) as LiveDriver[];
+      const freshActiveDrivers: LiveDriver[] = [];
+
       cached.forEach(d => {
-        if (d.isOnline) {
+        // Strip legacy demo drivers
+        if (d.id?.startsWith('demo-driver-')) return;
+
+        const isFresh = d.updatedAt && (now - d.updatedAt <= DRIVER_HEARTBEAT_TTL_MS);
+        if (d.isOnline && isFresh) {
+          freshActiveDrivers.push(d);
+
           if (
             userLat !== undefined &&
             userLng !== undefined &&
@@ -1047,26 +1032,20 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
           driversMap.set(d.id, d);
         }
       });
+
+      // Auto-prune stale drivers from localStorage so obsolete sessions don't linger
+      if (freshActiveDrivers.length !== cached.length) {
+        localStorage.setItem('solo_live_drivers', JSON.stringify(freshActiveDrivers));
+      }
     }
   } catch (e) {
     console.error('Error parsing cached live drivers:', e);
   }
 
-  // 4. Fallback demo drivers if no live drivers yet in radius
-  if (driversMap.size === 0) {
-    DEFAULT_DEMO_DRIVERS.forEach(d => {
-      if (
-        userLat === undefined ||
-        userLng === undefined ||
-        isWithinRadiusKm(userLat, userLng, d.lat, d.lng, radiusKm)
-      ) {
-        driversMap.set(d.id, d);
-      }
-    });
-  }
-
+  // Strictly return 100% real live drivers (No fake demo fallback)
   return Array.from(driversMap.values());
 };
+
 
 /**
  * Queries requested trips located within radiusKm of driver's current coordinates,
@@ -1191,14 +1170,11 @@ export const updateDriverLocation = async (
   try {
     const raw = localStorage.getItem('solo_live_drivers');
     let cached: LiveDriver[] = raw ? JSON.parse(raw) : [];
-    const idx = cached.findIndex(d => d.id === driverId);
-    if (idx >= 0) {
-      if (!isOnline) {
-        cached.splice(idx, 1);
-      } else {
-        cached[idx] = driverData;
-      }
-    } else if (isOnline) {
+
+    // Prune demo drivers and any stale driver record older than 5 minutes
+    cached = cached.filter(d => !d.id.startsWith('demo-driver-') && (now - d.updatedAt <= DRIVER_HEARTBEAT_TTL_MS) && d.id !== driverId);
+
+    if (isOnline) {
       cached.push(driverData);
     }
     localStorage.setItem('solo_live_drivers', JSON.stringify(cached));
