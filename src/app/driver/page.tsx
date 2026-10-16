@@ -57,6 +57,7 @@ export default function DriverPage() {
   const [isWaitingForPayment, setIsWaitingForPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
   const [showBankModal, setShowBankModal] = useState(false)
+  const [completionNotice, setCompletionNotice] = useState<string | null>(null)
 
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
@@ -488,9 +489,9 @@ export default function DriverPage() {
       setRequest(null);
       setIsWaitingForPayment(false);
       setShowFareCollection(false);
+      setCompletionNotice(`Trip completed! R${tripToComplete.fare_amount} fare settled.`);
       await completeTripAtomic(tripToComplete.id, 'cash', tripToComplete);
       await saveTrip({ ...tripToComplete, status: 'completed' });
-      alert("Trip Completed! Fare settled and trip closed.");
     }
   }
 
@@ -617,6 +618,21 @@ export default function DriverPage() {
                 </div>
               ) : (
                 <div className="text-center mt-6 animate-in fade-in duration-700">
+                  {completionNotice && (
+                    <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-2.5 text-emerald-800 dark:text-emerald-300 text-xs font-bold animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>{completionNotice}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCompletionNotice(null)}
+                        className="text-emerald-600 dark:text-emerald-400 hover:opacity-75 font-bold px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                   <div className="mb-6 flex justify-center">
                     <div className={`p-5 rounded-3xl ${isOnline ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-lg shadow-green-500/30' : 'bg-gray-100 text-gray-400 dark:bg-zinc-800'}`}>
                       <Car size={36} />

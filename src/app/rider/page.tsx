@@ -135,9 +135,13 @@ export default function RiderPage() {
       const currentActive = activeTripRef.current;
 
       if (currentActive) {
-        if (completedIds.has(currentActive.id)) {
+        if (completedIds.has(currentActive.id) || isTripCompleted(currentActive.id)) {
+          setRatingTrip(currentActive);
+          setShowRatingModal(true);
           updateActiveTripState(null);
           setDriverCoords(null);
+          setIsProcessingPayment(false);
+          setPaymentError(null);
           return;
         }
         if (declinedIds.has(currentActive.id)) {
@@ -160,6 +164,8 @@ export default function RiderPage() {
             setShowRatingModal(true);
             updateActiveTripState(null);
             setDriverCoords(null);
+            setIsProcessingPayment(false);
+            setPaymentError(null);
             return;
           }
           const matchedPrio = STATUS_PRIORITY[matched.status] || 0;
@@ -171,6 +177,28 @@ export default function RiderPage() {
             updateActiveTripState(matched);
           }
           return;
+        } else {
+          // If active trip is not in latest trips array, query authoritative status directly from server API
+          try {
+            const res = await fetch(`/api/trips/status?tripId=${encodeURIComponent(currentActive.id)}`);
+            const statusData = await res.json();
+            if (statusData?.trip?.status === 'completed') {
+              const completedTrip: MockTrip = {
+                ...currentActive,
+                status: 'completed',
+              };
+              markTripCompleted(completedTrip.id);
+              setRatingTrip(completedTrip);
+              setShowRatingModal(true);
+              updateActiveTripState(null);
+              setDriverCoords(null);
+              setIsProcessingPayment(false);
+              setPaymentError(null);
+              return;
+            }
+          } catch {
+            // Ignore non-blocking status error
+          }
         }
         return;
       }
@@ -231,15 +259,20 @@ export default function RiderPage() {
       if (type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (!trip) return;
-        const currentActive = activeTripRef.current;
+        const currentActive = activeTripRef.current || activeTrip;
 
         if (trip.status === 'completed') {
           markTripCompleted(trip.id);
-          if (!currentActive || currentActive.id === trip.id) {
-            setRatingTrip(trip);
+          if (!currentActive || currentActive.id === trip.id || isTripCompleted(currentActive.id)) {
+            const completedSnapshot: MockTrip = currentActive
+              ? { ...currentActive, ...trip, status: 'completed' }
+              : trip;
+            setRatingTrip(completedSnapshot);
             setShowRatingModal(true);
             updateActiveTripState(null);
             setDriverCoords(null);
+            setIsProcessingPayment(false);
+            setPaymentError(null);
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
               new Notification('Trip Completed! 🎉', {
                 body: `Your trip has ended. Thank you for riding with SOLO!`,

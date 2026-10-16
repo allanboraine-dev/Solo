@@ -265,6 +265,10 @@ export const markTripCompleted = (tripId: string): void => {
       current.push(tripId);
       localStorage.setItem('solo_completed_trips', JSON.stringify(current.slice(-300)));
     }
+    localStorage.setItem(
+      'solo_last_completed_trip',
+      JSON.stringify({ tripId, status: 'completed', timestamp: Date.now() })
+    );
   } catch (e) {
     console.error('Error recording completed trip locally:', e);
   }
@@ -694,6 +698,49 @@ export const startTripWithPin = async (tripId: string, pin: string): Promise<{ s
 };
 
 /**
+ * Deduplicates in-flight and stored chat messages by ID and fuzzy sender/content within a time window
+ */
+export const deduplicateMessages = (messages: MockMessage[]): MockMessage[] => {
+  const result: MockMessage[] = [];
+  const seenIds = new Set<string>();
+
+  for (const m of messages) {
+    if (!m || !m.text) continue;
+    if (m.id && seenIds.has(m.id)) continue;
+
+    // Fuzzy duplicate check: same trip, same sender, same trimmed text within a 6-second window
+    const isDup = result.some(existing => 
+      existing.sender === m.sender &&
+      existing.text.trim() === m.text.trim() &&
+      Math.abs(existing.timestamp - m.timestamp) < 6000
+    );
+
+    if (isDup) {
+      // If incoming message has a standard UUID while existing has a random short ID, update ID to UUID
+      if (m.id && m.id.length > 20) {
+        const existingIdx = result.findIndex(existing =>
+          existing.sender === m.sender &&
+          existing.text.trim() === m.text.trim() &&
+          Math.abs(existing.timestamp - m.timestamp) < 6000
+        );
+        if (existingIdx >= 0) {
+          result[existingIdx].id = m.id;
+          seenIds.add(m.id);
+        }
+      }
+      continue;
+    }
+
+    if (m.id) {
+      seenIds.add(m.id);
+    }
+    result.push(m);
+  }
+
+  return result.sort((a, b) => a.timestamp - b.timestamp);
+};
+
+/**
  * Atomic trip completion using Postgres RPC + direct DB update + permanent local completion record
  */
 export const completeTripAtomic = async (
@@ -718,12 +765,29 @@ export const completeTripAtomic = async (
         syncTripToLocalStorage(updatedTrip);
         broadcastEvent('trip_updated', updatedTrip);
       }
+      if (targetStatus === 'completed') {
+        localStorage.setItem(
+          'solo_last_completed_trip',
+          JSON.stringify({ tripId, status: 'completed', timestamp: Date.now() })
+        );
+      }
     } catch (e) {
       console.error('Error updating local trip during completeTripAtomic:', e);
     }
   }
 
-  // 2. Persist status transition to Supabase via RPC and direct update
+  // 2. Call server endpoint to bypass RLS and guarantee DB persistence in Supabase
+  try {
+    fetch('/api/trips/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId, paymentMethod }),
+    }).catch(err => console.warn('Background /api/trips/complete fetch non-blocking warning:', err));
+  } catch {
+    // Non-blocking fetch
+  }
+
+  // 3. Persist status transition to Supabase via RPC and direct update
   try {
     let { data, error } = await supabase.rpc('complete_trip', {
       p_trip_id: tripId,
@@ -775,7 +839,13 @@ export const completeTripAtomic = async (
 export const getMessages = (tripId: string): MockMessage[] => {
   if (typeof window === 'undefined') return [];
   const data = localStorage.getItem('mock_messages_' + tripId);
-  return data ? JSON.parse(data) : [];
+  if (!data) return [];
+  try {
+    const parsed: MockMessage[] = JSON.parse(data);
+    return deduplicateMessages(parsed);
+  } catch {
+    return [];
+  }
 };
 
 export const fetchTripMessages = async (tripId: string): Promise<MockMessage[]> => {
@@ -795,8 +865,10 @@ export const fetchTripMessages = async (tripId: string): Promise<MockMessage[]> 
         text: m.content,
         timestamp: new Date(m.created_at).getTime(),
       }));
-      localStorage.setItem('mock_messages_' + tripId, JSON.stringify(formatted));
-      return formatted;
+      const existing = getMessages(tripId);
+      const merged = deduplicateMessages([...existing, ...formatted]);
+      localStorage.setItem('mock_messages_' + tripId, JSON.stringify(merged));
+      return merged;
     }
   } catch (e) {
     console.error('Error fetching messages from Supabase:', e);
@@ -805,9 +877,8 @@ export const fetchTripMessages = async (tripId: string): Promise<MockMessage[]> 
 };
 
 export const saveMessage = async (msg: MockMessage) => {
-  // Save locally first
-  const msgs = getMessages(msg.trip_id);
-  msgs.push(msg);
+  // Save locally first with deduplication
+  const msgs = deduplicateMessages([...getMessages(msg.trip_id), msg]);
   localStorage.setItem('mock_messages_' + msg.trip_id, JSON.stringify(msgs));
   broadcastEvent('new_message', msg);
 
@@ -815,14 +886,21 @@ export const saveMessage = async (msg: MockMessage) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const currentUserId = session?.user?.id || (msg.sender === 'driver' ? localStorage.getItem('driver_id') : null);
-    if (currentUserId) {
-      await supabase.from('trip_messages').insert({
-        trip_id: msg.trip_id,
-        sender_id: currentUserId,
-        sender_role: msg.sender,
-        content: msg.text,
-      });
+    const validUserId = currentUserId && UUID_REGEX.test(currentUserId) ? currentUserId : null;
+
+    const payload: Record<string, any> = {
+      trip_id: msg.trip_id,
+      sender_role: msg.sender,
+      content: msg.text,
+    };
+    if (msg.id && UUID_REGEX.test(msg.id)) {
+      payload.id = msg.id;
     }
+    if (validUserId) {
+      payload.sender_id = validUserId;
+    }
+
+    await supabase.from('trip_messages').insert(payload);
   } catch (e) {
     console.error('Error persisting message to Supabase:', e);
   }
@@ -1308,6 +1386,35 @@ const initGlobalChannels = () => {
         // Ignore parse error
       }
     }
+    if (event.key === 'solo_last_completed_trip' && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        if (parsed?.tripId) {
+          markTripCompleted(parsed.tripId);
+          const localData = localStorage.getItem('mock_trips');
+          const trips: MockTrip[] = localData ? JSON.parse(localData) : [];
+          const target = trips.find(t => t.id === parsed.tripId);
+          const completedTrip: MockTrip = target
+            ? { ...target, status: 'completed' }
+            : {
+                id: parsed.tripId,
+                rider_id: '00000000-0000-0000-0000-000000000000',
+                status: 'completed',
+                fare_amount: 0,
+                pickup_location: 'Trip',
+                dropoff_location: 'Destination',
+                pickup_lat: 0,
+                pickup_lng: 0,
+                dropoff_lat: 0,
+                dropoff_lng: 0,
+              };
+          const synced = syncTripToLocalStorage(completedTrip);
+          listeners.forEach(cb => cb('trip_updated', synced));
+        }
+      } catch {
+        // Ignore parse error
+      }
+    }
   });
 
   // Realtime channel for trips
@@ -1352,6 +1459,9 @@ const initGlobalChannels = () => {
         text: m.content,
         timestamp: new Date(m.created_at).getTime(),
       };
+      const existing = getMessages(msg.trip_id);
+      const merged = deduplicateMessages([...existing, msg]);
+      localStorage.setItem('mock_messages_' + msg.trip_id, JSON.stringify(merged));
       listeners.forEach(cb => cb('new_message', msg));
     })
     .subscribe();
@@ -1367,7 +1477,36 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'trip_updated' }, (payload: any) => {
       if (payload.payload) {
-        const synced = syncTripToLocalStorage(payload.payload as MockTrip);
+        const updated = payload.payload as MockTrip;
+        if (updated.status === 'completed') {
+          markTripCompleted(updated.id);
+        }
+        const synced = syncTripToLocalStorage(updated);
+        listeners.forEach(cb => cb('trip_updated', synced));
+      }
+    })
+    .on('broadcast', { event: 'trip_completed' }, (payload: any) => {
+      const tripId = payload?.payload?.id || payload?.payload?.tripId;
+      if (tripId) {
+        markTripCompleted(tripId);
+        const localData = localStorage.getItem('mock_trips');
+        const trips: MockTrip[] = localData ? JSON.parse(localData) : [];
+        const target = trips.find(t => t.id === tripId);
+        const completedTrip: MockTrip = target
+          ? { ...target, status: 'completed' }
+          : {
+              id: tripId,
+              rider_id: '00000000-0000-0000-0000-000000000000',
+              status: 'completed',
+              fare_amount: 0,
+              pickup_location: 'Trip',
+              dropoff_location: 'Destination',
+              pickup_lat: 0,
+              pickup_lng: 0,
+              dropoff_lat: 0,
+              dropoff_lng: 0,
+            };
+        const synced = syncTripToLocalStorage(completedTrip);
         listeners.forEach(cb => cb('trip_updated', synced));
       }
     })

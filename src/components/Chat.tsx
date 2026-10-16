@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { getMessages, fetchTripMessages, saveMessage, subscribeToEvents, type MockMessage } from '@/lib/mockBackend';
+import { getMessages, fetchTripMessages, saveMessage, subscribeToEvents, deduplicateMessages, type MockMessage } from '@/lib/mockBackend';
 
 interface ChatProps {
   tripId: string;
@@ -15,21 +15,21 @@ export default function Chat({ tripId, role }: ChatProps) {
 
   useEffect(() => {
     // Load initial messages from local cache first
-    setMessages(getMessages(tripId));
+    setMessages(deduplicateMessages(getMessages(tripId)));
 
     // Fetch from Postgres database
     fetchTripMessages(tripId).then(dbMessages => {
       if (dbMessages && dbMessages.length > 0) {
-        setMessages(dbMessages);
+        setMessages(prev => deduplicateMessages([...prev, ...dbMessages]));
       }
     });
 
-    // Subscribe to new messages
+    // Subscribe to new messages with strict deduplication
     const unsubscribe = subscribeToEvents((type, payload) => {
       if (type === 'new_message') {
         const msg = payload as MockMessage;
         if (msg.trip_id === tripId) {
-          setMessages(prev => [...prev, msg]);
+          setMessages(prev => deduplicateMessages([...prev, msg]));
         }
       }
     });
@@ -44,8 +44,12 @@ export default function Chat({ tripId, role }: ChatProps) {
   const handleSend = () => {
     if (!input.trim()) return;
 
+    const msgId = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? crypto.randomUUID() 
+      : `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     const msg: MockMessage = {
-      id: Math.random().toString(36).substring(7),
+      id: msgId,
       trip_id: tripId,
       sender: role,
       text: input.trim(),
