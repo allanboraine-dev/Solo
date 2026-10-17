@@ -198,6 +198,9 @@ export default function DriverPage() {
             setIsTrialExpired(true);
             setShowSubModal(true);
           }
+          setIsDriverVerified(!!prof.isVerified);
+        } else {
+          setIsDriverVerified(!!prof.isVerified);
         }
         setProfile(prof)
       }

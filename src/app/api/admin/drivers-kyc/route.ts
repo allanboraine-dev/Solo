@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { isPlatformOwner } from '@/utils/owner';
+import { getAllKycDriverProfiles, getAllKycDocuments } from '@/utils/kycStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,19 +38,26 @@ export async function GET(req: NextRequest) {
     const filterStatus = searchParams.get('status') || 'all';
     const searchQuery = searchParams.get('search')?.toLowerCase().trim() || '';
 
-    // Fetch driver profiles
-    const { data: drivers, error: driverErr } = await supabase
-      .from('driver_profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 1. Fetch driver profiles from Supabase
+    let dbDrivers: any[] = [];
+    try {
+      const { data: drivers, error: driverErr } = await supabase
+        .from('driver_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (driverErr) {
-      console.warn('[AdminKycAPI] Error fetching drivers:', driverErr.message);
+      if (driverErr) {
+        console.warn('[AdminKycAPI] Error fetching drivers:', driverErr.message);
+      } else if (drivers) {
+        dbDrivers = drivers;
+      }
+    } catch (e) {
+      console.warn('[AdminKycAPI] DB drivers notice:', e);
     }
 
-    let driverList = drivers || [];
+    let driverList = [...dbDrivers];
 
-    // Also fetch drivers from profiles table who may not yet have a driver_profiles row
+    // 2. Also fetch drivers from profiles table who may not yet have a driver_profiles row
     try {
       const { data: profileDrivers } = await supabase
         .from('profiles')
@@ -81,32 +89,98 @@ export async function GET(req: NextRequest) {
       console.warn('[AdminKycAPI] Notice merging profile drivers:', e);
     }
 
-    // Fetch all driver documents
-    const { data: allDocs, error: docErr } = await supabase
-      .from('driver_documents')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (docErr) {
-      console.warn('[AdminKycAPI] Error fetching driver documents:', docErr.message);
+    // 3. Merge in-memory registered drivers from kycStore
+    const memoryDrivers = getAllKycDriverProfiles();
+    const existingIds = new Set(driverList.map((d: any) => d.id));
+    for (const m of memoryDrivers) {
+      if (!existingIds.has(m.id)) {
+        driverList.push({
+          id: m.id,
+          full_name: m.fullName,
+          email: m.email,
+          phone: m.phone,
+          vehicle_make: m.vehicleMake,
+          vehicle_model: m.vehicleModel,
+          license_plate: m.licensePlate,
+          prdp_number: m.prdpNumber,
+          is_verified: m.isVerified,
+          subscription_plan: m.subscriptionPlan,
+          trial_started_at: m.trialStartedAt,
+          created_at: m.createdAt,
+        });
+        existingIds.add(m.id);
+      } else {
+        // If already exists in DB but memory has newer verification status or metadata, merge
+        const idx = driverList.findIndex((d: any) => d.id === m.id);
+        if (idx !== -1) {
+          driverList[idx] = {
+            ...driverList[idx],
+            is_verified: driverList[idx].is_verified || m.isVerified,
+            full_name: driverList[idx].full_name || m.fullName,
+            phone: driverList[idx].phone || m.phone,
+            vehicle_make: driverList[idx].vehicle_make || m.vehicleMake,
+            vehicle_model: driverList[idx].vehicle_model || m.vehicleModel,
+            license_plate: driverList[idx].license_plate || m.licensePlate,
+          };
+        }
+      }
     }
 
+    // 4. Fetch all driver documents from Supabase
+    let dbDocs: DriverDocument[] = [];
+    try {
+      const { data: allDocs, error: docErr } = await supabase
+        .from('driver_documents')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (docErr) {
+        console.warn('[AdminKycAPI] Error fetching driver documents:', docErr.message);
+      } else if (allDocs) {
+        dbDocs = allDocs;
+      }
+    } catch (e) {
+      console.warn('[AdminKycAPI] DB docs notice:', e);
+    }
+
+    // 5. Merge in-memory documents from kycStore
+    const memoryDocs = getAllKycDocuments();
     const docsByDriver: Record<string, DriverDocument[]> = {};
-    for (const doc of allDocs || []) {
+
+    // Group memory docs first
+    for (const doc of memoryDocs) {
       if (!docsByDriver[doc.driver_id]) {
         docsByDriver[doc.driver_id] = [];
       }
       docsByDriver[doc.driver_id].push(doc);
     }
 
-    // Assemble compliance summaries
+    // Merge DB docs (preferring newer status while preserving signedUrl / previews)
+    for (const doc of dbDocs) {
+      if (!docsByDriver[doc.driver_id]) {
+        docsByDriver[doc.driver_id] = [];
+      }
+      const existingIdx = docsByDriver[doc.driver_id].findIndex((d) => d.doc_type === doc.doc_type);
+      if (existingIdx !== -1) {
+        const existing = docsByDriver[doc.driver_id][existingIdx];
+        docsByDriver[doc.driver_id][existingIdx] = {
+          ...doc,
+          signedUrl: existing.signedUrl || undefined,
+        };
+      } else {
+        docsByDriver[doc.driver_id].push(doc);
+      }
+    }
+
+    // 6. Assemble compliance summaries
     const summaries: DriverKycSummary[] = await Promise.all(
       driverList.map(async (driver) => {
         const rawDocs = docsByDriver[driver.id] || [];
 
-        // Generate signed URLs for private bucket documents
+        // Generate signed URLs for private bucket documents if not already provided
         const docsWithUrls: DriverDocument[] = await Promise.all(
           rawDocs.map(async (doc) => {
+            if (doc.signedUrl) return doc;
             try {
               const { data: signed } = await supabase.storage
                 .from('driver-documents')

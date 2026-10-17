@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { sendWebPushNotification, PushPayload } from '@/utils/webPush';
+import { approveAllKycDocuments, updateKycDocumentStatus } from '@/utils/kycStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
     // ----------------------------------------------------
     if (status === 'approve_all' || docType === 'all') {
       const mandatoryDocTypes: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
+      approveAllKycDocuments(driverId, reviewedByUuid);
       
       try {
         await supabase
@@ -194,6 +196,19 @@ export async function POST(req: NextRequest) {
       };
     }
 
+    // Update in-memory kycStore
+    const { document: memDoc, isAllApproved: memAllApproved } = updateKycDocumentStatus(
+      driverId,
+      docType as KycDocType,
+      status as KycDocStatus,
+      rejectionReason,
+      reviewedByUuid
+    );
+
+    if (!updatedDoc) {
+      updatedDoc = memDoc;
+    }
+
     // ----------------------------------------------------
     // Recalculate Compliance & Update Profile
     // ----------------------------------------------------
@@ -215,7 +230,7 @@ export async function POST(req: NextRequest) {
     const hasPrdp = mergedDocs.some((d) => d.doc_type === 'prdp' && d.status === 'approved');
     const hasRoadworthy = mergedDocs.some((d) => d.doc_type === 'roadworthy' && d.status === 'approved');
 
-    const allMandatoryApproved = hasLicenseFront && hasLicenseBack && hasPrdp && hasRoadworthy;
+    const allMandatoryApproved = memAllApproved || (hasLicenseFront && hasLicenseBack && hasPrdp && hasRoadworthy);
 
     // Update driver_profiles compliance flags
     const profileUpdates = {

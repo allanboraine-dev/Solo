@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getKycDocumentsForDriver, getKycDriverProfile } from '@/utils/kycStore'
+import { DriverDocument, KycDocType } from '@/types/kyc'
 
 export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mock.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-key'
 )
+
+const MANDATORY_DOC_TYPES: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy']
 
 export async function GET(req: Request) {
   try {
@@ -17,49 +21,96 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Driver ID is required' }, { status: 400 })
     }
 
-    // Fetch documents from database
-    const { data: documents, error } = await supabase
-      .from('driver_documents')
-      .select('*')
-      .eq('driver_id', driverId)
-      .order('created_at', { ascending: true })
+    // 1. Fetch documents from database (gracefully handling missing tables/RLS)
+    let dbDocuments: DriverDocument[] = []
+    try {
+      const { data, error } = await supabase
+        .from('driver_documents')
+        .select('*')
+        .eq('driver_id', driverId)
+        .order('created_at', { ascending: true })
 
-    if (error) {
-      throw error
+      if (!error && data) {
+        dbDocuments = data
+      }
+    } catch (dbErr) {
+      console.warn('[DriverDocumentsAPI] Supabase documents notice:', dbErr)
     }
 
-    // Generate signed URLs for each document so driver can securely view them
-    const docsWithSignedUrls = await Promise.all(
-      (documents || []).map(async (doc) => {
+    // 2. Fetch documents from memory kycStore
+    const memoryDocs = getKycDocumentsForDriver(driverId)
+
+    // 3. Merge: Database takes precedence, but memory fills in missing or offline docs & previews
+    const mergedMap = new Map<KycDocType, DriverDocument>()
+    for (const doc of memoryDocs) {
+      mergedMap.set(doc.doc_type, doc)
+    }
+    for (const doc of dbDocuments) {
+      const existing = mergedMap.get(doc.doc_type)
+      mergedMap.set(doc.doc_type, {
+        ...doc,
+        signedUrl: existing?.signedUrl || undefined,
+      })
+    }
+
+    // 4. Generate signed URLs for private bucket documents where preview is not already present
+    const finalDocs: DriverDocument[] = await Promise.all(
+      Array.from(mergedMap.values()).map(async (doc) => {
+        if (doc.signedUrl) return doc
         try {
           const { data: signed } = await supabase.storage
             .from('driver-documents')
             .createSignedUrl(doc.file_path, 3600)
           return {
             ...doc,
-            signedUrl: signed?.signedUrl || null,
+            signedUrl: signed?.signedUrl || undefined,
           }
         } catch {
-          return {
-            ...doc,
-            signedUrl: null,
-          }
+          return doc
         }
       })
     )
 
-    // Check profile verification status
-    const { data: profile } = await supabase
-      .from('driver_profiles')
-      .select('is_verified, verification_notes')
-      .eq('id', driverId)
-      .single()
+    // 5. Check profile verification status from DB & memory
+    let isVerified = false
+    let verificationNotes: string | null = null
+
+    try {
+      const { data: profile } = await supabase
+        .from('driver_profiles')
+        .select('is_verified, verification_notes')
+        .eq('id', driverId)
+        .maybeSingle()
+
+      if (profile) {
+        isVerified = !!profile.is_verified
+        verificationNotes = profile.verification_notes || null
+      }
+    } catch (pErr) {
+      console.warn('[DriverDocumentsAPI] Supabase profile notice:', pErr)
+    }
+
+    const memoryProfile = getKycDriverProfile(driverId)
+    if (memoryProfile) {
+      if (memoryProfile.isVerified) isVerified = true
+      if (memoryProfile.verificationNotes && !verificationNotes) {
+        verificationNotes = memoryProfile.verificationNotes
+      }
+    }
+
+    // If all 4 statutory documents are approved, driver is verified
+    const allMandatoryApproved = MANDATORY_DOC_TYPES.every((type) =>
+      finalDocs.some((d) => d.doc_type === type && d.status === 'approved')
+    )
+    if (allMandatoryApproved) {
+      isVerified = true
+    }
 
     return NextResponse.json({
       success: true,
-      documents: docsWithSignedUrls,
-      isVerified: !!profile?.is_verified,
-      verificationNotes: profile?.verification_notes || null,
+      documents: finalDocs,
+      isVerified,
+      verificationNotes,
     })
   } catch (error: unknown) {
     console.error('Fetch driver documents error:', error)

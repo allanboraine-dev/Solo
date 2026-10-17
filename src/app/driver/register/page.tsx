@@ -122,7 +122,27 @@ export default function DriverRegistration() {
       // Store driver_id locally to guarantee immediate portal access
       localStorage.setItem('driver_id', driverId)
 
-      // 3. Upload KYC Documents to Supabase Storage
+      // Store in all_registered_drivers collection for multi-driver local testing
+      try {
+        const existingDrivers = JSON.parse(localStorage.getItem('all_registered_drivers') || '[]')
+        const filteredDrivers = existingDrivers.filter((d: any) => d.id !== driverId)
+        filteredDrivers.push({
+          id: driverId,
+          fullName,
+          email,
+          phone,
+          vehicleMake,
+          vehicleModel,
+          licensePlate,
+          prdpNumber,
+          isVerified: isOwner,
+          subscriptionPlan: isOwner ? 'owner' : 'trial',
+          createdAt: new Date().toISOString(),
+        })
+        localStorage.setItem('all_registered_drivers', JSON.stringify(filteredDrivers))
+      } catch {}
+
+      // 3. Upload KYC Documents to Server & Storage
       const documentsToUpload: { file: File | null; type: KycDocType; label: string }[] = [
         { file: licenseFrontFile, type: 'license_front', label: "Driver's License (Front)" },
         { file: licenseBackFile, type: 'license_back', label: "Driver's License (Back)" },
@@ -135,7 +155,15 @@ export default function DriverRegistration() {
         if (item.file) {
           setUploadProgressText(`Uploading ${item.label}...`)
           try {
-            const uploadRes = await uploadDriverKycDocument(driverId, item.type, item.file)
+            const uploadRes = await uploadDriverKycDocument(driverId, item.type, item.file, {
+              fullName,
+              email,
+              phone,
+              vehicleMake,
+              vehicleModel,
+              licensePlate,
+              prdpNumber,
+            })
             if (!uploadRes.success) {
               console.warn(`Warning: Could not upload ${item.label}:`, uploadRes.error)
             }

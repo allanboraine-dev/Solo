@@ -2,6 +2,16 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { KYC_DOCUMENT_CONFIGS } from '../src/types/kyc.ts';
 import type { KycDocType, KycDocStatus } from '../src/types/kyc.ts';
+import {
+  saveKycDriverProfile,
+  getKycDriverProfile,
+  getAllKycDriverProfiles,
+  saveKycDocument,
+  getKycDocumentsForDriver,
+  updateKycDocumentStatus,
+  approveAllKycDocuments,
+  resetKycStore,
+} from '../src/utils/kycStore.ts';
 
 // Helper simulating compliance determination logic
 function calculateComplianceStatus(docs: { doc_type: KycDocType; status: KycDocStatus }[]): {
@@ -173,5 +183,171 @@ describe('Admin Driver Compliance & KYC Verification Suite', () => {
     const batchResult = calculateComplianceStatus(approvedDocs);
     assert.strictEqual(batchResult.status, 'verified');
     assert.strictEqual(batchResult.isVerified, true);
+  });
+
+  describe('End-to-End Multi-Driver Registration, Document Upload & Admin Approval', () => {
+    it('allows new driver 1 (Sipho) to register, upload docs, and admin to manually approve individually', () => {
+      resetKycStore();
+      const driverId = '11111111-2222-3333-4444-555555555555';
+
+      // 1. Driver 1 registers with personal and vehicle info
+      const profile = saveKycDriverProfile({
+        id: driverId,
+        fullName: 'Sipho Mthembu',
+        email: 'sipho@example.co.za',
+        phone: '+27 82 555 1234',
+        vehicleMake: 'Toyota',
+        vehicleModel: 'Corolla Quest',
+        licensePlate: 'GP 789-456',
+        prdpNumber: 'PRDP-GP-2026',
+        isVerified: false,
+      });
+
+      assert.strictEqual(profile.fullName, 'Sipho Mthembu');
+      assert.strictEqual(profile.isVerified, false);
+
+      // 2. Driver 1 uploads statutory KYC documents
+      saveKycDocument({
+        id: 'doc-sipho-lic-f',
+        driver_id: driverId,
+        doc_type: 'license_front',
+        file_path: `${driverId}/license_front.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-sipho-lic-b',
+        driver_id: driverId,
+        doc_type: 'license_back',
+        file_path: `${driverId}/license_back.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-sipho-prdp',
+        driver_id: driverId,
+        doc_type: 'prdp',
+        file_path: `${driverId}/prdp.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-sipho-rw',
+        driver_id: driverId,
+        doc_type: 'roadworthy',
+        file_path: `${driverId}/roadworthy.jpg`,
+        status: 'pending',
+      });
+
+      // Verify documents are saved and listed for driver
+      const initialDocs = getKycDocumentsForDriver(driverId);
+      assert.strictEqual(initialDocs.length, 4);
+      assert.strictEqual(initialDocs.every((d) => d.status === 'pending'), true);
+
+      // 3. Admin rejects roadworthy certificate due to expiry
+      const rejectResult = updateKycDocumentStatus(
+        driverId,
+        'roadworthy',
+        'rejected',
+        'Certificate expired on 2026-08-01. Please upload valid certificate.',
+        '00000000-0000-4000-8000-000000000001'
+      );
+      assert.strictEqual(rejectResult.document.status, 'rejected');
+      assert.strictEqual(rejectResult.document.rejection_reason?.includes('expired'), true);
+      assert.strictEqual(rejectResult.isAllApproved, false);
+
+      // Driver remains unverified
+      let currentProfile = getKycDriverProfile(driverId);
+      assert.strictEqual(currentProfile?.isVerified, false);
+
+      // 4. Driver uploads renewed roadworthy certificate
+      saveKycDocument({
+        id: 'doc-sipho-rw-renewed',
+        driver_id: driverId,
+        doc_type: 'roadworthy',
+        file_path: `${driverId}/roadworthy_renewed.jpg`,
+        status: 'pending',
+      });
+
+      // 5. Admin approves license_front, license_back, prdp, and renewed roadworthy
+      updateKycDocumentStatus(driverId, 'license_front', 'approved');
+      updateKycDocumentStatus(driverId, 'license_back', 'approved');
+      updateKycDocumentStatus(driverId, 'prdp', 'approved');
+      const finalApproval = updateKycDocumentStatus(driverId, 'roadworthy', 'approved');
+
+      assert.strictEqual(finalApproval.isAllApproved, true);
+
+      // Driver profile must now be fully verified
+      currentProfile = getKycDriverProfile(driverId);
+      assert.strictEqual(currentProfile?.isVerified, true);
+    });
+
+    it('allows new driver 2 (Thabo) to register, upload docs, and admin to batch approve all', () => {
+      const driverId = '22222222-3333-4444-5555-666666666666';
+
+      // 1. Driver 2 registers
+      saveKycDriverProfile({
+        id: driverId,
+        fullName: 'Thabo Molefe',
+        email: 'thabo@example.co.za',
+        phone: '+27 83 444 9876',
+        vehicleMake: 'Volkswagen',
+        vehicleModel: 'Polo Sedan',
+        licensePlate: 'CA 654-321',
+        prdpNumber: 'PRDP-WC-9988',
+        isVerified: false,
+      });
+
+      // 2. Driver 2 uploads documents
+      saveKycDocument({
+        id: 'doc-thabo-lic-f',
+        driver_id: driverId,
+        doc_type: 'license_front',
+        file_path: `${driverId}/license_front.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-thabo-lic-b',
+        driver_id: driverId,
+        doc_type: 'license_back',
+        file_path: `${driverId}/license_back.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-thabo-prdp',
+        driver_id: driverId,
+        doc_type: 'prdp',
+        file_path: `${driverId}/prdp.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-thabo-rw',
+        driver_id: driverId,
+        doc_type: 'roadworthy',
+        file_path: `${driverId}/roadworthy.jpg`,
+        status: 'pending',
+      });
+      saveKycDocument({
+        id: 'doc-thabo-vp',
+        driver_id: driverId,
+        doc_type: 'vehicle_photo',
+        file_path: `${driverId}/vehicle_photo.jpg`,
+        status: 'pending',
+      });
+
+      // 3. Admin performs batch "Approve All & Verify"
+      const batchResult = approveAllKycDocuments(driverId, '00000000-0000-4000-8000-000000000001');
+      assert.strictEqual(batchResult.isVerified, true);
+      assert.strictEqual(batchResult.documents.length, 5);
+      assert.strictEqual(batchResult.documents.every((d) => d.status === 'approved'), true);
+
+      // Verify profile state
+      const profile = getKycDriverProfile(driverId);
+      assert.strictEqual(profile?.isVerified, true);
+    });
+
+    it('lists all registered drivers in compliance dashboard store without dropping drivers', () => {
+      const allDrivers = getAllKycDriverProfiles();
+      assert.strictEqual(allDrivers.length >= 2, true);
+      assert.strictEqual(allDrivers.some((d) => d.fullName === 'Sipho Mthembu'), true);
+      assert.strictEqual(allDrivers.some((d) => d.fullName === 'Thabo Molefe'), true);
+    });
   });
 });

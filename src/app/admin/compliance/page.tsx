@@ -77,9 +77,24 @@ export default function AdminComplianceDashboard() {
       // Check localStorage for local driver registrations so local test drivers appear
       if (typeof window !== "undefined") {
         try {
+          const profilesToSync: any[] = [];
           const localProfileStr = localStorage.getItem("mock_driver_profile");
           if (localProfileStr) {
-            const localProf = JSON.parse(localProfileStr);
+            profilesToSync.push(JSON.parse(localProfileStr));
+          }
+          const allRegStr = localStorage.getItem("all_registered_drivers");
+          if (allRegStr) {
+            const allReg = JSON.parse(allRegStr);
+            if (Array.isArray(allReg)) {
+              for (const p of allReg) {
+                if (!profilesToSync.some((x) => x.id === p.id)) {
+                  profilesToSync.push(p);
+                }
+              }
+            }
+          }
+
+          for (const localProf of profilesToSync) {
             const exists = serverDrivers.some(
               (d) => d.id === localProf.id || (localProf.phone && d.phone === localProf.phone)
             );
