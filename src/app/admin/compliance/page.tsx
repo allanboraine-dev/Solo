@@ -101,46 +101,7 @@ export default function AdminComplianceDashboard() {
             );
             if (!exists && localProf.fullName && localProf.id) {
               const localDocStore = localStorage.getItem(`driver_kyc_documents_${localProf.id}`);
-              const localDocs: DriverDocument[] = localDocStore
-                ? JSON.parse(localDocStore)
-                : [
-                    {
-                      id: `doc-lic-front-${localProf.id}`,
-                      driver_id: localProf.id,
-                      doc_type: "license_front",
-                      file_path: `${localProf.id}/license_front.jpg`,
-                      status: localProf.isVerified ? "approved" : "pending",
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    },
-                    {
-                      id: `doc-lic-back-${localProf.id}`,
-                      driver_id: localProf.id,
-                      doc_type: "license_back",
-                      file_path: `${localProf.id}/license_back.jpg`,
-                      status: localProf.isVerified ? "approved" : "pending",
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    },
-                    {
-                      id: `doc-prdp-${localProf.id}`,
-                      driver_id: localProf.id,
-                      doc_type: "prdp",
-                      file_path: `${localProf.id}/prdp.jpg`,
-                      status: localProf.isVerified ? "approved" : "pending",
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    },
-                    {
-                      id: `doc-roadworthy-${localProf.id}`,
-                      driver_id: localProf.id,
-                      doc_type: "roadworthy",
-                      file_path: `${localProf.id}/roadworthy.jpg`,
-                      status: localProf.isVerified ? "approved" : "pending",
-                      created_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    },
-                  ];
+              const localDocs: DriverDocument[] = localDocStore ? JSON.parse(localDocStore) : [];
 
               const pendingCount = localDocs.filter((d) => d.status === "pending").length;
               const approvedCount = localDocs.filter((d) => d.status === "approved").length;

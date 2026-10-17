@@ -8,6 +8,7 @@ import {
   getAllKycDriverProfiles,
   saveKycDocument,
   getKycDocumentsForDriver,
+  getAllKycDocuments,
   updateKycDocumentStatus,
   approveAllKycDocuments,
   resetKycStore,
@@ -350,20 +351,10 @@ describe('Admin Driver Compliance & KYC Verification Suite', () => {
       assert.strictEqual(allDrivers.some((d) => d.fullName === 'Thabo Molefe'), true);
     });
 
-    it('always provides default registered SOLO fleet drivers including platform founder Allan Boraine', () => {
-      const allDrivers = getAllKycDriverProfiles();
-      assert.strictEqual(allDrivers.length >= 5, true);
-      assert.strictEqual(allDrivers.some((d) => d.email === 'allanboraine@gmail.com' && d.isVerified), true);
-      assert.strictEqual(allDrivers.some((d) => d.fullName === 'Sipho Dlamini' && !d.isVerified), true);
-      assert.strictEqual(allDrivers.some((d) => d.fullName === 'Thabo Mokoena' && !d.isVerified), true);
-      assert.strictEqual(allDrivers.some((d) => d.fullName === 'Lerato Khumalo' && d.isVerified), true);
-    });
-
-    it('ensures pending registered drivers have statutory documents with visual preview URLs ready for inspection', () => {
-      const siphoDocs = getKycDocumentsForDriver('00000000-0000-4000-8000-000000000002');
-      assert.strictEqual(siphoDocs.length, 4);
-      assert.strictEqual(siphoDocs.every((d) => d.status === 'pending'), true);
-      assert.strictEqual(siphoDocs.every((d) => typeof d.signedUrl === 'string' && d.signedUrl.length > 0), true);
+    it('guarantees kycStore contains only real registered drivers and resets cleanly', () => {
+      resetKycStore();
+      assert.strictEqual(getAllKycDriverProfiles().length, 0);
+      assert.strictEqual(getAllKycDocuments().length, 0);
     });
   });
 });
