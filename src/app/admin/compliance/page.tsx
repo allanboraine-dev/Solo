@@ -24,6 +24,7 @@ import {
   CreditCard,
   UserCheck,
   Crown,
+  Users,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
@@ -434,6 +435,14 @@ export default function AdminComplianceDashboard() {
           </div>
 
           <div className="flex items-center gap-2 self-start md:self-center">
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-bold text-xs transition active:scale-95"
+            >
+              <Users size={14} />
+              <span>Manager Overview</span>
+            </Link>
+
             <Link
               href="/admin/simulator"
               className="flex items-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition shadow-md shadow-blue-600/20 active:scale-95"
