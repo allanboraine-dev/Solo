@@ -47,7 +47,39 @@ export async function GET(req: NextRequest) {
       console.warn('[AdminKycAPI] Error fetching drivers:', driverErr.message);
     }
 
-    const driverList = drivers || [];
+    let driverList = drivers || [];
+
+    // Also fetch drivers from profiles table who may not yet have a driver_profiles row
+    try {
+      const { data: profileDrivers } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_type', 'driver');
+
+      if (profileDrivers && profileDrivers.length > 0) {
+        const existingIds = new Set(driverList.map((d: any) => d.id));
+        for (const p of profileDrivers) {
+          if (!existingIds.has(p.id)) {
+            driverList.push({
+              id: p.id,
+              full_name: p.full_name,
+              email: p.email || '',
+              phone: p.phone || '',
+              vehicle_make: '',
+              vehicle_model: '',
+              license_plate: '',
+              prdp_number: '',
+              is_verified: false,
+              subscription_plan: 'trial',
+              created_at: p.created_at || new Date().toISOString(),
+            });
+            existingIds.add(p.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AdminKycAPI] Notice merging profile drivers:', e);
+    }
 
     // Fetch all driver documents
     const { data: allDocs, error: docErr } = await supabase

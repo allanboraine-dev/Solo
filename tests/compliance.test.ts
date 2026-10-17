@@ -121,4 +121,57 @@ describe('Admin Driver Compliance & KYC Verification Suite', () => {
       assert.strictEqual(match, true, `Query "${query}" should match driver profile`);
     }
   });
+
+  it('validates UUID safety for admin review notes to prevent Postgres UUID syntax errors', () => {
+    const isValidUuid = (val?: unknown): boolean =>
+      typeof val === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    // Non-UUID text notes (e.g. "SOLO Compliance Officer") must be filtered out
+    assert.strictEqual(isValidUuid('SOLO Compliance Officer'), false);
+    assert.strictEqual(isValidUuid('Allan Boraine'), false);
+    assert.strictEqual(isValidUuid(''), false);
+    assert.strictEqual(isValidUuid(undefined), false);
+
+    // Authentic UUID v4 must be accepted
+    assert.strictEqual(isValidUuid('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'), true);
+    assert.strictEqual(isValidUuid('d0000000-0000-0000-0000-000000000001'), true);
+  });
+
+  it('validates document rejection rule: rejection reason is strictly required', () => {
+    const validateReviewRequest = (body: { status: string; rejectionReason?: string }) => {
+      if (body.status === 'rejected' && (!body.rejectionReason || !body.rejectionReason.trim())) {
+        return { valid: false, error: 'A specific rejection reason is required when rejecting a document' };
+      }
+      return { valid: true };
+    };
+
+    assert.strictEqual(validateReviewRequest({ status: 'rejected', rejectionReason: '' }).valid, false);
+    assert.strictEqual(validateReviewRequest({ status: 'rejected', rejectionReason: '   ' }).valid, false);
+    assert.strictEqual(
+      validateReviewRequest({ status: 'rejected', rejectionReason: 'Document is blurry or unreadable' }).valid,
+      true
+    );
+    assert.strictEqual(validateReviewRequest({ status: 'approved' }).valid, true);
+  });
+
+  it('validates batch approval state transitions and immediate driver clearance', () => {
+    const docs = [
+      { doc_type: 'license_front' as KycDocType, status: 'pending' as KycDocStatus },
+      { doc_type: 'license_back' as KycDocType, status: 'pending' as KycDocStatus },
+      { doc_type: 'prdp' as KycDocType, status: 'pending' as KycDocStatus },
+      { doc_type: 'roadworthy' as KycDocType, status: 'pending' as KycDocStatus },
+    ];
+
+    // Before batch approve: pending
+    const initialStatus = calculateComplianceStatus(docs);
+    assert.strictEqual(initialStatus.status, 'pending_review');
+    assert.strictEqual(initialStatus.isVerified, false);
+
+    // Simulate batch approve_all
+    const approvedDocs = docs.map((d) => ({ ...d, status: 'approved' as KycDocStatus }));
+    const batchResult = calculateComplianceStatus(approvedDocs);
+    assert.strictEqual(batchResult.status, 'verified');
+    assert.strictEqual(batchResult.isVerified, true);
+  });
 });

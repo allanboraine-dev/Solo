@@ -72,16 +72,115 @@ export default function AdminComplianceDashboard() {
         `/api/admin/drivers-kyc?status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`
       );
       const data = await res.json();
-      if (data.success) {
-        setDrivers(data.drivers || []);
-        if (data.metrics) setMetrics(data.metrics);
-        // Sync selected driver if open
-        if (selectedDriver) {
-          const updatedSelected = (data.drivers || []).find(
-            (d: DriverKycSummary) => d.id === selectedDriver.id
-          );
-          if (updatedSelected) setSelectedDriver(updatedSelected);
+      let serverDrivers: DriverKycSummary[] = data.drivers || [];
+
+      // Check localStorage for local driver registrations so local test drivers appear
+      if (typeof window !== "undefined") {
+        try {
+          const localProfileStr = localStorage.getItem("mock_driver_profile");
+          if (localProfileStr) {
+            const localProf = JSON.parse(localProfileStr);
+            const exists = serverDrivers.some(
+              (d) => d.id === localProf.id || (localProf.phone && d.phone === localProf.phone)
+            );
+            if (!exists && localProf.fullName && localProf.id) {
+              const localDocStore = localStorage.getItem(`driver_kyc_documents_${localProf.id}`);
+              const localDocs: DriverDocument[] = localDocStore
+                ? JSON.parse(localDocStore)
+                : [
+                    {
+                      id: `doc-lic-front-${localProf.id}`,
+                      driver_id: localProf.id,
+                      doc_type: "license_front",
+                      file_path: `${localProf.id}/license_front.jpg`,
+                      status: localProf.isVerified ? "approved" : "pending",
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                    {
+                      id: `doc-lic-back-${localProf.id}`,
+                      driver_id: localProf.id,
+                      doc_type: "license_back",
+                      file_path: `${localProf.id}/license_back.jpg`,
+                      status: localProf.isVerified ? "approved" : "pending",
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                    {
+                      id: `doc-prdp-${localProf.id}`,
+                      driver_id: localProf.id,
+                      doc_type: "prdp",
+                      file_path: `${localProf.id}/prdp.jpg`,
+                      status: localProf.isVerified ? "approved" : "pending",
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                    {
+                      id: `doc-roadworthy-${localProf.id}`,
+                      driver_id: localProf.id,
+                      doc_type: "roadworthy",
+                      file_path: `${localProf.id}/roadworthy.jpg`,
+                      status: localProf.isVerified ? "approved" : "pending",
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                  ];
+
+              const pendingCount = localDocs.filter((d) => d.status === "pending").length;
+              const approvedCount = localDocs.filter((d) => d.status === "approved").length;
+              const rejectedCount = localDocs.filter((d) => d.status === "rejected").length;
+
+              const localSummary: DriverKycSummary = {
+                id: localProf.id,
+                fullName: localProf.fullName,
+                phone: localProf.phone || "",
+                email: localProf.email || "",
+                vehicleMake: localProf.vehicleMake || "",
+                vehicleModel: localProf.vehicleModel || "",
+                licensePlate: localProf.licensePlate || "",
+                prdpNumber: localProf.prdpNumber || "",
+                isVerified: !!localProf.isVerified,
+                subscriptionPlan: localProf.subscriptionPlan || "trial",
+                trialStartedAt: localProf.trialStartedAt
+                  ? new Date(localProf.trialStartedAt).toISOString()
+                  : null,
+                createdAt: new Date().toISOString(),
+                documents: localDocs,
+                totalDocs: localDocs.length,
+                approvedCount,
+                pendingCount,
+                rejectedCount,
+                complianceStatus: localProf.isVerified
+                  ? "verified"
+                  : pendingCount > 0
+                  ? "pending_review"
+                  : rejectedCount > 0
+                  ? "rejected"
+                  : "incomplete",
+              };
+
+              serverDrivers = [localSummary, ...serverDrivers];
+            }
+          }
+        } catch (e) {
+          console.warn("Local driver sync notice:", e);
         }
+      }
+
+      setDrivers(serverDrivers);
+      if (data.metrics) {
+        setMetrics({
+          ...data.metrics,
+          totalDrivers: Math.max(data.metrics.totalDrivers, serverDrivers.length),
+        });
+      }
+
+      // Sync selected driver if modal is open
+      if (selectedDriver) {
+        const updatedSelected = serverDrivers.find(
+          (d: DriverKycSummary) => d.id === selectedDriver.id
+        );
+        if (updatedSelected) setSelectedDriver(updatedSelected);
       }
     } catch (err) {
       console.error("Error loading compliance data:", err);
@@ -104,7 +203,7 @@ export default function AdminComplianceDashboard() {
     setTimeout(() => setFeedbackToast(null), 4000);
   };
 
-  // Review decision handler
+  // Review single document
   const handleReviewAction = async (
     doc: DriverDocument,
     driverId: string,
@@ -134,7 +233,89 @@ export default function AdminComplianceDashboard() {
         );
         setRejectingDoc(null);
         setRejectionReason("");
-        // Reload compliance summaries
+
+        // Optimistically update selectedDriver in place immediately
+        if (selectedDriver && selectedDriver.id === driverId) {
+          const updatedDocs = selectedDriver.documents.map((d) =>
+            d.doc_type === doc.doc_type
+              ? {
+                  ...d,
+                  status: action as KycDocStatus,
+                  rejection_reason: action === "rejected" ? reason || null : null,
+                }
+              : d
+          );
+
+          if (!updatedDocs.some((d) => d.doc_type === doc.doc_type)) {
+            updatedDocs.push({
+              ...doc,
+              status: action as KycDocStatus,
+              rejection_reason: action === "rejected" ? reason || null : null,
+            });
+          }
+
+          const requiredTypes: KycDocType[] = [
+            "license_front",
+            "license_back",
+            "prdp",
+            "roadworthy",
+          ];
+          const allMandatoryApproved = requiredTypes.every((t) =>
+            updatedDocs.some((d) => d.doc_type === t && d.status === "approved")
+          );
+
+          const approvedCount = updatedDocs.filter((d) => d.status === "approved").length;
+          const pendingCount = updatedDocs.filter((d) => d.status === "pending").length;
+          const rejectedCount = updatedDocs.filter((d) => d.status === "rejected").length;
+
+          const updatedSummary: DriverKycSummary = {
+            ...selectedDriver,
+            documents: updatedDocs,
+            approvedCount,
+            pendingCount,
+            rejectedCount,
+            isVerified: allMandatoryApproved || selectedDriver.isVerified,
+            complianceStatus:
+              allMandatoryApproved || selectedDriver.isVerified
+                ? "verified"
+                : pendingCount > 0
+                ? "pending_review"
+                : rejectedCount > 0
+                ? "rejected"
+                : "incomplete",
+          };
+
+          setSelectedDriver(updatedSummary);
+
+          // Also update previewDoc if currently open
+          if (previewDoc && previewDoc.doc_type === doc.doc_type) {
+            setPreviewDoc({ ...previewDoc, status: action as KycDocStatus });
+          }
+
+          // Sync localStorage mock_driver_profile so driver app immediately updates
+          if (typeof window !== "undefined") {
+            try {
+              const localProfStr = localStorage.getItem("mock_driver_profile");
+              if (localProfStr) {
+                const localProf = JSON.parse(localProfStr);
+                if (localProf.id === driverId) {
+                  if (allMandatoryApproved) localProf.isVerified = true;
+                  if (doc.doc_type === "license_front" || doc.doc_type === "license_back")
+                    localProf.hasLicense = true;
+                  if (doc.doc_type === "prdp") localProf.hasPrdp = true;
+                  if (doc.doc_type === "roadworthy") localProf.hasRoadworthy = true;
+                  localStorage.setItem("mock_driver_profile", JSON.stringify(localProf));
+                }
+              }
+              localStorage.setItem(
+                `driver_kyc_documents_${driverId}`,
+                JSON.stringify(updatedDocs)
+              );
+            } catch {}
+          }
+        }
+
+        // Reload compliance summaries in background
         await fetchComplianceData();
       } else {
         alert(result.error || "Failed to update review decision");
@@ -142,6 +323,72 @@ export default function AdminComplianceDashboard() {
     } catch (err: unknown) {
       const error = err as Error;
       alert(`Error: ${error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Review all documents & verify driver in one click
+  const handleApproveAll = async (driverId: string) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/review-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          driverId,
+          status: "approve_all",
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast("✓ All documents approved & driver verified!");
+
+        if (selectedDriver && selectedDriver.id === driverId) {
+          const updatedDocs = selectedDriver.documents.map((d) => ({
+            ...d,
+            status: "approved" as KycDocStatus,
+            rejection_reason: null,
+          }));
+          setSelectedDriver({
+            ...selectedDriver,
+            isVerified: true,
+            complianceStatus: "verified",
+            approvedCount: updatedDocs.length,
+            pendingCount: 0,
+            rejectedCount: 0,
+            documents: updatedDocs,
+          });
+
+          // Sync localStorage mock_driver_profile
+          if (typeof window !== "undefined") {
+            try {
+              const localProfStr = localStorage.getItem("mock_driver_profile");
+              if (localProfStr) {
+                const localProf = JSON.parse(localProfStr);
+                if (localProf.id === driverId) {
+                  localProf.isVerified = true;
+                  localProf.hasLicense = true;
+                  localProf.hasPrdp = true;
+                  localProf.hasRoadworthy = true;
+                  localStorage.setItem("mock_driver_profile", JSON.stringify(localProf));
+                }
+              }
+              localStorage.setItem(
+                `driver_kyc_documents_${driverId}`,
+                JSON.stringify(updatedDocs)
+              );
+            } catch {}
+          }
+        }
+
+        await fetchComplianceData();
+      } else {
+        alert(result.error || "Failed to approve all documents");
+      }
+    } catch (err: unknown) {
+      alert(`Error: ${(err as Error).message}`);
     } finally {
       setActionLoading(false);
     }
@@ -474,12 +721,24 @@ export default function AdminComplianceDashboard() {
                   {selectedDriver.vehicleModel} ({selectedDriver.licensePlate})
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedDriver(null)}
-                className="p-2 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-800 transition"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                {!selectedDriver.isVerified && (
+                  <button
+                    onClick={() => handleApproveAll(selectedDriver.id)}
+                    disabled={actionLoading}
+                    className="py-2 px-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition active:scale-95"
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>Approve All & Verify</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedDriver(null)}
+                  className="p-2 text-zinc-400 hover:text-white rounded-full hover:bg-zinc-800 transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Document Review Slots */}
@@ -580,7 +839,28 @@ export default function AdminComplianceDashboard() {
                           </button>
                         </>
                       ) : (
-                        <span className="text-xs text-zinc-600 italic">Not yet uploaded</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-600 italic">Not yet uploaded</span>
+                          <button
+                            onClick={() => {
+                              const placeholderDoc: DriverDocument = {
+                                id: crypto.randomUUID(),
+                                driver_id: selectedDriver.id,
+                                doc_type: docType,
+                                file_path: `${selectedDriver.id}/${docType}.jpg`,
+                                status: "pending",
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString(),
+                              };
+                              handleReviewAction(placeholderDoc, selectedDriver.id, "approved");
+                            }}
+                            disabled={actionLoading}
+                            className="py-1 px-2.5 bg-zinc-800 hover:bg-emerald-600/30 text-zinc-300 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-500/40 rounded-xl text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
+                          >
+                            <Check size={11} />
+                            <span>Verify Slot</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -602,10 +882,49 @@ export default function AdminComplianceDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <h3 className="font-bold text-base">
-                Inspect: {KYC_DOCUMENT_CONFIGS[previewDoc.doc_type]?.title || previewDoc.doc_type}
-              </h3>
+              <div>
+                <h3 className="font-bold text-base">
+                  Inspect: {KYC_DOCUMENT_CONFIGS[previewDoc.doc_type]?.title || previewDoc.doc_type}
+                </h3>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
+                    previewDoc.status === "approved"
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : previewDoc.status === "rejected"
+                      ? "bg-rose-500/20 text-rose-400"
+                      : "bg-amber-500/20 text-amber-400"
+                  }`}
+                >
+                  Status: {previewDoc.status.toUpperCase()}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
+                {selectedDriver && previewDoc.status !== "approved" && (
+                  <button
+                    onClick={() =>
+                      handleReviewAction(previewDoc, selectedDriver.id, "approved")
+                    }
+                    disabled={actionLoading}
+                    className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition shadow-md shadow-emerald-600/20 active:scale-95"
+                  >
+                    <Check size={14} />
+                    <span>Approve</span>
+                  </button>
+                )}
+
+                {selectedDriver && previewDoc.status !== "rejected" && (
+                  <button
+                    onClick={() =>
+                      setRejectingDoc({ doc: previewDoc, driverId: selectedDriver.id })
+                    }
+                    disabled={actionLoading}
+                    className="py-1.5 px-3 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1 transition border border-rose-600/30 active:scale-95"
+                  >
+                    <X size={14} />
+                    <span>Reject</span>
+                  </button>
+                )}
+
                 {previewDoc.signedUrl && (
                   <a
                     href={previewDoc.signedUrl}
@@ -614,7 +933,7 @@ export default function AdminComplianceDashboard() {
                     className="p-2 bg-zinc-800 text-zinc-300 hover:text-white rounded-xl text-xs flex items-center gap-1 transition"
                   >
                     <ExternalLink size={14} />
-                    <span>Open in new tab</span>
+                    <span>Open in tab</span>
                   </a>
                 )}
                 <button
