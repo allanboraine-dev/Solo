@@ -23,10 +23,135 @@ const memoryDocuments = new Map<string, Map<KycDocType, DriverDocument>>();
 
 const MANDATORY_DOC_TYPES: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
 
+const generateSampleDocSvg = (title: string, subtitle: string, licenseNo: string) =>
+  `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380"><rect width="600" height="380" fill="%2318181b" rx="20"/><rect x="20" y="20" width="560" height="340" fill="%2327272a" rx="16" stroke="%233f3f46" stroke-width="2"/><text x="50" y="70" fill="%2310b981" font-family="sans-serif" font-size="16" font-weight="bold">REPUBLIC OF SOUTH AFRICA • DEPT OF TRANSPORT</text><text x="50" y="110" fill="%23ffffff" font-family="sans-serif" font-size="22" font-weight="bold">${encodeURIComponent(title)}</text><text x="50" y="145" fill="%23a1a1aa" font-family="sans-serif" font-size="15">${encodeURIComponent(subtitle)}</text><line x1="50" y1="165" x2="550" y2="165" stroke="%2352525b" stroke-width="2"/><rect x="50" y="185" width="95" height="115" fill="%233f3f46" rx="8"/><circle cx="97" cy="230" r="22" fill="%2371717a"/><path d="M68 285 C68 265, 126 265, 126 285 Z" fill="%2371717a"/><text x="170" y="210" fill="%23e4e4e7" font-family="sans-serif" font-size="13">DOCUMENT NO: ${encodeURIComponent(licenseNo)}</text><text x="170" y="240" fill="%23e4e4e7" font-family="sans-serif" font-size="13">NATIONAL LAND TRANSPORT ACT COMPLIANT</text><text x="170" y="270" fill="%2310b981" font-family="sans-serif" font-size="13">STATUS: SUBMITTED FOR COMPLIANCE VERIFICATION</text></svg>`;
+
+export const DEFAULT_SOLO_DRIVERS: KycDriverProfile[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    fullName: 'Allan Boraine',
+    email: 'allanboraine@gmail.com',
+    phone: '+27 82 000 0001',
+    vehicleMake: 'Mercedes-Benz',
+    vehicleModel: 'C200 Avantgarde',
+    licensePlate: 'CA 100-001',
+    prdpNumber: 'PRDP-ZA-0001',
+    isVerified: true,
+    subscriptionPlan: 'owner',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    verificationNotes: 'Platform Founder - Lifetime Verified Clearance',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    fullName: 'Sipho Dlamini',
+    email: 'sipho.dlamini@soloride.co.za',
+    phone: '+27 82 482 9910',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'Corolla Quest 1.6',
+    licensePlate: 'NC 482-910',
+    prdpNumber: 'PRDP-NC-2025',
+    isVerified: false,
+    subscriptionPlan: 'trial',
+    createdAt: '2026-10-14T08:30:00.000Z',
+    verificationNotes: 'Statutory documents submitted - ready for manager review',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    fullName: 'Thabo Mokoena',
+    email: 'thabo.mokoena@soloride.co.za',
+    phone: '+27 83 892 1000',
+    vehicleMake: 'Volkswagen',
+    vehicleModel: 'Polo Sedan 1.4 Trendline',
+    licensePlate: 'GP 892-100',
+    prdpNumber: 'PRDP-GP-2026',
+    isVerified: false,
+    subscriptionPlan: 'trial',
+    createdAt: '2026-10-15T11:15:00.000Z',
+    verificationNotes: 'Pending compliance officer verification',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000004',
+    fullName: 'Lerato Khumalo',
+    email: 'lerato.khumalo@soloride.co.za',
+    phone: '+27 84 554 3210',
+    vehicleMake: 'Hyundai',
+    vehicleModel: 'Grand i10 Sedan',
+    licensePlate: 'CA 554-321',
+    prdpNumber: 'PRDP-WC-8821',
+    isVerified: true,
+    subscriptionPlan: 'paid',
+    createdAt: '2026-10-10T14:20:00.000Z',
+    verificationNotes: 'Approved and verified by SOLO Compliance Officer',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000005',
+    fullName: 'Kagiso Ndlovu',
+    email: 'kagiso.ndlovu@soloride.co.za',
+    phone: '+27 71 332 9901',
+    vehicleMake: 'Suzuki',
+    vehicleModel: 'Ciaz 1.5 GL',
+    licensePlate: 'ND 332-901',
+    prdpNumber: 'PRDP-KZN-4412',
+    isVerified: false,
+    subscriptionPlan: 'trial',
+    createdAt: '2026-10-16T16:45:00.000Z',
+    verificationNotes: 'Registration started - pending documents upload',
+  },
+];
+
+/**
+ * Seed initial registered drivers and their documents if store is uninitialized
+ */
+export function seedDefaultKycDrivers(): void {
+  for (const driver of DEFAULT_SOLO_DRIVERS) {
+    if (!memoryDrivers.has(driver.id)) {
+      memoryDrivers.set(driver.id, driver);
+    }
+
+    if (!memoryDocuments.has(driver.id)) {
+      const docMap = new Map<KycDocType, DriverDocument>();
+      const isVerified = driver.isVerified;
+
+      // Seed documents for drivers with documents
+      if (driver.id !== '00000000-0000-4000-8000-000000000005') {
+        const docTypes: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
+        for (const type of docTypes) {
+          const title =
+            type === 'license_front'
+              ? "Driver's License (Front)"
+              : type === 'license_back'
+              ? "Driver's License (Back)"
+              : type === 'prdp'
+              ? 'Professional Driving Permit (PrDP)'
+              : 'Certificate of Roadworthiness (CoR)';
+
+          docMap.set(type, {
+            id: `doc-${driver.id.slice(-4)}-${type}`,
+            driver_id: driver.id,
+            doc_type: type,
+            file_path: `${driver.id}/${type}.png`,
+            status: isVerified ? 'approved' : 'pending',
+            rejection_reason: null,
+            created_at: driver.createdAt,
+            updated_at: driver.createdAt,
+            signedUrl: generateSampleDocSvg(title, driver.fullName, driver.licensePlate),
+          });
+        }
+      }
+
+      memoryDocuments.set(driver.id, docMap);
+    }
+  }
+}
+
+// Automatically seed on module initialization
+seedDefaultKycDrivers();
+
 /**
  * Register or update driver profile in the in-memory store
  */
 export function saveKycDriverProfile(profile: Partial<KycDriverProfile> & { id: string }): KycDriverProfile {
+  seedDefaultKycDrivers();
   const existing = memoryDrivers.get(profile.id);
   const isOwner = isPlatformOwner(profile.email || existing?.email || '');
 
@@ -54,6 +179,7 @@ export function saveKycDriverProfile(profile: Partial<KycDriverProfile> & { id: 
  * Retrieve driver profile from store
  */
 export function getKycDriverProfile(id: string): KycDriverProfile | undefined {
+  seedDefaultKycDrivers();
   return memoryDrivers.get(id);
 }
 
@@ -61,6 +187,7 @@ export function getKycDriverProfile(id: string): KycDriverProfile | undefined {
  * Retrieve all registered drivers
  */
 export function getAllKycDriverProfiles(): KycDriverProfile[] {
+  seedDefaultKycDrivers();
   return Array.from(memoryDrivers.values());
 }
 
@@ -68,6 +195,7 @@ export function getAllKycDriverProfiles(): KycDriverProfile[] {
  * Save an uploaded KYC document for a driver
  */
 export function saveKycDocument(doc: DriverDocument): DriverDocument {
+  seedDefaultKycDrivers();
   if (!memoryDocuments.has(doc.driver_id)) {
     memoryDocuments.set(doc.driver_id, new Map());
   }
@@ -103,6 +231,7 @@ export function saveKycDocument(doc: DriverDocument): DriverDocument {
  * Retrieve all documents for a specific driver
  */
 export function getKycDocumentsForDriver(driverId: string): DriverDocument[] {
+  seedDefaultKycDrivers();
   const driverMap = memoryDocuments.get(driverId);
   if (!driverMap) return [];
   return Array.from(driverMap.values());
@@ -112,6 +241,7 @@ export function getKycDocumentsForDriver(driverId: string): DriverDocument[] {
  * Retrieve all documents across all drivers
  */
 export function getAllKycDocuments(): DriverDocument[] {
+  seedDefaultKycDrivers();
   const all: DriverDocument[] = [];
   for (const driverMap of memoryDocuments.values()) {
     all.push(...driverMap.values());
@@ -129,6 +259,7 @@ export function updateKycDocumentStatus(
   rejectionReason?: string | null,
   reviewedBy?: string | null
 ): { document: DriverDocument; isAllApproved: boolean } {
+  seedDefaultKycDrivers();
   let driverMap = memoryDocuments.get(driverId);
   if (!driverMap) {
     driverMap = new Map();
@@ -178,6 +309,7 @@ export function approveAllKycDocuments(
   driverId: string,
   reviewedBy?: string | null
 ): { documents: DriverDocument[]; isVerified: boolean } {
+  seedDefaultKycDrivers();
   let driverMap = memoryDocuments.get(driverId);
   if (!driverMap) {
     driverMap = new Map();

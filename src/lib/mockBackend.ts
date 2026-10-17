@@ -158,6 +158,23 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
   // Store locally for quick access/fallback
   localStorage.setItem('mock_driver_profile', JSON.stringify(profile));
 
+  // Store in all_registered_drivers list
+  try {
+    const allReg = JSON.parse(localStorage.getItem('all_registered_drivers') || '[]');
+    const filtered = allReg.filter((d: any) => d.id !== profile.id);
+    filtered.push(profile);
+    localStorage.setItem('all_registered_drivers', JSON.stringify(filtered));
+  } catch {}
+
+  // Sync to server API so Admin & Compliance portal can view driver across any device/browser
+  try {
+    fetch('/api/driver/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(profile),
+    }).catch((err) => console.warn('Background driver register notice:', err));
+  } catch {}
+
   try {
     const dbPayload = {
       ...(profile.id ? { id: profile.id } : {}),

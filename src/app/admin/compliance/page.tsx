@@ -206,6 +206,20 @@ export default function AdminComplianceDashboard() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlStatus = params.get("status");
+      const urlSearch = params.get("search");
+      if (urlStatus && ["all", "pending_review", "verified", "rejected", "incomplete"].includes(urlStatus)) {
+        setStatusFilter(urlStatus as any);
+      }
+      if (urlSearch) {
+        setSearchQuery(urlSearch);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     fetchComplianceData();
   }, [statusFilter]);
 
