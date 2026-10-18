@@ -14,8 +14,13 @@ export function Navbar() {
     <div className="fixed top-2.5 md:top-4 pt-safe left-0 right-0 flex justify-center z-[1000] pointer-events-none px-3 md:px-4">
       <nav className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3 bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-gray-200/60 dark:border-white/10 rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 w-full max-w-2xl pointer-events-auto transition-all">
         <div className="flex gap-4 md:gap-6 items-center">
-          <Link href="/" className="font-extrabold text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-            SOLO
+          <Link href="/" className="flex items-center gap-2 font-extrabold text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
+            <img
+              src="/icon-192.png"
+              alt="SOLO Logo"
+              className="w-7 h-7 md:w-8 md:h-8 rounded-lg shadow-sm object-cover border border-emerald-500/30"
+            />
+            <span>SOLO</span>
           </Link>
           
           {!isDriverApp && (

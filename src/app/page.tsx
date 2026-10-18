@@ -27,8 +27,12 @@ export default function Home() {
       <main className="max-w-6xl w-full text-center space-y-20 p-8 relative z-10">
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
           <div className="flex justify-center mb-6">
-            <div className="bg-white/50 dark:bg-zinc-900/50 backdrop-blur-md text-blue-600 dark:text-blue-400 p-5 rounded-full shadow-xl shadow-blue-500/10 border border-white/20 dark:border-white/5">
-              <Navigation size={48} strokeWidth={1.5} />
+            <div className="relative p-1.5 rounded-[2rem] bg-gradient-to-br from-emerald-500/40 via-teal-500/20 to-blue-600/40 shadow-2xl shadow-emerald-500/20">
+              <img
+                src="/icon-512.png"
+                alt="SOLO Official App Icon"
+                className="w-24 h-24 md:w-28 md:h-28 rounded-[1.7rem] object-cover shadow-inner border border-white/15"
+              />
             </div>
           </div>
           <h1 className="text-6xl md:text-8xl font-extrabold tracking-tighter leading-tight">
