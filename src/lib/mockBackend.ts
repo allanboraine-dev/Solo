@@ -418,20 +418,29 @@ const syncTripToLocalStorage = (trip: MockTrip): MockTrip => {
   }
 };
 
+let inFlightTripsPromise: Promise<any[] | null> | null = null;
+
 export const getTrips = async (): Promise<MockTrip[]> => {
   if (typeof window === 'undefined') return [];
 
-  // 1. Fetch from Supabase first so we never hold a stale pre-await localStorage snapshot
+  // 1. Fetch from Supabase first (with in-flight request deduplication so concurrent calls share 1 DB query)
   let dbRows: any[] | null = null;
   try {
-    const { data, error } = await supabase
-      .from('trips')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (data && !error) {
-      dbRows = data;
+    if (!inFlightTripsPromise) {
+      inFlightTripsPromise = (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('trips')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+          return data && !error ? data : null;
+        } finally {
+          inFlightTripsPromise = null;
+        }
+      })();
     }
+    dbRows = await inFlightTripsPromise;
   } catch (e) {
     console.error('Error fetching trips from Supabase:', e);
   }
@@ -1135,7 +1144,8 @@ export const getNearbyRequestedTrips = async (
   driverLat: number,
   driverLng: number,
   radiusKm: number = 15,
-  driverId?: string | null
+  driverId?: string | null,
+  prefetchedTrips?: MockTrip[]
 ): Promise<MockTrip[]> => {
   if (typeof window === 'undefined') return [];
 
@@ -1143,7 +1153,7 @@ export const getNearbyRequestedTrips = async (
   const declinedIds = getDeclinedTripIds(resolvedDriverId);
   const completedIds = getCompletedTripIds();
 
-  const allTrips = await getTrips();
+  const allTrips = prefetchedTrips ?? (await getTrips());
   const knownStatusMap = new Map<string, MockTrip['status']>();
   allTrips.forEach(t => {
     if (t?.id) knownStatusMap.set(t.id, t.status);

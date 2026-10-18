@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound } from 'lucide-react'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -18,7 +18,7 @@ import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModa
 import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
-import { registerForPushNotifications } from '@/utils/pushClient'
+import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -82,6 +82,11 @@ export default function DriverPage() {
   const [isTrialExpired, setIsTrialExpired] = useState(false)
   const [showBankModal, setShowBankModal] = useState(false)
   const [completionNotice, setCompletionNotice] = useState<string | null>(null)
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false)
+  const [isNotifyingArrival, setIsNotifyingArrival] = useState(false)
 
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
@@ -274,7 +279,7 @@ export default function DriverPage() {
         let nearbyRequested: MockTrip[] = [];
         const coords = driverCoordsRef.current;
         if (coords) {
-          nearbyRequested = await getNearbyRequestedTrips(coords.lat, coords.lng, 15, driverId);
+          nearbyRequested = await getNearbyRequestedTrips(coords.lat, coords.lng, 15, driverId, trips);
         }
         if (nearbyRequested.length === 0) {
           nearbyRequested = trips.filter(
@@ -307,7 +312,8 @@ export default function DriverPage() {
     };
 
     loadTrips();
-    const pollInterval = setInterval(loadTrips, 3000);
+    // Realtime Broadcast & postgres_changes handle instant trip events; 15s jittered fallback prevents 1,000-driver DB polling storms
+    const pollInterval = setInterval(loadTrips, 14000 + Math.floor(Math.random() * 2000));
 
     const unsubscribe = subscribeToEvents((type, payload) => {
       if (type === 'driver_session_preempted') {
@@ -402,9 +408,14 @@ export default function DriverPage() {
       if (profile?.id) {
         updateDriverLocation(profile.id, latitude, longitude, true, {
           fullName: profile.fullName,
+          phone: profile.phone,
           vehicleMake: profile.vehicleMake,
           vehicleModel: profile.vehicleModel,
+          vehicleYear: profile.vehicleYear,
+          vehicleColor: profile.vehicleColor,
           licensePlate: profile.licensePlate,
+          rating: ratingSummary?.average || 5.0,
+          ratingCount: ratingSummary?.count || 0,
           tripId: activeTripRef.current?.id,
           deviceId: deviceIdRef.current,
         });
@@ -533,6 +544,63 @@ export default function DriverPage() {
     lastAlertedTripIdRef.current = null;
     await declineTrip(tripToDecline, driverId);
   }
+
+  const handleDriverArrived = async () => {
+    const current = activeTripRef.current || activeTrip;
+    if (!current) return;
+    setIsNotifyingArrival(true);
+    try {
+      const updated: MockTrip = { ...current, status: 'arrived' };
+      recordTripStatusOverride(updated.id, 'arrived', updated.driver_id);
+      updateActiveTripState(updated);
+      await saveTrip(updated);
+
+      const driverName = profile?.fullName || 'Your SOLO Driver';
+      await dispatchDriverArrivedPush({
+        tripId: current.id,
+        driverName,
+        otpPin: current.verification_pin || '',
+      });
+    } catch (err) {
+      console.error('Error recording arrival:', err);
+    } finally {
+      setIsNotifyingArrival(false);
+    }
+  };
+
+  const handleVerifyPinAndStart = async (inputCode?: string) => {
+    const current = activeTripRef.current || activeTrip;
+    if (!current) return;
+    const pinToValidate = (inputCode !== undefined ? inputCode : pinInput).trim();
+    if (!pinToValidate) {
+      setPinError('Please enter the 4-digit PIN provided by the rider.');
+      return;
+    }
+
+    setIsVerifyingPin(true);
+    setPinError(null);
+    try {
+      const res = await startTripWithPin(current.id, pinToValidate);
+      if (!res.success) {
+        setPinError(res.error || 'Incorrect PIN. Please re-check with the rider.');
+        setIsVerifyingPin(false);
+        return;
+      }
+
+      const updated: MockTrip = { ...current, status: 'in_progress' };
+      recordTripStatusOverride(updated.id, 'in_progress', updated.driver_id);
+      updateActiveTripState(updated);
+      await saveTrip(updated);
+      setShowPinModal(false);
+      setPinInput('');
+      setPinError(null);
+    } catch (err: any) {
+      console.error('Error verifying PIN:', err);
+      setPinError('Failed to verify PIN. Please try again.');
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
 
   const handleConfirmPickup = async () => {
     const current = activeTripRef.current || activeTrip;
@@ -693,21 +761,87 @@ export default function DriverPage() {
                     </div>
                   </div>
                   <h2 className="text-2xl font-bold mb-2 text-center tracking-tight">
-                    {activeTrip.status === 'accepted' ? 'En route to Pickup' : 'Trip in Progress'}
+                    {activeTrip.status === 'accepted' ? 'En route to Pickup' : activeTrip.status === 'arrived' ? 'Arrived at Pickup' : 'Trip in Progress'}
                   </h2>
-                  <p className="text-gray-500 mb-4 font-medium text-center text-sm">To: {activeTrip.status === 'accepted' ? activeTrip.pickup_location : activeTrip.dropoff_location}</p>
-                  <div className="flex justify-center mb-6">
+                  <p className="text-gray-500 mb-3 font-medium text-center text-sm">
+                    {activeTrip.status === 'in_progress' ? `To: ${activeTrip.dropoff_location}` : `Pickup: ${activeTrip.pickup_location}`}
+                  </p>
+                  <div className="flex justify-center mb-4">
                      <span className="text-green-600 dark:text-green-400 font-black text-3xl tracking-tight">R{activeTrip.fare_amount}</span>
                   </div>
+
+                  {/* Rider Boarding PIN Card - Displayed prominently to driver to confirm with rider */}
+                  <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 shadow-sm flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                        <KeyRound size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider">Boarding PIN</span>
+                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
+                            Confirm with Rider
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                          Match with rider before departure
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/80 shadow-inner">
+                        <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-blue-600 dark:text-blue-400">
+                          {activeTrip.verification_pin || '----'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   
-                  {activeTrip.status === 'accepted' ? (
-                    <button 
-                      onClick={handleConfirmPickup}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center text-sm sm:text-base"
-                    >
-                      Confirm Pickup
-                    </button>
-                  ) : (
+                  {activeTrip.status === 'accepted' && (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={handleDriverArrived}
+                        disabled={isNotifyingArrival}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
+                      >
+                        <MapPin size={18} />
+                        <span>{isNotifyingArrival ? 'Notifying Rider...' : 'I Have Arrived at Pickup'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPinInput(activeTrip.verification_pin || '');
+                          setPinError(null);
+                          setShowPinModal(true);
+                        }}
+                        className="w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-100 min-h-[44px] p-2.5 rounded-2xl font-bold transition-all active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 text-xs sm:text-sm border border-gray-200 dark:border-white/5"
+                      >
+                        <KeyRound size={15} className="text-blue-600 dark:text-blue-400" />
+                        <span>Confirm PIN &amp; Start Trip</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {activeTrip.status === 'arrived' && (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-semibold">
+                        <MapPin size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>Arrived at pickup. Ask rider for PIN <strong>{activeTrip.verification_pin}</strong> to start trip.</span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setPinInput(activeTrip.verification_pin || '');
+                          setPinError(null);
+                          setShowPinModal(true);
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
+                      >
+                        <KeyRound size={18} />
+                        <span>Verify PIN &amp; Start Trip</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {activeTrip.status !== 'accepted' && activeTrip.status !== 'arrived' && (
                     <button 
                       onClick={handleComplete}
                       className="w-full bg-black dark:bg-white text-white dark:text-black min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
@@ -1290,6 +1424,112 @@ export default function DriverPage() {
         isOpen={showBankModal}
         onClose={() => setShowBankModal(false)}
       />
+
+      {/* Rider PIN Verification Modal */}
+      {showPinModal && activeTrip && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => {
+                setShowPinModal(false);
+                setPinError(null);
+              }}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 mx-auto mb-3 bg-blue-100 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-md">
+                <KeyRound size={28} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white">Verify Boarding PIN</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Confirm the rider&apos;s 4-digit PIN before starting the trip.
+              </p>
+            </div>
+
+            {/* Expected Trip PIN display for driver convenience */}
+            <div className="p-3.5 mb-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-center justify-between">
+              <div className="text-left">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Assigned PIN</span>
+                <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">From trip booking</p>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800 shadow-inner">
+                <span className="font-mono text-xl font-black tracking-widest text-blue-600 dark:text-blue-400">
+                  {activeTrip.verification_pin || '----'}
+                </span>
+              </div>
+            </div>
+
+            {/* Input field for rider verbal PIN */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 text-left">
+                Enter 4-Digit PIN from Rider
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={pinInput}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setPinInput(val);
+                    setPinError(null);
+                  }}
+                  placeholder="e.g. 1234"
+                  className="w-full text-center text-2xl font-mono tracking-widest font-black py-3 px-4 rounded-xl border border-gray-300 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 dark:text-white"
+                  autoFocus
+                />
+              </div>
+              {pinError && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-red-500 font-semibold justify-center">
+                  <AlertTriangle size={14} />
+                  <span>{pinError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => handleVerifyPinAndStart()}
+                disabled={isVerifyingPin || pinInput.length < 4}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 active:scale-95 text-sm"
+              >
+                {isVerifyingPin ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Verifying PIN...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} />
+                    <span>Confirm &amp; Start Trip</span>
+                  </>
+                )}
+              </button>
+
+              {activeTrip.verification_pin && pinInput !== activeTrip.verification_pin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinInput(activeTrip.verification_pin || '');
+                    setPinError(null);
+                  }}
+                  className="w-full text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline py-1.5 text-center"
+                >
+                  Quick Fill Assigned PIN ({activeTrip.verification_pin})
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

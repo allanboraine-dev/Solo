@@ -4,13 +4,15 @@ import dynamic from 'next/dynamic'
 import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
+import OnlineDriversModal from '@/components/OnlineDriversModal'
 import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car } from 'lucide-react'
+import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -59,6 +61,13 @@ export default function RiderPage() {
   const [ratingTrip, setRatingTrip] = useState<MockTrip | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
+  const [showDriversModal, setShowDriversModal] = useState(false)
+  const [focusedDriverCoords, setFocusedDriverCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  const handleLocateDriverOnMap = (driver: LiveDriver) => {
+    setFocusedDriverCoords({ lat: driver.lat, lng: driver.lng })
+    setIsSheetMinimized(true)
+  }
 
   // Assigned Driver & Vehicle Information (Vehicle Make, Model, License Plate)
   const [assignedDriverInfo, setAssignedDriverInfo] = useState<{
@@ -105,7 +114,7 @@ export default function RiderPage() {
     });
   }, [activeTrip?.driver_id, activeTrip?.status, availableDrivers]);
 
-  // Fetch active registered drivers in proximity to rider (with real-time updates and 10s auto-refresh)
+  // Fetch active registered drivers in proximity to rider (live updates arrive via WebSocket broadcast; 20s fallback sync)
   useEffect(() => {
     const lat = pickupCoords?.lat;
     const lng = pickupCoords?.lng;
@@ -117,21 +126,10 @@ export default function RiderPage() {
     };
 
     refreshDrivers();
-    const interval = setInterval(refreshDrivers, 10000);
-
-    const onDriverLocationUpdate = () => refreshDrivers();
-    window.addEventListener('solo_driver_location_update', onDriverLocationUpdate);
-
-    const unsubscribe = subscribeToEvents((type) => {
-      if (type === 'driver_location') {
-        refreshDrivers();
-      }
-    });
+    const interval = setInterval(refreshDrivers, 19000 + Math.floor(Math.random() * 2000));
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('solo_driver_location_update', onDriverLocationUpdate);
-      unsubscribe();
     };
   }, [pickupCoords?.lat, pickupCoords?.lng]);
 
@@ -295,7 +293,8 @@ export default function RiderPage() {
       }
     };
     loadTrips();
-    const pollInterval = setInterval(loadTrips, 3000);
+    // Realtime Broadcast & postgres_changes handle instant trip events; 15s jittered fallback prevents 1,000-user DB polling storms
+    const pollInterval = setInterval(loadTrips, 14000 + Math.floor(Math.random() * 2000));
 
     const handleDriverLocationUpdate = (data: any) => {
       if (!data?.id && !data?.driverId) return;
@@ -312,12 +311,21 @@ export default function RiderPage() {
           return prev.filter(d => d.id !== driverId);
         }
         const existingIdx = prev.findIndex(d => d.id === driverId);
+        const dist = pickupCoords ? calculateDistanceKm(pickupCoords.lat, pickupCoords.lng, data.lat, data.lng) : data.distanceKm;
+        const eta = dist !== undefined ? estimateEtaMinutes(dist) : data.etaMinutes;
         const updated: LiveDriver = {
           id: driverId,
           fullName: data.fullName || 'Registered Driver',
-          vehicleMake: data.vehicleMake,
-          vehicleModel: data.vehicleModel,
-          licensePlate: data.licensePlate,
+          phone: data.phone,
+          vehicleMake: data.vehicleMake || 'Toyota',
+          vehicleModel: data.vehicleModel || 'Corolla Quest',
+          vehicleYear: data.vehicleYear,
+          vehicleColor: data.vehicleColor,
+          licensePlate: data.licensePlate || 'NC 482-910',
+          rating: data.rating || 5.0,
+          ratingCount: data.ratingCount || 0,
+          distanceKm: dist,
+          etaMinutes: eta,
           lat: data.lat,
           lng: data.lng,
           isOnline: true,
@@ -396,6 +404,14 @@ export default function RiderPage() {
                     body: `Your driver is on the way! Trip PIN: ${trip.verification_pin || 'Check app'}`,
                     icon: '/rider-icon-192.png',
                     tag: `rider-trip-${trip.id}`,
+                  });
+                }
+              } else if (trip.status === 'arrived' && currentActive.status !== 'arrived') {
+                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
+                  new Notification('Your Driver Has Arrived! 📍', {
+                    body: `Your driver has arrived at pickup. Share PIN ${trip.verification_pin || ''} to board.`,
+                    icon: '/rider-icon-192.png',
+                    tag: `rider-trip-arrived-${trip.id}`,
                   });
                 }
               }
@@ -622,10 +638,19 @@ export default function RiderPage() {
             lat: d.lat,
             lng: d.lng,
             name: d.fullName,
+            phone: d.phone,
             vehicle: [d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '),
+            vehicleMake: d.vehicleMake,
+            vehicleModel: d.vehicleModel,
+            vehicleYear: d.vehicleYear,
+            vehicleColor: d.vehicleColor,
             licensePlate: d.licensePlate,
-            rating: 5.0
+            rating: d.rating ?? 5.0,
+            ratingCount: d.ratingCount ?? 0,
+            distanceKm: d.distanceKm,
+            etaMinutes: d.etaMinutes,
           }))}
+          focusedDriverCoords={focusedDriverCoords}
           assignedDriver={activeTrip && (driverCoords || assignedDriverInfo) ? {
             lat: driverCoords?.lat || (activeTrip.pickup_lat),
             lng: driverCoords?.lng || (activeTrip.pickup_lng),
@@ -698,15 +723,36 @@ export default function RiderPage() {
                     </div>
                     <div>
                       <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight">Where to?</h1>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        <p className="text-xs font-semibold text-green-600 dark:text-green-400">
-                          {availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDriversModal(true)}
+                        className="flex items-center gap-1.5 mt-0.5 group text-left transition"
+                        title="View all online drivers with drive and car details"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-xs font-semibold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5">
+                          <span>{availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby</span>
+                          <span className="text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-md border border-green-200 dark:border-green-800 flex items-center gap-1">
+                            <span>View All</span>
+                            <span>&rarr;</span>
+                          </span>
+                        </span>
+                      </button>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowDriversModal(true)}
+                      className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2.5 py-1.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60 transition active:scale-95 shadow-2xs"
+                      title="View all online drivers and vehicles"
+                    >
+                      <Car size={14} />
+                      <span className="hidden sm:inline">Drivers</span>
+                      <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                        {availableDrivers.length}
+                      </span>
+                    </button>
                     <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-zinc-800" />
                     <button
                       type="button"
@@ -755,6 +801,9 @@ export default function RiderPage() {
                         updateActiveTripState(trip);
                         setDeclineNotice(null);
                       }}
+                      availableDrivers={availableDrivers}
+                      onViewAllDrivers={() => setShowDriversModal(true)}
+                      onLocateDriverOnMap={handleLocateDriverOnMap}
                     />
                   </>
                 )}
@@ -809,11 +858,25 @@ export default function RiderPage() {
                         )}
                         {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
                         {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
+                        {activeTrip.status === 'arrived' && 'Your driver has arrived! Confirm PIN with driver to board.'}
                         {activeTrip.status === 'in_progress' && 'Heading to destination...'}
                       </p>
 
+                      {/* Driver Arrived PIN Alert */}
+                      {activeTrip.status === 'arrived' && (
+                        <div className="mt-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-pulse">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <MapPin size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="truncate">Driver is waiting outside. Share PIN to board:</span>
+                          </div>
+                          <span className="font-mono font-black text-sm bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
+                            {activeTrip.verification_pin}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Dispatched Driver & Vehicle Identification Card */}
-                      {(activeTrip.status === 'accepted' || activeTrip.status === 'in_progress') && (
+                      {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
                         <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1014,6 +1077,18 @@ export default function RiderPage() {
             phone: user.phone,
           });
           setShowAuthModal(false);
+        }}
+      />
+
+      {/* Online Drivers Modal for Riders */}
+      <OnlineDriversModal
+        isOpen={showDriversModal}
+        onClose={() => setShowDriversModal(false)}
+        drivers={availableDrivers}
+        onLocateOnMap={handleLocateDriverOnMap}
+        onSelectDriver={(driver) => {
+          setShowDriversModal(false);
+          setFocusedDriverCoords({ lat: driver.lat, lng: driver.lng });
         }}
       />
     </div>
