@@ -18,13 +18,45 @@ export interface PushPayload {
   tag?: string;
 }
 
-// Initialize VAPID configuration
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@solo-app.co.za';
+// Sanitize VAPID keys (handles accidental `KEY_NAME=...` paste, quotes, whitespace, and trailing `=` padding)
+export function sanitizeVapidKey(raw?: string): string {
+  if (!raw) return '';
+  return raw
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^[A-Z0-9_]+\s*=\s*/i, '')
+    .trim()
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function sanitizeVapidSubject(raw?: string): string {
+  const cleaned = (raw || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^[A-Z0-9_]+\s*=\s*/i, '')
+    .trim();
+  if (cleaned.startsWith('mailto:') || cleaned.startsWith('https://')) {
+    return cleaned;
+  }
+  if (cleaned.includes('@')) {
+    return `mailto:${cleaned}`;
+  }
+  return 'mailto:admin@solo-app.co.za';
+}
+
+// Initialize VAPID configuration safely
+const vapidPublicKey = sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+const vapidPrivateKey = sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY);
+const vapidSubject = sanitizeVapidSubject(process.env.VAPID_SUBJECT);
 
 if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  try {
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  } catch (err) {
+    console.warn('[WebPush] Skipping VAPID initialization at build/import time:', (err as Error)?.message || err);
+  }
 }
 
 export async function sendWebPushNotification(
