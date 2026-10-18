@@ -501,7 +501,7 @@ class DeterrentSirenController {
       // Fall through to Web Audio API
     }
 
-    // 3. Start High-Decibel Dual-Oscillator Web Audio API Graph with explicit .resume()
+    // 3. Start High-Decibel Discrete-Step Web Audio API Siren Wail
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
@@ -512,68 +512,69 @@ class DeterrentSirenController {
           this.ctx.resume().catch(() => {});
         }
 
-        const now = this.ctx.currentTime || 0;
-        const compressor = this.ctx.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-10, now);
-        compressor.knee.setValueAtTime(8, now);
-        compressor.ratio.setValueAtTime(12, now);
-        compressor.attack.setValueAtTime(0.002, now);
-        compressor.release.setValueAtTime(0.15, now);
-
-        this.gain = this.ctx.createGain();
-        this.gain.gain.setValueAtTime(1.0, now);
-
-        this.oscPrimary = this.ctx.createOscillator();
-        this.oscSecondary = this.ctx.createOscillator();
-
-        this.oscPrimary.type = 'sawtooth';
-        this.oscSecondary.type = 'square';
-
-        this.oscPrimary.frequency.setValueAtTime(680, now);
-        this.oscSecondary.frequency.setValueAtTime(715, now);
-
-        // Schedule initial upward wail sweep
-        this.oscPrimary.frequency.linearRampToValueAtTime(1440, now + 0.35);
-        this.oscSecondary.frequency.linearRampToValueAtTime(1495, now + 0.35);
-
-        this.oscPrimary.connect(this.gain);
-        this.oscSecondary.connect(this.gain);
-        this.gain.connect(compressor);
-        compressor.connect(this.ctx.destination);
-
-        this.oscPrimary.start(now);
-        this.oscSecondary.start(now);
-
-        // Deterministic alternating sweep (avoids mobile WebKit osc.frequency.value readback freeze)
-        let high = false;
-        this.sweepInterval = setInterval(() => {
-          if (!this.ctx || !this.oscPrimary || !this.oscSecondary) return;
+        const playCycle = () => {
+          if (!this.ctx) return;
           if (this.ctx.state === 'suspended' || (this.ctx.state as string) === 'interrupted') {
             this.ctx.resume().catch(() => {});
           }
-          const t = this.ctx.currentTime || 0;
-          const startPrimary = high ? 680 : 1440;
-          const targetPrimary = high ? 1440 : 680;
-          const startSecondary = high ? 715 : 1495;
-          const targetSecondary = high ? 1495 : 715;
+          const now = this.ctx.currentTime || 0;
+          const freqs = [
+            680, 790, 900, 1010, 1120, 1240, 1360, 1480,
+            1520, 1400, 1280, 1160, 1040, 920, 800, 700,
+          ];
+          const stepDur = 0.075;
 
-          this.oscPrimary.frequency.cancelScheduledValues(t);
-          this.oscPrimary.frequency.setValueAtTime(startPrimary, t);
-          this.oscPrimary.frequency.linearRampToValueAtTime(targetPrimary, t + 0.34);
+          const masterGain = this.ctx.createGain();
+          masterGain.gain.setValueAtTime(1.0, now);
 
-          this.oscSecondary.frequency.cancelScheduledValues(t);
-          this.oscSecondary.frequency.setValueAtTime(startSecondary, t);
-          this.oscSecondary.frequency.linearRampToValueAtTime(targetSecondary, t + 0.34);
+          if (typeof this.ctx.createDynamicsCompressor === 'function') {
+            const compressor = this.ctx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-10, now);
+            compressor.knee.setValueAtTime(6, now);
+            compressor.ratio.setValueAtTime(12, now);
+            masterGain.connect(compressor);
+            compressor.connect(this.ctx.destination);
+          } else {
+            masterGain.connect(this.ctx.destination);
+          }
 
-          high = !high;
+          freqs.forEach((freq, idx) => {
+            if (!this.ctx) return;
+            const start = idx * stepDur;
+            const dur = stepDur + 0.012;
+            const osc1 = this.ctx.createOscillator();
+            const osc2 = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
 
-          // Keep vibrating on mobile during active deterrent siren
+            osc1.type = 'sawtooth';
+            osc2.type = 'square';
+            osc1.frequency.setValueAtTime(freq, now + start);
+            osc2.frequency.setValueAtTime(freq * 1.05, now + start);
+
+            gain.gain.setValueAtTime(0.01, now + start);
+            gain.gain.linearRampToValueAtTime(0.95, now + start + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.05, now + start + dur);
+
+            osc1.connect(gain);
+            osc2.connect(gain);
+            gain.connect(masterGain);
+
+            osc1.start(now + start);
+            osc2.start(now + start);
+            osc1.stop(now + start + dur);
+            osc2.stop(now + start + dur);
+          });
+        };
+
+        playCycle();
+        this.sweepInterval = setInterval(() => {
+          playCycle();
           if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
             try {
               navigator.vibrate(250);
             } catch {}
           }
-        }, 360);
+        }, 1180);
 
         startedAny = true;
       }
@@ -639,14 +640,6 @@ class DeterrentSirenController {
         // Ignore
       }
       this.gain = null;
-    }
-    if (this.ctx) {
-      try {
-        this.ctx.close();
-      } catch {
-        // Ignore
-      }
-      this.ctx = null;
     }
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {

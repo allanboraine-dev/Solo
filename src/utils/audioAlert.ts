@@ -76,9 +76,12 @@ class AudioAlertManager {
   private audioCtx: AudioContext | null = null;
   private tripChimeWavUri: string | null = null;
   private statusChimeWavUri: string | null = null;
+  private sirenWavUri: string | null = null;
   private silentWavUri: string | null = null;
   private sharedAudioEl: HTMLAudioElement | null = null;
   private ringtoneLoopInterval: ReturnType<typeof setInterval> | null = null;
+  private sirenLoopInterval: ReturnType<typeof setInterval> | null = null;
+  private sirenActive = false;
   private unlocked = false;
   private listenersAttached = false;
 
@@ -103,11 +106,16 @@ class AudioAlertManager {
     if (typeof window === 'undefined' || this.listenersAttached) return;
     this.listenersAttached = true;
 
+    const events = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'];
     const unlockHandler = () => {
       this.unlockMobileAudio(false);
+      if (this.unlocked && this.audioCtx && this.audioCtx.state === 'running') {
+        events.forEach((evt) => {
+          window.removeEventListener(evt, unlockHandler, { capture: true } as EventListenerOptions);
+        });
+      }
     };
 
-    const events = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'];
     events.forEach((evt) => {
       window.addEventListener(evt, unlockHandler, { passive: true, capture: true });
     });
@@ -120,7 +128,7 @@ class AudioAlertManager {
       const AudioCtxClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!this.audioCtx && AudioCtxClass) {
+      if ((!this.audioCtx || (this.audioCtx.state as string) === 'closed') && AudioCtxClass) {
         this.audioCtx = new AudioCtxClass();
       }
       if (this.audioCtx && (this.audioCtx.state === 'suspended' || (this.audioCtx.state as string) === 'interrupted')) {
@@ -176,6 +184,25 @@ class AudioAlertManager {
     return this.statusChimeWavUri;
   }
 
+  private getSirenWavUri(): string | null {
+    if (this.sirenWavUri) return this.sirenWavUri;
+    let phase1 = 0;
+    let phase2 = 0;
+    const durationSec = 1.2;
+    this.sirenWavUri = buildPcmWavDataUri(durationSec, (t, sampleRate) => {
+      const half = durationSec / 2;
+      const sweep = t < half ? t / half : 1 - (t - half) / half;
+      const f1 = 680 + sweep * 820;
+      const f2 = 730 + sweep * 840;
+      phase1 += (2 * Math.PI * f1) / sampleRate;
+      phase2 += (2 * Math.PI * f2) / sampleRate;
+      const raw1 = Math.sin(phase1) + 0.5 * Math.sin(3 * phase1) + 0.25 * Math.sin(5 * phase1);
+      const raw2 = Math.sin(phase2) >= 0 ? 0.7 : -0.7;
+      return (raw1 + raw2) * 0.75;
+    });
+    return this.sirenWavUri;
+  }
+
   /**
    * Explicitly unlocks mobile Web Audio API and HTML5 Audio on user gesture
    * (e.g., when tapping "Go Online" or "Book Ride").
@@ -203,24 +230,26 @@ class AudioAlertManager {
       }
     }
 
-    // Prime shared HTMLAudioElement during user gesture
-    try {
-      if (typeof Audio !== 'undefined') {
-        if (!this.silentWavUri) {
-          this.silentWavUri = buildPcmWavDataUri(0.05, () => 0);
-        }
-        if (!this.sharedAudioEl && this.silentWavUri) {
-          this.sharedAudioEl = new Audio(this.silentWavUri);
-          this.sharedAudioEl.volume = 1.0;
-          (this.sharedAudioEl as any).playsInline = true;
-          const p = this.sharedAudioEl.play();
-          if (p && typeof p.catch === 'function') {
-            p.catch(() => {});
+    // Prime shared HTMLAudioElement ONLY once during initial unlock so we never interrupt active audio
+    if (!this.unlocked && !this.sirenActive && !this.ringtoneLoopInterval) {
+      try {
+        if (typeof Audio !== 'undefined') {
+          if (!this.silentWavUri) {
+            this.silentWavUri = buildPcmWavDataUri(0.04, () => 0);
+          }
+          if (!this.sharedAudioEl && this.silentWavUri) {
+            this.sharedAudioEl = new Audio(this.silentWavUri);
+            this.sharedAudioEl.volume = 1.0;
+            (this.sharedAudioEl as any).playsInline = true;
+            const p = this.sharedAudioEl.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch(() => {});
+            }
           }
         }
+      } catch {
+        // Ignore
       }
-    } catch {
-      // Ignore
     }
 
     this.unlocked = true;
@@ -235,6 +264,7 @@ class AudioAlertManager {
    */
   public playStatusChime(): void {
     if (typeof window === 'undefined') return;
+    if (this.sirenActive) return;
     this.forcePlaybackAudioSession();
 
     // 1. HTMLAudioElement WAV playback
@@ -293,6 +323,7 @@ class AudioAlertManager {
    */
   public playTripAlertChime(): void {
     if (typeof window === 'undefined') return;
+    if (this.sirenActive) return;
     this.forcePlaybackAudioSession();
 
     // 1. Play synthesized 16-bit PCM WAV on HTMLAudioElement (pierces mobile media channel)
@@ -376,6 +407,158 @@ class AudioAlertManager {
   }
 
   /**
+   * Plays a single 1.2-second high-decibel emergency police siren wail cycle
+   * using the EXACT same discrete-note Web Audio architecture as `playTripAlertChime`
+   * (guaranteed to play on all mobile WebKit/Blink devices without ramp freezes).
+   */
+  public playSirenCycle(): void {
+    if (typeof window === 'undefined') return;
+    this.forcePlaybackAudioSession();
+
+    const ctx = this.getSharedAudioContext();
+    if (!ctx) return;
+
+    try {
+      const scheduleSirenNotes = () => {
+        const now = ctx.currentTime;
+        // 16-step ascending & descending piercing police siren wail (680Hz <-> 1520Hz)
+        const freqs = [
+          680, 790, 900, 1010, 1120, 1240, 1360, 1480,
+          1520, 1400, 1280, 1160, 1040, 920, 800, 700,
+        ];
+        const stepDur = 0.075; // 16 * 0.075s = 1.20s per full cycle
+
+        const masterGain = ctx.createGain();
+        masterGain.gain.setValueAtTime(1.0, now);
+
+        if (typeof ctx.createDynamicsCompressor === 'function') {
+          const compressor = ctx.createDynamicsCompressor();
+          compressor.threshold.setValueAtTime(-10, now);
+          compressor.knee.setValueAtTime(6, now);
+          compressor.ratio.setValueAtTime(12, now);
+          masterGain.connect(compressor);
+          compressor.connect(ctx.destination);
+        } else {
+          masterGain.connect(ctx.destination);
+        }
+
+        freqs.forEach((freq, idx) => {
+          const start = idx * stepDur;
+          const dur = stepDur + 0.012; // Slight overlap for continuous smooth wail
+
+          // Primary sawtooth + secondary detuned square for maximum mobile speaker projection
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc1.type = 'sawtooth';
+          osc2.type = 'square';
+          osc1.frequency.setValueAtTime(freq, now + start);
+          osc2.frequency.setValueAtTime(freq * 1.05, now + start);
+
+          gain.gain.setValueAtTime(0.01, now + start);
+          gain.gain.linearRampToValueAtTime(0.95, now + start + 0.008);
+          gain.gain.exponentialRampToValueAtTime(0.05, now + start + dur);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(masterGain);
+
+          osc1.start(now + start);
+          osc2.start(now + start);
+          osc1.stop(now + start + dur);
+          osc2.stop(now + start + dur);
+        });
+      };
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(scheduleSirenNotes).catch(() => {
+          scheduleSirenNotes();
+        });
+      } else {
+        scheduleSirenNotes();
+      }
+    } catch (e) {
+      console.warn('[AudioAlert] Siren Web Audio cycle failed:', e);
+    }
+  }
+
+  /**
+   * Starts the continuous High-Decibel Emergency Deterrent Siren on mobile & desktop
+   */
+  public startDeterrentSiren(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (this.sirenActive) return true;
+
+    this.stopTripRingtoneLoop();
+    this.forcePlaybackAudioSession();
+    this.sirenActive = true;
+
+    // 1. Start HTMLAudioElement loop using pre-synthesized Base64 PCM WAV on the shared unlocked element
+    try {
+      const uri = this.getSirenWavUri() || '/siren.wav';
+      if (uri && typeof Audio !== 'undefined') {
+        const audio = this.sharedAudioEl || new Audio();
+        this.sharedAudioEl = audio;
+        audio.src = uri;
+        audio.loop = true;
+        audio.volume = 1.0;
+        audio.muted = false;
+        (audio as any).playsInline = true;
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    // 2. Immediately fire Web Audio discrete siren cycle and repeat every 1.18s
+    this.playSirenCycle();
+    this.triggerDeviceVibration();
+
+    this.sirenLoopInterval = setInterval(() => {
+      if (!this.sirenActive) return;
+      this.playSirenCycle();
+      this.triggerDeviceVibration();
+    }, 1180);
+
+    return true;
+  }
+
+  /**
+   * Stops the High-Decibel Emergency Deterrent Siren
+   */
+  public stopDeterrentSiren(): void {
+    this.sirenActive = false;
+    if (this.sirenLoopInterval) {
+      clearInterval(this.sirenLoopInterval);
+      this.sirenLoopInterval = null;
+    }
+    if (this.sharedAudioEl) {
+      try {
+        this.sharedAudioEl.pause();
+        this.sharedAudioEl.loop = false;
+        this.sharedAudioEl.currentTime = 0;
+      } catch {
+        // Ignore
+      }
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(0);
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  public isDeterrentSirenRunning(): boolean {
+    return this.sirenActive;
+  }
+
+  /**
    * Starts a continuous repeating dispatch ringtone + vibration loop while a trip request modal is open
    */
   public startTripRingtoneLoop(): void {
@@ -395,7 +578,7 @@ class AudioAlertManager {
       clearInterval(this.ringtoneLoopInterval);
       this.ringtoneLoopInterval = null;
     }
-    if (this.sharedAudioEl) {
+    if (!this.sirenActive && this.sharedAudioEl) {
       try {
         this.sharedAudioEl.pause();
         this.sharedAudioEl.currentTime = 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShieldAlert,
   PhoneCall,
@@ -109,6 +109,7 @@ export default function SafetyShieldModal({
   const [activeIncident, setActiveIncident] = useState<SafetyIncidentRecord | null>(null);
   const [sirenActive, setSirenActive] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const sirenAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Trusted Contacts (ICE) state
   const [contacts, setContacts] = useState<TrustedContact[]>([]);
@@ -124,9 +125,47 @@ export default function SafetyShieldModal({
   useEffect(() => {
     if (isOpen) {
       setContacts(getTrustedContacts(role));
-      setSirenActive(emergencySiren.isRunning());
+      setSirenActive(audioAlert.isDeterrentSirenRunning() || emergencySiren.isRunning());
     }
   }, [isOpen, role]);
+
+  const startSirenPlayback = () => {
+    // 1. Play preloaded DOM <audio src="/siren.wav"> directly inside user tap gesture
+    try {
+      const el = sirenAudioRef.current;
+      if (el) {
+        el.volume = 1.0;
+        el.muted = false;
+        el.loop = true;
+        el.currentTime = 0;
+        const p = el.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    // 2. Start shared unlocked Web Audio 16-step siren wail + Base64 WAV loop in audioAlert
+    audioAlert.startDeterrentSiren();
+    setSirenActive(true);
+  };
+
+  const stopSirenPlayback = () => {
+    try {
+      const el = sirenAudioRef.current;
+      if (el) {
+        el.pause();
+        el.currentTime = 0;
+      }
+    } catch {
+      // Ignore
+    }
+    audioAlert.stopDeterrentSiren();
+    emergencySiren.stop();
+    setSirenActive(false);
+  };
 
   // Handle 3-second accidental-tap countdown before automatic armed response dispatch
   useEffect(() => {
@@ -174,9 +213,7 @@ export default function SafetyShieldModal({
 
       // If not in silent duress mode, trigger loud deterrent siren & vibration on mobile
       if (!silentDuress) {
-        audioAlert.unlockMobileAudio(false);
-        const started = emergencySiren.start();
-        setSirenActive(started);
+        startSirenPlayback();
       }
     } finally {
       setIsDispatching(false);
@@ -184,13 +221,10 @@ export default function SafetyShieldModal({
   };
 
   const handleToggleSiren = () => {
-    audioAlert.unlockMobileAudio(false);
-    if (sirenActive || emergencySiren.isRunning()) {
-      emergencySiren.stop();
-      setSirenActive(false);
+    if (sirenActive || audioAlert.isDeterrentSirenRunning() || emergencySiren.isRunning()) {
+      stopSirenPlayback();
     } else {
-      const started = emergencySiren.start();
-      setSirenActive(started);
+      startSirenPlayback();
     }
   };
 
@@ -231,10 +265,30 @@ export default function SafetyShieldModal({
     setContacts(updated);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return (
+      <audio
+        ref={sirenAudioRef}
+        src="/siren.wav"
+        loop
+        preload="auto"
+        playsInline
+        className="hidden"
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      {/* Preloaded native DOM audio element for instant mobile speaker playback on tap */}
+      <audio
+        ref={sirenAudioRef}
+        src="/siren.wav"
+        loop
+        preload="auto"
+        playsInline
+        className="hidden"
+      />
       <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-lg shadow-2xl border border-red-500/30 dark:border-red-500/40 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] max-h-[92dvh] flex flex-col">
         {/* Top Security Header */}
         <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-700 text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
@@ -261,10 +315,7 @@ export default function SafetyShieldModal({
             type="button"
             onClick={() => {
               setCountdown(null);
-              if (emergencySiren.isRunning()) {
-                emergencySiren.stop();
-                setSirenActive(false);
-              }
+              stopSirenPlayback();
               onClose();
             }}
             className="p-2 rounded-xl bg-black/20 hover:bg-black/40 text-white transition shrink-0"
