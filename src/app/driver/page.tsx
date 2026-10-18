@@ -1547,6 +1547,11 @@ export default function DriverPage() {
                 </div>
               </div>
             )}
+            <div className="pt-3 mt-2 border-t border-gray-200/50 dark:border-white/5 text-center">
+              <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 dark:text-gray-500">
+                Designed and Developed by <span className="font-black text-emerald-600 dark:text-emerald-400">BORAINE TECH</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
