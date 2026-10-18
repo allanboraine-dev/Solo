@@ -285,7 +285,7 @@ export default function BookingForm({
       </div>
       
       {fare !== null && distanceKm !== null && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-3.5 md:p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-3 md:p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
           <div>
             <div className="flex items-center gap-1.5 mb-0.5">
               <p className="text-xs md:text-sm font-bold text-blue-900 dark:text-blue-100">Estimated Fare</p>
@@ -305,9 +305,24 @@ export default function BookingForm({
         </div>
       )}
 
+      {/* Primary Request Ride Button Placed Immediately Below Inputs/Fare for 0-Scroll Mobile Access */}
+      <button 
+        onClick={handleBook}
+        disabled={isBooking || fare === null}
+        className="w-full bg-blue-600 hover:bg-blue-500 dark:bg-white dark:text-black text-white font-black py-3.5 md:p-4 rounded-2xl hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-45 disabled:hover:scale-100 shadow-xl shadow-blue-600/20 dark:shadow-white/5 flex justify-center items-center gap-2 text-sm md:text-base sticky bottom-0 z-10"
+      >
+        {isBooking ? (
+          <div className="w-5 h-5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
+        ) : fare !== null ? (
+          `Request Ride • R${fare}`
+        ) : (
+          'Select Pickup & Dropoff to Book'
+        )}
+      </button>
+
       {/* Online Drivers & Vehicle Telematics Section for Riders */}
       <div className="pt-0.5">
-        <div className="bg-gray-50/90 dark:bg-zinc-900/60 rounded-2xl p-3 border border-gray-200/80 dark:border-white/5 space-y-2.5">
+        <div className="bg-gray-50/90 dark:bg-zinc-900/60 rounded-2xl p-2.5 md:p-3 border border-gray-200/80 dark:border-white/5 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -328,14 +343,14 @@ export default function BookingForm({
           </div>
 
           {availableDrivers.length === 0 ? (
-            <div className="py-2 px-1 text-center">
+            <div className="py-1.5 px-1 text-center">
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
-                No drivers currently online nearby. Registered drivers will receive instant push notifications when you request a ride.
+                Registered drivers receive instant push alerts when you request a ride.
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {availableDrivers.slice(0, 2).map((driver) => {
+            <div className="space-y-1.5">
+              {availableDrivers.slice(0, 1).map((driver) => {
                 const vehicleName = [driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'
                 const vehicleMeta = [driver.vehicleColor, driver.vehicleYear].filter(Boolean).join(' • ')
                 const plate = driver.licensePlate || 'NC 482-910'
@@ -343,10 +358,10 @@ export default function BookingForm({
                 return (
                   <div
                     key={driver.id}
-                    className="p-2.5 bg-white dark:bg-zinc-950 rounded-xl border border-gray-200/60 dark:border-white/5 shadow-xs flex items-center justify-between gap-2.5 hover:border-blue-500/30 transition"
+                    className="p-2 bg-white dark:bg-zinc-950 rounded-xl border border-gray-200/60 dark:border-white/5 shadow-xs flex items-center justify-between gap-2 hover:border-blue-500/30 transition"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                         {driver.fullName ? driver.fullName.charAt(0).toUpperCase() : 'D'}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -358,16 +373,16 @@ export default function BookingForm({
                             ★ {driver.rating ? driver.rating.toFixed(1) : '5.0'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-gray-300 font-medium truncate mt-0.5">
-                          <Car size={12} className="text-blue-500 shrink-0" />
+                        <div className="flex items-center gap-1 text-[11px] text-gray-600 dark:text-gray-300 font-medium truncate">
+                          <Car size={11} className="text-blue-500 shrink-0" />
                           <span className="truncate">{vehicleName}</span>
                           {vehicleMeta && <span className="text-gray-400 text-[10px] hidden sm:inline">• {vehicleMeta}</span>}
                         </div>
                       </div>
                     </div>
 
-                    <div className="shrink-0 flex flex-col items-end gap-1">
-                      <div className="px-2 py-0.5 bg-amber-300 dark:bg-amber-400 text-black font-mono font-bold text-[10px] rounded border border-black/60 shadow-2xs uppercase flex items-center gap-1">
+                    <div className="shrink-0 flex flex-col items-end gap-0.5">
+                      <div className="px-1.5 py-0.5 bg-amber-300 dark:bg-amber-400 text-black font-mono font-bold text-[10px] rounded border border-black/60 shadow-2xs uppercase flex items-center gap-1">
                         <span className="text-[9px]">🇿🇦</span>
                         <span>{plate}</span>
                       </div>
@@ -379,31 +394,19 @@ export default function BookingForm({
                 )
               })}
 
-              {availableDrivers.length > 2 && onViewAllDrivers && (
+              {availableDrivers.length > 1 && onViewAllDrivers && (
                 <button
                   type="button"
                   onClick={onViewAllDrivers}
                   className="w-full py-1.5 text-center text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-xl transition border border-blue-100 dark:border-blue-900/30"
                 >
-                  + {availableDrivers.length - 2} more online drivers with car info
+                  + {availableDrivers.length - 1} more online drivers with car info
                 </button>
               )}
             </div>
           )}
         </div>
       </div>
-
-      <button 
-        onClick={handleBook}
-        disabled={isBooking || fare === null}
-        className="w-full bg-black dark:bg-white text-white dark:text-black font-bold p-3.5 md:p-4 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-black/10 dark:shadow-white/5 flex justify-center items-center gap-2"
-      >
-        {isBooking ? (
-          <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
-        ) : (
-          'Request Ride'
-        )}
-      </button>
     </div>
   )
 }

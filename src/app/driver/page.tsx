@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
@@ -66,10 +66,14 @@ export default function DriverPage() {
     setActiveTrip(next)
   }
 
+  const [driverTripSubTab, setDriverTripSubTab] = useState<'controls' | 'chat'>('controls')
+
   useEffect(() => {
     activeTripRef.current = activeTrip
     if (activeTrip) {
       setIsHomeSheetMinimized(false)
+    } else {
+      setDriverTripSubTab('controls')
     }
   }, [activeTrip])
 
@@ -789,7 +793,12 @@ export default function DriverPage() {
             : 'top-[76px] sm:top-[86px] md:top-28 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28'
         }`}
       >
-        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited">
+        <div
+          onFocusCapture={() => {
+            if (isHomeSheetMinimized) setIsHomeSheetMinimized(false)
+          }}
+          className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited"
+        >
           {/* Mobile Handle for Home tab */}
           {activeTab === 'home' && (
             <div 
@@ -800,130 +809,254 @@ export default function DriverPage() {
                 <div className="w-8 h-1 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
                 <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 truncate">
                   {isHomeSheetMinimized 
-                    ? (activeTrip ? `Trip: R${activeTrip.fare_amount} (Tap to expand)` : isOnline ? "Online • Searching (Tap to expand)" : "Offline • Tap to expand")
+                    ? (activeTrip ? `${activeTrip.status.replace('_', ' ').toUpperCase()} • PIN: ${activeTrip.verification_pin || '----'} • R${activeTrip.fare_amount}` : isOnline ? "Online • Searching (Tap to expand)" : "Offline • Tap to expand")
                     : "Driver Controls"}
                 </span>
               </div>
-              <button 
-                type="button" 
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-0.5 p-1 shrink-0 touch-manipulation"
-              >
-                <span>{isHomeSheetMinimized ? 'Expand' : 'Map View'}</span>
-                {isHomeSheetMinimized ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isHomeSheetMinimized && activeTrip && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDriverTripSubTab('chat')
+                      setIsHomeSheetMinimized(false)
+                    }}
+                    className="text-[11px] font-bold text-white bg-blue-600 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs"
+                  >
+                    <MessageCircle size={12} />
+                    <span>Chat</span>
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-0.5 p-1 shrink-0 touch-manipulation"
+                >
+                  <span>{isHomeSheetMinimized ? 'Expand' : 'Map View'}</span>
+                  {isHomeSheetMinimized ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </div>
             </div>
           )}
 
-          <div className={`p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
-            activeTab === 'home' && isHomeSheetMinimized ? 'hidden md:flex' : 'pb-28 md:pb-8'
+          <div className={`p-3.5 sm:p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
+            activeTab === 'home' && isHomeSheetMinimized
+              ? 'hidden md:flex'
+              : activeTab === 'home' && activeTrip
+                ? 'pb-4 md:pb-6'
+                : 'pb-28 md:pb-8'
           }`}>
             {activeTab === 'home' && (
               activeTrip ? (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-500 flex flex-col h-full">
-                  <div className="mb-4 flex justify-center">
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30">
-                      <MapPin size={32} />
-                    </div>
-                  </div>
-                  <h2 className="text-2xl font-bold mb-2 text-center tracking-tight">
-                    {activeTrip.status === 'accepted' ? 'En route to Pickup' : activeTrip.status === 'arrived' ? 'Arrived at Pickup' : 'Trip in Progress'}
-                  </h2>
-                  <p className="text-gray-500 mb-3 font-medium text-center text-sm">
-                    {activeTrip.status === 'in_progress' ? `To: ${activeTrip.dropoff_location}` : `Pickup: ${activeTrip.pickup_location}`}
-                  </p>
-                  <div className="flex justify-center mb-4">
-                     <span className="text-green-600 dark:text-green-400 font-black text-3xl tracking-tight">R{activeTrip.fare_amount}</span>
-                  </div>
-
-                  {/* Rider Boarding PIN Card - Displayed prominently to driver to confirm with rider */}
-                  <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 shadow-sm flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                        <KeyRound size={20} />
+                  {/* Compact Top Status & Fare Header */}
+                  <div className="flex items-center justify-between gap-2 mb-2.5 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm shrink-0">
+                        <MapPin size={18} />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider">Boarding PIN</span>
-                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
-                            Confirm with Rider
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                          Match with rider before departure
+                        <h2 className="text-base sm:text-lg font-black tracking-tight truncate">
+                          {activeTrip.status === 'accepted' ? 'En route to Pickup' : activeTrip.status === 'arrived' ? 'Arrived at Pickup' : 'Trip in Progress'}
+                        </h2>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 font-semibold truncate">
+                          {activeTrip.status === 'in_progress' ? `To: ${activeTrip.dropoff_location}` : `Pickup: ${activeTrip.pickup_location}`}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/80 shadow-inner">
-                        <span className="font-mono text-xl sm:text-2xl font-black tracking-widest text-blue-600 dark:text-blue-400">
-                          {activeTrip.verification_pin || '----'}
-                        </span>
-                      </div>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl sm:text-2xl tracking-tight">
+                        R{activeTrip.fare_amount}
+                      </span>
                     </div>
                   </div>
-                  
-                  {activeTrip.status === 'accepted' && (
-                    <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={handleDriverArrived}
-                        disabled={isNotifyingArrival}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
-                      >
-                        <MapPin size={18} />
-                        <span>{isNotifyingArrival ? 'Notifying Rider...' : 'I Have Arrived at Pickup'}</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPinInput(activeTrip.verification_pin || '');
-                          setPinError(null);
-                          setShowPinModal(true);
-                        }}
-                        className="w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-100 min-h-[44px] p-2.5 rounded-2xl font-bold transition-all active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 text-xs sm:text-sm border border-gray-200 dark:border-white/5"
-                      >
-                        <KeyRound size={15} className="text-blue-600 dark:text-blue-400" />
-                        <span>Confirm PIN &amp; Start Trip</span>
-                      </button>
-                    </div>
-                  )}
 
-                  {activeTrip.status === 'arrived' && (
-                    <div className="flex flex-col gap-2.5">
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-semibold">
-                        <MapPin size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>Arrived at pickup. Ask rider for PIN <strong>{activeTrip.verification_pin}</strong> to start trip.</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          setPinInput(activeTrip.verification_pin || '');
-                          setPinError(null);
-                          setShowPinModal(true);
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
-                      >
-                        <KeyRound size={18} />
-                        <span>Verify PIN &amp; Start Trip</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {activeTrip.status !== 'accepted' && activeTrip.status !== 'arrived' && (
-                    <button 
-                      onClick={handleComplete}
-                      className="w-full bg-black dark:bg-white text-white dark:text-black min-h-[48px] p-3.5 sm:p-4 rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
+                  {/* Segmented Mobile Tab Toggle: Eliminates scroll conflict between Trip Controls & Rider Chat */}
+                  <div className="grid grid-cols-2 gap-1.5 p-1 mb-3 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-white/5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDriverTripSubTab('controls')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                        driverTripSubTab === 'controls'
+                          ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                      }`}
                     >
-                      Confirm Dropoff (Complete)
+                      <Navigation size={14} className={driverTripSubTab === 'controls' ? 'text-blue-600 dark:text-blue-400' : ''} />
+                      <span>Trip &amp; PIN</span>
                     </button>
-                  )}
-
-                  {/* Chat Section */}
-                  <div className="mt-6 flex-1 min-h-[250px] flex flex-col border border-gray-200/50 dark:border-white/5 rounded-2xl overflow-hidden bg-white/50 dark:bg-black/50">
-                    <div className="p-3 font-bold border-b border-gray-200/50 dark:border-white/5 bg-gray-50/50 dark:bg-zinc-900/50 text-sm flex items-center justify-center text-gray-500">
-                      Chat with Rider
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <Chat tripId={activeTrip.id} role="driver" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDriverTripSubTab('chat')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                        driverTripSubTab === 'chat'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <MessageCircle size={14} />
+                      <span>Chat with Rider</span>
+                    </button>
                   </div>
+
+                  {driverTripSubTab === 'controls' ? (
+                    <div className="flex flex-col gap-3">
+                      {/* Rider Boarding PIN Card - Displayed prominently to driver to confirm with rider */}
+                      <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 shadow-sm flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                            <KeyRound size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider">Boarding PIN</span>
+                              <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
+                                Confirm
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                              Match with rider before departure
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="bg-white dark:bg-zinc-900 px-3 py-1 rounded-xl border border-blue-200 dark:border-blue-800/80 shadow-inner">
+                            <span className="font-mono text-lg sm:text-xl font-black tracking-widest text-blue-600 dark:text-blue-400">
+                              {activeTrip.verification_pin || '----'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Full Route Card */}
+                      <div className="p-3 rounded-2xl bg-gray-50 dark:bg-zinc-900/70 border border-gray-200/70 dark:border-white/5 space-y-1.5 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <span className="text-gray-400 font-semibold shrink-0">Pickup:</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-100 truncate">{activeTrip.pickup_location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-none bg-emerald-500 shrink-0" />
+                          <span className="text-gray-400 font-semibold shrink-0">Dropoff:</span>
+                          <span className="font-bold text-gray-800 dark:text-gray-100 truncate">{activeTrip.dropoff_location}</span>
+                        </div>
+                      </div>
+
+                      {activeTrip.status === 'accepted' && (
+                        <div className="flex flex-col gap-2">
+                          <button 
+                            onClick={handleDriverArrived}
+                            disabled={isNotifyingArrival}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
+                          >
+                            <MapPin size={18} />
+                            <span>{isNotifyingArrival ? 'Notifying Rider...' : 'I Have Arrived at Pickup'}</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPinInput(activeTrip.verification_pin || '');
+                              setPinError(null);
+                              setShowPinModal(true);
+                            }}
+                            className="w-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-100 min-h-[44px] p-2.5 rounded-2xl font-bold transition-all active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 text-xs sm:text-sm border border-gray-200 dark:border-white/5"
+                          >
+                            <KeyRound size={15} className="text-blue-600 dark:text-blue-400" />
+                            <span>Confirm PIN &amp; Start Trip</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {activeTrip.status === 'arrived' && (
+                        <div className="flex flex-col gap-2">
+                          <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 rounded-xl flex items-center gap-2 text-amber-900 dark:text-amber-200 text-xs font-semibold">
+                            <MapPin size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span>Arrived at pickup. Ask rider for PIN <strong>{activeTrip.verification_pin}</strong> to start trip.</span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setPinInput(activeTrip.verification_pin || '');
+                              setPinError(null);
+                              setShowPinModal(true);
+                            }}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] p-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-blue-600/20 active:scale-95 touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base"
+                          >
+                            <KeyRound size={18} />
+                            <span>Verify PIN &amp; Start Trip</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {activeTrip.status !== 'accepted' && activeTrip.status !== 'arrived' && (
+                        <button 
+                          onClick={handleComplete}
+                          className="w-full bg-black dark:bg-white text-white dark:text-black min-h-[48px] p-3.5 rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
+                        >
+                          Confirm Dropoff (Complete)
+                        </button>
+                      )}
+
+                      {/* Quick Action Footer: Open Rider Chat or Trigger SOS */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setDriverTripSubTab('chat')}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/70 dark:border-blue-800/60 text-xs font-bold active:scale-95 transition touch-manipulation"
+                        >
+                          <MessageCircle size={14} />
+                          <span>Message Rider</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowSafetyModal(true)}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black active:scale-95 transition touch-manipulation shadow-2xs"
+                        >
+                          <span>🚨 SOS / Security</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Dedicated Full-Height Rider Chat View + Sticky Quick Trip Progression Bar */
+                    <div className="flex-1 flex flex-col min-h-[260px] gap-2">
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/50 shrink-0">
+                        <span className="text-xs font-bold text-blue-900 dark:text-blue-200">
+                          PIN: <strong className="font-mono">{activeTrip.verification_pin || '----'}</strong>
+                        </span>
+                        {activeTrip.status === 'accepted' ? (
+                          <button
+                            type="button"
+                            onClick={handleDriverArrived}
+                            disabled={isNotifyingArrival}
+                            className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs active:scale-95"
+                          >
+                            {isNotifyingArrival ? 'Notifying...' : 'Mark Arrived'}
+                          </button>
+                        ) : activeTrip.status === 'arrived' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPinInput(activeTrip.verification_pin || '');
+                              setPinError(null);
+                              setShowPinModal(true);
+                            }}
+                            className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs active:scale-95"
+                          >
+                            Verify PIN &amp; Start
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleComplete}
+                            className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs active:scale-95"
+                          >
+                            Confirm Dropoff
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex-1 min-h-[220px] flex flex-col border border-gray-200/70 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black shadow-inner">
+                        <Chat tripId={activeTrip.id} role="driver" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center mt-6 animate-in fade-in duration-700">

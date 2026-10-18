@@ -46,6 +46,9 @@ export default function RiderPage() {
 
   useEffect(() => {
     activeTripRef.current = activeTrip
+    if (!activeTrip) {
+      setTripSubTab('details')
+    }
   }, [activeTrip])
 
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
@@ -53,6 +56,7 @@ export default function RiderPage() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isSheetMinimized, setIsSheetMinimized] = useState(false)
+  const [tripSubTab, setTripSubTab] = useState<'details' | 'chat'>('details')
   
   // Authentication State
   const [currentUser, setCurrentUser] = useState<{ id: string; fullName?: string; phone?: string } | null>(null)
@@ -708,8 +712,11 @@ export default function RiderPage() {
       {/* Floating UI Panel / Mobile Bottom Sheet */}
       <div className="absolute bottom-0 left-0 right-0 w-full md:bottom-auto md:right-auto md:top-4 md:left-6 md:w-96 flex flex-col z-20 md:max-h-[calc(100vh-128px)] md:max-h-[calc(100dvh-128px)] gpu-composited">
         <div
+          onFocusCapture={() => {
+            if (isSheetMinimized) setIsSheetMinimized(false)
+          }}
           className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
-            isSheetMinimized ? 'max-h-[76px] md:max-h-full overflow-hidden' : 'max-h-[72vh] max-h-[72dvh] md:max-h-full'
+            isSheetMinimized ? 'max-h-[82px] md:max-h-full overflow-hidden' : 'max-h-[76vh] max-h-[76dvh] md:max-h-full'
           }`}
         >
           {/* Mobile Sheet Handle / Minimize Toggle */}
@@ -722,7 +729,7 @@ export default function RiderPage() {
             <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
           </button>
 
-          <div className="p-4 pt-1 pb-6 md:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
+          <div className="p-4 pt-1 pb-5 md:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 <div className="mb-3 md:mb-5 flex items-center justify-between gap-3">
@@ -819,172 +826,244 @@ export default function RiderPage() {
               </div>
             ) : (
               <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-xl md:text-2xl font-bold tracking-tight">Trip Status</h2>
-                  <button
-                    type="button"
-                    onClick={() => setIsSheetMinimized(prev => !prev)}
-                    className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800"
-                  >
-                    {isSheetMinimized ? (
-                      <>
-                        <span>Details</span>
-                        <ChevronUp size={14} />
-                      </>
-                    ) : (
-                      <>
-                        <span>Map</span>
-                        <ChevronDown size={14} />
-                      </>
+                {/* Compact Active Trip Header (Always Visible even when Minimized) */}
+                <div className="flex items-center justify-between gap-2 mb-2.5 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                    <h2 className="text-base sm:text-lg md:text-xl font-black tracking-tight capitalize truncate">
+                      {activeTrip.status.replace('_', ' ')}
+                    </h2>
+                    {activeTrip.verification_pin && (
+                      <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-blue-600 text-white shadow-2xs shrink-0">
+                        PIN: {activeTrip.verification_pin}
+                      </span>
                     )}
-                  </button>
+                    <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                      R{activeTrip.fare_amount}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isSheetMinimized && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTripSubTab('chat')
+                          setIsSheetMinimized(false)
+                        }}
+                        className="md:hidden flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
+                      >
+                        <MessageCircle size={13} />
+                        <span>Chat</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsSheetMinimized(prev => !prev)}
+                      className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800"
+                    >
+                      {isSheetMinimized ? (
+                        <>
+                          <span>Expand</span>
+                          <ChevronUp size={14} />
+                        </>
+                      ) : (
+                        <>
+                          <span>Map</span>
+                          <ChevronDown size={14} />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 
                 {!isSheetMinimized && (
                   <>
-                    <div className="p-4 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl mb-3 md:mb-5 border border-blue-100 dark:border-blue-800/50">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="font-bold text-base md:text-lg capitalize text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                          {activeTrip.status.replace('_', ' ')}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {activeTrip.verification_pin && (
-                            <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-blue-600 text-white shadow-sm">
-                              PIN: {activeTrip.verification_pin}
+                    {/* Segmented Navigation Bar: Eliminates vertical scroll conflict between Trip Details & Chat Input */}
+                    <div className="grid grid-cols-2 gap-1.5 p-1 mb-3 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-white/5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTripSubTab('details')}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                          tripSubTab === 'details'
+                            ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        <MapPin size={14} className={tripSubTab === 'details' ? 'text-blue-600 dark:text-blue-400' : ''} />
+                        <span>Trip Info &amp; PIN</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTripSubTab('chat')}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                          tripSubTab === 'chat'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        <MessageCircle size={14} />
+                        <span>Chat with Driver</span>
+                      </button>
+                    </div>
+
+                    {tripSubTab === 'details' ? (
+                      <div className="p-3.5 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/50">
+                        <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 font-semibold">
+                          {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
+                            <span className="block mb-1 text-blue-500">
+                              Scheduled for: {new Date(activeTrip.scheduled_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                             </span>
                           )}
-                          <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                            R{activeTrip.fare_amount}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 font-medium">
-                        {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
-                          <span className="block mb-1 text-blue-500">
-                            Scheduled for: {new Date(activeTrip.scheduled_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                          </span>
-                        )}
-                        {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
-                        {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
-                        {activeTrip.status === 'arrived' && 'Your driver has arrived! Confirm PIN with driver to board.'}
-                        {activeTrip.status === 'in_progress' && 'Heading to destination...'}
-                      </p>
+                          {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
+                          {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
+                          {activeTrip.status === 'arrived' && 'Your driver has arrived! Confirm PIN with driver to board.'}
+                          {activeTrip.status === 'in_progress' && 'Heading to destination...'}
+                        </p>
 
-                      {/* Driver Arrived PIN Alert */}
-                      {activeTrip.status === 'arrived' && (
-                        <div className="mt-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-pulse">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <MapPin size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                            <span className="truncate">Driver is waiting outside. Share PIN to board:</span>
+                        {/* Route Summary */}
+                        <div className="mt-2.5 pt-2.5 border-t border-blue-200/50 dark:border-blue-800/40 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                            <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{activeTrip.pickup_location}</span>
                           </div>
-                          <span className="font-mono font-black text-sm bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
-                            {activeTrip.verification_pin}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Dispatched Driver & Vehicle Identification Card */}
-                      {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
-                        <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
-                                {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : <User size={18} />}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                                    {assignedDriverInfo?.fullName || 'Assigned Driver'}
-                                  </h4>
-                                  <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
-                                    ★ {assignedDriverInfo?.rating ? assignedDriverInfo.rating.toFixed(1) : '5.0'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200 font-bold mt-0.5">
-                                  <Car size={14} className="text-blue-500 shrink-0" />
-                                  <span className="truncate">
-                                    {[assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* South African License Plate Number Badge */}
-                            <div className="shrink-0 flex flex-col items-end">
-                              <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">License Plate</span>
-                              <div className="px-2.5 py-1 bg-amber-300 dark:bg-amber-400 text-black font-mono font-black text-xs sm:text-sm tracking-wider rounded-lg border-2 border-black/60 shadow-sm uppercase flex items-center gap-1">
-                                <span className="text-[10px] opacity-80">🇿🇦</span>
-                                <span>{assignedDriverInfo?.licensePlate || 'NC 482-910'}</span>
-                              </div>
-                            </div>
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-2 h-2 rounded-none bg-emerald-500 shrink-0" />
+                            <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{activeTrip.dropoff_location}</span>
                           </div>
+                        </div>
 
-                          {/* Security & Verification Reminder */}
-                          <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                              <ShieldCheck size={13} /> Verify plate before boarding
+                        {/* Driver Arrived PIN Alert */}
+                        {activeTrip.status === 'arrived' && (
+                          <div className="mt-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-pulse">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <MapPin size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span className="truncate">Driver is waiting outside. Share PIN to board:</span>
+                            </div>
+                            <span className="font-mono font-black text-sm bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
+                              {activeTrip.verification_pin}
                             </span>
-                            {assignedDriverInfo?.phone && (
-                              <a
-                                href={`tel:${assignedDriverInfo.phone}`}
-                                className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
-                              >
-                                <Phone size={11} /> Call
-                              </a>
-                            )}
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      <div className="mt-2.5 md:mt-3 flex flex-wrap items-center gap-2">
-                        <a
-                          href={buildWhatsAppTripShareUrl(activeTrip)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl transition"
-                        >
-                          <MessageCircle size={14} />
-                          <span>Share Live Trip via WhatsApp</span>
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => setShowSafetyModal(true)}
-                          className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded-xl shadow-sm transition active:scale-95"
-                        >
-                          <span>🚨 SOS / Armed Response</span>
-                        </button>
-                        {activeTrip.status === 'requested' && (
+                        {/* Dispatched Driver & Vehicle Identification Card */}
+                        {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
+                          <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                                  {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : <User size={18} />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                      {assignedDriverInfo?.fullName || 'Assigned Driver'}
+                                    </h4>
+                                    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
+                                      ★ {assignedDriverInfo?.rating ? assignedDriverInfo.rating.toFixed(1) : '5.0'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200 font-bold mt-0.5">
+                                    <Car size={14} className="text-blue-500 shrink-0" />
+                                    <span className="truncate">
+                                      {[assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* South African License Plate Number Badge */}
+                              <div className="shrink-0 flex flex-col items-end">
+                                <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">License Plate</span>
+                                <div className="px-2.5 py-1 bg-amber-300 dark:bg-amber-400 text-black font-mono font-black text-xs sm:text-sm tracking-wider rounded-lg border-2 border-black/60 shadow-sm uppercase flex items-center gap-1">
+                                  <span className="text-[10px] opacity-80">🇿🇦</span>
+                                  <span>{assignedDriverInfo?.licensePlate || 'NC 482-910'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Security & Verification Reminder + Quick Message Button */}
+                            <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium truncate">
+                                <ShieldCheck size={13} className="shrink-0" /> Verify plate before boarding
+                              </span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setTripSubTab('chat')}
+                                  className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg flex items-center gap-1 hover:bg-blue-100 transition"
+                                >
+                                  <MessageCircle size={11} /> Message Driver
+                                </button>
+                                {assignedDriverInfo?.phone && (
+                                  <a
+                                    href={`tel:${assignedDriverInfo.phone}`}
+                                    className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                                  >
+                                    <Phone size={11} /> Call
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!activeTrip) return;
-                              const myRiderId = getRiderSessionId(currentUser?.id);
-                              const storedActiveTripId = getRiderActiveTripId();
-                              if (
-                                activeTrip.id !== storedActiveTripId &&
-                                activeTrip.rider_id !== myRiderId &&
-                                myRiderId !== '00000000-0000-0000-0000-000000000000'
-                              ) {
-                                console.warn('[Rider] Refusing to cancel trip belonging to another rider session');
-                                return;
-                              }
-                              const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
-                              updateActiveTripState(null);
-                              setDriverCoords(null);
-                              await saveTrip(cancelled);
-                            }}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
+                            onClick={() => setTripSubTab('chat')}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
                           >
-                            <span>Cancel Request</span>
+                            <MessageCircle size={14} />
+                            <span>Open Driver Chat</span>
                           </button>
-                        )}
+                          <a
+                            href={buildWhatsAppTripShareUrl(activeTrip)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-2 rounded-xl transition"
+                          >
+                            <MessageCircle size={14} />
+                            <span>Share via WhatsApp</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setShowSafetyModal(true)}
+                            className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-red-600 hover:bg-red-500 px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
+                          >
+                            <span>🚨 SOS</span>
+                          </button>
+                          {activeTrip.status === 'requested' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!activeTrip) return;
+                                const myRiderId = getRiderSessionId(currentUser?.id);
+                                const storedActiveTripId = getRiderActiveTripId();
+                                if (
+                                  activeTrip.id !== storedActiveTripId &&
+                                  activeTrip.rider_id !== myRiderId &&
+                                  myRiderId !== '00000000-0000-0000-0000-000000000000'
+                                ) {
+                                  console.warn('[Rider] Refusing to cancel trip belonging to another rider session');
+                                  return;
+                                }
+                                const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
+                                updateActiveTripState(null);
+                                setDriverCoords(null);
+                                await saveTrip(cancelled);
+                              }}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-2 rounded-xl transition"
+                            >
+                              <span>Cancel Request</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex-1 min-h-[190px] md:min-h-[280px] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">
-                      <Chat tripId={activeTrip.id} role="rider" />
-                    </div>
+                    ) : (
+                      <div className="flex-1 min-h-[260px] md:min-h-[320px] flex flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-black shadow-inner">
+                        <Chat tripId={activeTrip.id} role="rider" />
+                      </div>
+                    )}
                   </>
                 )}
               </div>

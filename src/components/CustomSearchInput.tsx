@@ -165,6 +165,11 @@ export default function CustomSearchInput({
           }}
           onFocus={() => {
             setIsOpen(true)
+            if (typeof window !== 'undefined' && window.innerWidth < 768) {
+              setTimeout(() => {
+                wrapperRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 120)
+            }
           }}
           onKeyDown={handleKeyDown}
           autoCapitalize="words"
@@ -172,7 +177,7 @@ export default function CustomSearchInput({
           spellCheck={false}
           autoComplete="off"
           placeholder={placeholder}
-          className={`w-full p-3.5 md:p-4 bg-transparent outline-none font-medium text-base sm:text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 ${
+          className={`w-full p-3 md:p-4 bg-transparent outline-none font-medium text-base sm:text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 ${
             hasRightAction ? 'pr-20' : 'pr-10'
           }`}
         />
@@ -202,17 +207,21 @@ export default function CustomSearchInput({
       {isOpen && (
         <div
           ref={listRef}
-          className="absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-60 md:max-h-72 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col animate-in fade-in zoom-in-95 duration-150"
+          className="absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-52 md:max-h-72 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col animate-in fade-in zoom-in-95 duration-150"
         >
-          {isQueryShort && (
-            <div className="px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/90 dark:bg-zinc-800/60 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Sparkles size={12} className="text-amber-500" />
-                Popular Destinations
-              </span>
-              <span className="text-[10px] lowercase text-gray-400 font-normal">Kimberley</span>
-            </div>
-          )}
+          <div className="px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/90 dark:bg-zinc-800/60 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between sticky top-0 z-10">
+            <span className="flex items-center gap-1.5">
+              <Sparkles size={12} className="text-amber-500" />
+              {isQueryShort ? 'Popular Destinations' : 'Matching Locations'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="text-[11px] font-bold text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded hover:bg-gray-200/60 dark:hover:bg-zinc-700"
+            >
+              Done ✕
+            </button>
+          </div>
 
           {activePlacesList.length > 0 ? (
             activePlacesList.map((place, index) => {
