@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -68,6 +68,26 @@ export default function DriverPage() {
   }
 
   const [driverTripSubTab, setDriverTripSubTab] = useState<'controls' | 'chat'>('controls')
+  const [driverUnreadChatCount, setDriverUnreadChatCount] = useState(0)
+  const [driverIncomingMessageToast, setDriverIncomingMessageToast] = useState<{ sender: string; text: string } | null>(null)
+  const driverTripSubTabRef = useRef(driverTripSubTab)
+
+  useEffect(() => {
+    driverTripSubTabRef.current = driverTripSubTab
+    if (driverTripSubTab === 'chat') {
+      setDriverUnreadChatCount(0)
+      setDriverIncomingMessageToast(null)
+    }
+  }, [driverTripSubTab])
+
+  useEffect(() => {
+    if (driverIncomingMessageToast) {
+      const timer = setTimeout(() => {
+        setDriverIncomingMessageToast(null)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [driverIncomingMessageToast])
 
   useEffect(() => {
     activeTripRef.current = activeTrip
@@ -355,6 +375,22 @@ export default function DriverPage() {
           setPreemptedNotice("Signed out of active duty: your driver account went online from another device. Drivers can only be active on 1 device at a time.");
           return;
         }
+        return;
+      }
+
+      if (type === 'new_message') {
+        const msg = payload as MockMessage;
+        const currentActive = activeTripRef.current;
+        if (msg && currentActive && msg.trip_id === currentActive.id) {
+          if (msg.sender === 'rider') {
+            audioAlert.alertOfNewMessage(msg, 'driver');
+            if (driverTripSubTabRef.current !== 'chat') {
+              setDriverUnreadChatCount((prev) => prev + 1);
+              setDriverIncomingMessageToast({ sender: 'Rider', text: msg.text });
+            }
+          }
+        }
+        return;
       }
 
       if (type === 'INSERT' || type === 'trip_updated') {
@@ -916,10 +952,13 @@ export default function DriverPage() {
                       setDriverTripSubTab('chat')
                       setIsHomeSheetMinimized(false)
                     }}
-                    className="text-[11px] font-bold text-white bg-blue-600 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs"
+                    className="relative text-[11px] font-bold text-white bg-blue-600 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs"
                   >
                     <MessageCircle size={12} />
                     <span>Chat</span>
+                    {driverUnreadChatCount > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
+                    )}
                   </button>
                 )}
                 <button 
@@ -982,7 +1021,7 @@ export default function DriverPage() {
                     <button
                       type="button"
                       onClick={() => setDriverTripSubTab('chat')}
-                      className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                      className={`relative flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
                         driverTripSubTab === 'chat'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -990,8 +1029,29 @@ export default function DriverPage() {
                     >
                       <MessageCircle size={14} />
                       <span>Chat with Rider</span>
+                      {driverUnreadChatCount > 0 && driverTripSubTab !== 'chat' && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-bounce leading-none shadow-sm">
+                          {driverUnreadChatCount}
+                        </span>
+                      )}
                     </button>
                   </div>
+
+                  {/* Incoming Message Floating Alert Toast if Driver is on Navigation/Controls Tab */}
+                  {driverIncomingMessageToast && driverTripSubTab === 'controls' && (
+                    <div
+                      onClick={() => setDriverTripSubTab('chat')}
+                      className="mb-2.5 p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-between gap-2 text-xs font-medium shadow-md cursor-pointer animate-in fade-in slide-in-from-top-2 transition active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <MessageCircle size={16} className="shrink-0 animate-pulse text-blue-200" />
+                        <span className="truncate">
+                          <strong className="text-blue-100">{driverIncomingMessageToast.sender}:</strong> {driverIncomingMessageToast.text}
+                        </span>
+                      </div>
+                      <span className="text-[11px] underline shrink-0 font-bold text-blue-100">Reply →</span>
+                    </div>
+                  )}
 
                   {driverTripSubTab === 'controls' ? (
                     <div className="flex flex-col gap-3">

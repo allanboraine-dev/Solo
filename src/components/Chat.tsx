@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { getMessages, fetchTripMessages, saveMessage, subscribeToEvents, deduplicateMessages, type MockMessage } from '@/lib/mockBackend';
+import { audioAlert } from '@/utils/audioAlert';
 
 interface ChatProps {
   tripId: string;
@@ -32,6 +33,9 @@ export default function Chat({ tripId, role }: ChatProps) {
   const quickReplies = role === 'driver' ? DRIVER_QUICK_REPLIES : RIDER_QUICK_REPLIES;
 
   useEffect(() => {
+    // Prime audio context on chat component mount
+    audioAlert.unlockMobileAudio(false);
+
     // Load initial messages from local cache first
     setMessages(deduplicateMessages(getMessages(tripId)));
 
@@ -42,18 +46,21 @@ export default function Chat({ tripId, role }: ChatProps) {
       }
     });
 
-    // Subscribe to new messages with strict deduplication
+    // Subscribe to new messages with strict deduplication & sound notification
     const unsubscribe = subscribeToEvents((type, payload) => {
       if (type === 'new_message') {
         const msg = payload as MockMessage;
         if (msg.trip_id === tripId) {
           setMessages(prev => deduplicateMessages([...prev, msg]));
+          if (msg.sender !== role) {
+            audioAlert.alertOfNewMessage(msg, role);
+          }
         }
       }
     });
 
     return () => unsubscribe();
-  }, [tripId]);
+  }, [tripId, role]);
 
   // Scroll ONLY the internal chat container, never hijacking the parent mobile sheet scroll!
   useEffect(() => {

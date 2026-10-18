@@ -5,7 +5,7 @@ import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
-import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver, type MockMessage } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -58,6 +58,26 @@ export default function RiderPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isSheetMinimized, setIsSheetMinimized] = useState(false)
   const [tripSubTab, setTripSubTab] = useState<'details' | 'chat'>('details')
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+  const [incomingMessageToast, setIncomingMessageToast] = useState<{ sender: string; text: string } | null>(null)
+  const tripSubTabRef = useRef(tripSubTab)
+
+  useEffect(() => {
+    tripSubTabRef.current = tripSubTab
+    if (tripSubTab === 'chat') {
+      setUnreadChatCount(0)
+      setIncomingMessageToast(null)
+    }
+  }, [tripSubTab])
+
+  useEffect(() => {
+    if (incomingMessageToast) {
+      const timer = setTimeout(() => {
+        setIncomingMessageToast(null)
+      }, 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [incomingMessageToast])
   
   // Authentication State
   const [currentUser, setCurrentUser] = useState<{ id: string; fullName?: string; phone?: string } | null>(null)
@@ -503,6 +523,19 @@ export default function RiderPage() {
         }
       } else if (type === 'driver_location') {
         handleDriverLocationUpdate(payload);
+      } else if (type === 'new_message') {
+        const msg = payload as MockMessage;
+        const currentActive = activeTripRef.current || activeTrip;
+        if (msg && currentActive && msg.trip_id === currentActive.id) {
+          if (msg.sender === 'driver') {
+            // Play acoustic sound chime & mobile haptics immediately
+            audioAlert.alertOfNewMessage(msg, 'rider');
+            if (tripSubTabRef.current !== 'chat') {
+              setUnreadChatCount((prev) => prev + 1);
+              setIncomingMessageToast({ sender: 'Driver', text: msg.text });
+            }
+          }
+        }
       }
     });
 
@@ -963,10 +996,13 @@ export default function RiderPage() {
                           setTripSubTab('chat')
                           setIsSheetMinimized(false)
                         }}
-                        className="md:hidden flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
+                        className="md:hidden relative flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
                       >
                         <MessageCircle size={13} />
                         <span>Chat</span>
+                        {unreadChatCount > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
+                        )}
                       </button>
                     )}
                     <button
@@ -992,7 +1028,7 @@ export default function RiderPage() {
                 {!isSheetMinimized && (
                   <>
                     {/* Segmented Navigation Bar: Eliminates vertical scroll conflict between Trip Details & Chat Input */}
-                    <div className="grid grid-cols-2 gap-1.5 p-1 mb-3 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-white/5 shrink-0">
+                    <div className="grid grid-cols-2 gap-1.5 p-1 mb-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-white/5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setTripSubTab('details')}
@@ -1008,7 +1044,7 @@ export default function RiderPage() {
                       <button
                         type="button"
                         onClick={() => setTripSubTab('chat')}
-                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                        className={`relative flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
                           tripSubTab === 'chat'
                             ? 'bg-blue-600 text-white shadow-sm'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -1016,8 +1052,29 @@ export default function RiderPage() {
                       >
                         <MessageCircle size={14} />
                         <span>Chat with Driver</span>
+                        {unreadChatCount > 0 && tripSubTab !== 'chat' && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-bounce leading-none shadow-sm">
+                            {unreadChatCount}
+                          </span>
+                        )}
                       </button>
                     </div>
+
+                    {/* Incoming Message Floating Alert Toast if Rider is on Details Tab */}
+                    {incomingMessageToast && tripSubTab === 'details' && (
+                      <div
+                        onClick={() => setTripSubTab('chat')}
+                        className="mb-2.5 p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-between gap-2 text-xs font-medium shadow-md cursor-pointer animate-in fade-in slide-in-from-top-2 transition active:scale-[0.98]"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MessageCircle size={16} className="shrink-0 animate-pulse text-blue-200" />
+                          <span className="truncate">
+                            <strong className="text-blue-100">{incomingMessageToast.sender}:</strong> {incomingMessageToast.text}
+                          </span>
+                        </div>
+                        <span className="text-[11px] underline shrink-0 font-bold text-blue-100">Reply →</span>
+                      </div>
+                    )}
 
                     {tripSubTab === 'details' ? (
                       <div className="p-3.5 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/50">

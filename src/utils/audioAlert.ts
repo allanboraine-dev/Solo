@@ -76,11 +76,13 @@ class AudioAlertManager {
   private audioCtx: AudioContext | null = null;
   private tripChimeWavUri: string | null = null;
   private statusChimeWavUri: string | null = null;
+  private messageChimeWavUri: string | null = null;
   private sirenWavUri: string | null = null;
   private silentWavUri: string | null = null;
   private sharedAudioEl: HTMLAudioElement | null = null;
   private ringtoneLoopInterval: ReturnType<typeof setInterval> | null = null;
   private sirenLoopInterval: ReturnType<typeof setInterval> | null = null;
+  private recentAlertedMessageIds = new Set<string>();
   private sirenActive = false;
   private unlocked = false;
   private listenersAttached = false;
@@ -184,6 +186,25 @@ class AudioAlertManager {
       return (Math.sin(p) + 0.35 * Math.sin(3 * p)) * 0.75 * env;
     });
     return this.statusChimeWavUri;
+  }
+
+  private getMessageChimeWavUri(): string | null {
+    if (this.messageChimeWavUri) return this.messageChimeWavUri;
+    // Crisp 0.40s two-tone melodic bubble pop chime (B5 -> E6)
+    const notes = [
+      { freq: 987.77, start: 0.0, end: 0.14 },
+      { freq: 1318.51, start: 0.14, end: 0.40 },
+    ];
+    this.messageChimeWavUri = buildPcmWavDataUri(0.40, (t) => {
+      const active = notes.find((n) => t >= n.start && t <= n.end);
+      if (!active) return 0;
+      const localT = t - active.start;
+      const dur = active.end - active.start;
+      const env = Math.min(1, localT / 0.008) * Math.max(0.08, 1 - (localT / dur) * 0.72);
+      const p = 2 * Math.PI * active.freq * t;
+      return (Math.sin(p) + 0.28 * Math.sin(2 * p) + 0.15 * Math.sin(3 * p)) * 0.82 * env;
+    });
+    return this.messageChimeWavUri;
   }
 
   private getSirenWavUri(): string | null {
@@ -324,6 +345,163 @@ class AudioAlertManager {
     } catch {
       // Ignore
     }
+  }
+
+  /**
+   * Plays a crisp, melodic 2-tone notification chime for incoming chat messages
+   * using both HTML5 PCM WAV and Web Audio API for guaranteed mobile playback.
+   */
+  public playMessageNotification(isIncoming = true): void {
+    if (typeof window === 'undefined') return;
+    if (this.sirenActive) return;
+    this.forcePlaybackAudioSession();
+
+    // 1. Play synthesized 16-bit PCM WAV on HTMLAudioElement
+    try {
+      const uri = this.getMessageChimeWavUri();
+      if (uri && typeof Audio !== 'undefined') {
+        const audio = new Audio(uri);
+        audio.volume = 1.0;
+        (audio as any).playsInline = true;
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      }
+    } catch {
+      // Fall through to Web Audio
+    }
+
+    // 2. Play Web Audio API synthesized chime
+    const ctx = this.getSharedAudioContext();
+    if (ctx) {
+      try {
+        const scheduleMessageNotes = () => {
+          const now = ctx.currentTime;
+          const notes = isIncoming
+            ? [
+                { freq: 987.77, start: 0.0, dur: 0.13 },  // B5
+                { freq: 1318.51, start: 0.13, dur: 0.25 }, // E6
+              ]
+            : [
+                { freq: 1318.51, start: 0.0, dur: 0.12 }, // E6
+                { freq: 1567.98, start: 0.12, dur: 0.22 }, // G6
+              ];
+
+          const masterGain = ctx.createGain();
+          masterGain.gain.setValueAtTime(0.85, now);
+          masterGain.connect(ctx.destination);
+
+          notes.forEach(({ freq, start, dur }) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + start);
+
+            gain.gain.setValueAtTime(0.001, now + start);
+            gain.gain.linearRampToValueAtTime(0.8, now + start + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+            osc.connect(gain);
+            gain.connect(masterGain);
+
+            osc.start(now + start);
+            osc.stop(now + start + dur);
+          });
+        };
+
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(scheduleMessageNotes).catch(() => scheduleMessageNotes());
+        } else {
+          scheduleMessageNotes();
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    // 3. Subtle mobile haptic double-buzz: [70ms, 40ms pause, 70ms]
+    try {
+      const nav = window.navigator || (typeof navigator !== 'undefined' ? navigator : null);
+      if (nav && 'vibrate' in nav && typeof (nav as any).vibrate === 'function') {
+        (nav as any).vibrate([70, 40, 70]);
+      }
+    } catch {}
+  }
+
+  /**
+   * Dispatches acoustic sound alert, haptic vibration, and system notification
+   * whenever a new message is received from the other party (deduplicated by message ID).
+   */
+  public alertOfNewMessage(
+    msg: { id: string; trip_id?: string; sender: 'rider' | 'driver'; text: string },
+    currentRole: 'rider' | 'driver'
+  ): boolean {
+    if (typeof window === 'undefined') return false;
+    // Only alert for incoming messages sent by the other party
+    if (msg.sender === currentRole) return false;
+    // Avoid re-alerting for the same message within a short window
+    if (this.recentAlertedMessageIds.has(msg.id)) return false;
+
+    this.recentAlertedMessageIds.add(msg.id);
+    if (this.recentAlertedMessageIds.size > 100) {
+      const oldest = Array.from(this.recentAlertedMessageIds).slice(0, 50);
+      oldest.forEach((id) => this.recentAlertedMessageIds.delete(id));
+    }
+
+    // Play notification sound & mobile haptics
+    this.playMessageNotification(true);
+
+    // Show system notification if browser is in background / permission granted
+    this.showMessageSystemNotification(msg, currentRole);
+
+    return true;
+  }
+
+  /**
+   * Shows a mobile system notification for incoming messages when app is in background
+   */
+  public async showMessageSystemNotification(
+    msg: { id: string; trip_id?: string; sender: 'rider' | 'driver'; text: string },
+    currentRole: 'rider' | 'driver'
+  ): Promise<void> {
+    if (typeof window === 'undefined') return;
+    const win = window as any;
+    if (!win.Notification || win.Notification.permission !== 'granted') return;
+
+    const senderTitle = msg.sender === 'driver' ? '🚗 Driver' : '👤 Rider';
+    const title = `💬 Message from ${senderTitle}`;
+    const options: NotificationOptions = {
+      body: msg.text,
+      icon: currentRole === 'rider' ? '/rider-icon-192.png' : '/driver-icon-192.png',
+      badge: '/icon-192.png',
+      tag: `msg-${msg.id}`,
+      // @ts-expect-error vibrate in NotificationOptions
+      vibrate: [70, 40, 70],
+      renotify: true,
+      silent: false,
+      data: {
+        url: currentRole === 'rider' ? `/rider?chat=true` : `/driver?chat=true`,
+        tripId: msg.trip_id,
+      },
+    };
+
+    try {
+      const nav = win.navigator;
+      if (nav && 'serviceWorker' in nav && nav.serviceWorker?.ready) {
+        const registration = await nav.serviceWorker.ready;
+        if (registration && typeof registration.showNotification === 'function') {
+          await registration.showNotification(title, options);
+          return;
+        }
+      }
+    } catch {}
+
+    try {
+      if (typeof win.Notification === 'function') {
+        new win.Notification(title, options);
+      }
+    } catch {}
   }
 
   /**
