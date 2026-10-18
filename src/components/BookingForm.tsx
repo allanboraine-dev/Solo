@@ -74,6 +74,10 @@ export default function BookingForm({
             lng: position.coords.longitude
           }
           
+          // Immediately anchor pickup coordinates and center the map on actual GPS position
+          setRealPickupCoords(coords)
+          onLocationSelect('pickup', coords.lat, coords.lng)
+
           let address = 'Current Location';
           try {
             const resolved = await reverseGeocode(coords.lat, coords.lng);
@@ -90,15 +94,20 @@ export default function BookingForm({
           }
           
           setPickup(address)
-          setRealPickupCoords(coords)
-          onLocationSelect('pickup', coords.lat, coords.lng)
         },
         (error) => {
-          alert('Could not fetch location. Please ensure location services are enabled.')
-          console.error(error)
+          alert('Could not fetch GPS location. Please ensure location services are enabled on your device.')
+          console.error('Geolocation error:', error)
           setPickup('')
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
         }
       )
+    } else {
+      alert('Geolocation is not supported by your browser.')
     }
   }
 

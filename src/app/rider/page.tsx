@@ -810,6 +810,7 @@ export default function RiderPage() {
   };
 
   const handleLocationSelect = (type: 'pickup' | 'dropoff', lat: number, lng: number) => {
+    setFocusedDriverCoords(null);
     if (type === 'pickup') setPickupCoords({ lat, lng })
     else setDropoffCoords({ lat, lng })
   }
@@ -841,9 +842,9 @@ export default function RiderPage() {
             etaMinutes: d.etaMinutes,
           }))}
           focusedDriverCoords={focusedDriverCoords}
-          assignedDriver={activeTrip && (driverCoords || assignedDriverInfo) ? {
-            lat: driverCoords?.lat || (activeTrip.pickup_lat),
-            lng: driverCoords?.lng || (activeTrip.pickup_lng),
+          assignedDriver={activeTrip && (driverCoords || assignedDriverInfo) && ((driverCoords?.lat && Math.abs(driverCoords.lat) > 1) || (activeTrip.pickup_lat && Math.abs(activeTrip.pickup_lat) > 1)) ? {
+            lat: (driverCoords?.lat && Math.abs(driverCoords.lat) > 1) ? driverCoords.lat : activeTrip.pickup_lat,
+            lng: (driverCoords?.lng && Math.abs(driverCoords.lng) > 1) ? driverCoords.lng : activeTrip.pickup_lng,
             name: assignedDriverInfo?.fullName || 'Your Driver',
             vehicle: [assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'En route',
             licensePlate: assignedDriverInfo?.licensePlate,

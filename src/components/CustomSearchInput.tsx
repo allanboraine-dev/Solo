@@ -41,6 +41,7 @@ export default function CustomSearchInput({
   const listRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const suppressNextSearchRef = useRef(false)
+  const isUserTypingRef = useRef(false)
 
   // When value is short/empty, show top Kimberley destinations as quick-picks
   const isQueryShort = !value || value.trim().length < 2
@@ -49,6 +50,13 @@ export default function CustomSearchInput({
   useEffect(() => {
     if (suppressNextSearchRef.current) {
       suppressNextSearchRef.current = false
+      setIsOpen(false)
+      return
+    }
+
+    // Only run debounced network search if the user is actively typing in the input
+    if (!isUserTypingRef.current) {
+      setIsLoading(false)
       return
     }
 
@@ -96,6 +104,7 @@ export default function CustomSearchInput({
   }, [activeIndex])
 
   const handleSelect = (place: SearchResultPlace) => {
+    isUserTypingRef.current = false
     suppressNextSearchRef.current = true
     onSelect(place)
     setIsOpen(false)
@@ -119,9 +128,13 @@ export default function CustomSearchInput({
       setActiveIndex((prev) => (prev > 0 ? prev - 1 : list.length - 1))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const selected = activeIndex >= 0 ? list[activeIndex] : list[0]
-      if (selected) {
-        handleSelect(selected)
+      // Only select if user actively highlighted an item from the list
+      if (activeIndex >= 0 && list[activeIndex]) {
+        handleSelect(list[activeIndex])
+      } else {
+        // If no item is highlighted, Enter simply closes the suggestions and retains current value
+        setIsOpen(false)
+        setActiveIndex(-1)
       }
     } else if (e.key === 'Escape') {
       e.preventDefault()
@@ -160,6 +173,7 @@ export default function CustomSearchInput({
           type="text"
           value={value}
           onChange={(e) => {
+            isUserTypingRef.current = true
             onChange(e.target.value)
             setIsOpen(true)
           }}
@@ -189,6 +203,7 @@ export default function CustomSearchInput({
           <button
             type="button"
             onClick={() => {
+              isUserTypingRef.current = false
               onChange('')
               setResults([])
               setActiveIndex(-1)

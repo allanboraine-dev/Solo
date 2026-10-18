@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -120,15 +120,36 @@ const MapUpdater = ({
   focusedDriverCoords,
 }: any) => {
   const map = useMap();
+  const prevFocusedRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (focusedDriverCoords?.lat && focusedDriverCoords?.lng) {
-      map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
-      return;
+    // Coordinate sanity check helper (avoid zooming to 0,0 in the Atlantic ocean)
+    const isValidCoord = (lat?: number | null, lng?: number | null) =>
+      typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 1 && Math.abs(lng) > 1;
+
+    const hasValidPickup = isValidCoord(pickupLat, pickupLng);
+    const hasValidDropoff = isValidCoord(dropoffLat, dropoffLng);
+    const hasValidDriver = isValidCoord(driverLat, driverLng);
+    const hasValidFocusedDriver = isValidCoord(focusedDriverCoords?.lat, focusedDriverCoords?.lng);
+
+    // If focused driver was tapped, fly to driver only once when selected
+    if (hasValidFocusedDriver) {
+      const isNewFocus =
+        !prevFocusedRef.current ||
+        prevFocusedRef.current.lat !== focusedDriverCoords.lat ||
+        prevFocusedRef.current.lng !== focusedDriverCoords.lng;
+
+      if (isNewFocus) {
+        prevFocusedRef.current = { lat: focusedDriverCoords.lat, lng: focusedDriverCoords.lng };
+        map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
+        return;
+      }
+    } else {
+      prevFocusedRef.current = null;
     }
 
     // 1. If trip is accepted and driver is en route to pickup:
-    if (tripStatus === 'accepted' && driverLat && driverLng && pickupLat && pickupLng) {
+    if (tripStatus === 'accepted' && hasValidDriver && hasValidPickup) {
       const bounds = L.latLngBounds(
         [driverLat, driverLng],
         [pickupLat, pickupLng]
@@ -138,7 +159,7 @@ const MapUpdater = ({
     }
 
     // 2. If trip is in progress and driver is en route to destination:
-    if (tripStatus === 'in_progress' && driverLat && driverLng && dropoffLat && dropoffLng) {
+    if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
       const bounds = L.latLngBounds(
         [driverLat, driverLng],
         [dropoffLat, dropoffLng]
@@ -148,22 +169,24 @@ const MapUpdater = ({
     }
 
     // 3. If driver arrived at pickup:
-    if (tripStatus === 'arrived' && pickupLat && pickupLng) {
+    if (tripStatus === 'arrived' && hasValidPickup) {
       map.setView([pickupLat, pickupLng], 16);
       return;
     }
 
     // 4. Default pickup to dropoff bounds:
-    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+    if (hasValidPickup && hasValidDropoff) {
       const bounds = L.latLngBounds(
         [pickupLat, pickupLng],
         [dropoffLat, dropoffLng]
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-    } else if (pickupLat && pickupLng) {
+    } else if (hasValidPickup) {
       map.setView([pickupLat, pickupLng], 15);
-    } else if (dropoffLat && dropoffLng) {
+    } else if (hasValidDropoff) {
       map.setView([dropoffLat, dropoffLng], 15);
+    } else if (hasValidDriver && !tripStatus) {
+      map.setView([driverLat, driverLng], 15);
     }
   }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords]);
 
