@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
-import { isWithinRadiusKm } from '@/utils/geo'
+import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
@@ -97,6 +97,7 @@ export default function DriverPage() {
   const [isNotifyingArrival, setIsNotifyingArrival] = useState(false)
   const [showSafetyModal, setShowSafetyModal] = useState(false)
   const [nearbySosAlert, setNearbySosAlert] = useState<SafetyIncidentRecord | null>(null)
+  const [liveNavDetails, setLiveNavDetails] = useState<{ distanceKm: number; durationMinutes: number } | null>(null)
   const [telemetryStatus, setTelemetryStatus] = useState<ComputedGpsSample | null>(null)
   const telemetryGovernorRef = useRef<AdaptiveTelemetryGovernor | null>(null)
 
@@ -472,6 +473,22 @@ export default function DriverPage() {
           speedKmh: sample.speedKmh,
           shouldBroadcastWs: sample.shouldBroadcastWs,
         });
+
+        // Push authoritative real-time GPS coordinate to tracking endpoint for active trips
+        if (activeTripRef.current?.id) {
+          fetch('/api/trips/tracking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tripId: activeTripRef.current.id,
+              driverId: profile.id,
+              lat: latitude,
+              lng: longitude,
+              heading: sample.heading,
+              speedKmh: sample.speedKmh,
+            }),
+          }).catch(() => {});
+        }
       }
     };
 
@@ -601,6 +618,19 @@ export default function DriverPage() {
         return;
       }
       await saveTrip(updated);
+
+      if (driverCoordsRef.current) {
+        fetch('/api/trips/tracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: tripToAccept.id,
+            driverId,
+            lat: driverCoordsRef.current.lat,
+            lng: driverCoordsRef.current.lng,
+          }),
+        }).catch(() => {});
+      }
     }
   }
 
@@ -700,9 +730,18 @@ export default function DriverPage() {
     }
   }
 
-  // Define map pins for pending request or active trip
+  // Define map pins and routing for pending request or active trip
   const mapProps = activeTrip 
-    ? { pickupLat: activeTrip.pickup_lat, pickupLng: activeTrip.pickup_lng, dropoffLat: activeTrip.dropoff_lat, dropoffLng: activeTrip.dropoff_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+    ? {
+        pickupLat: activeTrip.pickup_lat,
+        pickupLng: activeTrip.pickup_lng,
+        dropoffLat: activeTrip.dropoff_lat,
+        dropoffLng: activeTrip.dropoff_lng,
+        driverLat: driverCoords?.lat,
+        driverLng: driverCoords?.lng,
+        tripStatus: activeTrip.status,
+        onRouteChange: (details: { distanceKm: number; durationMinutes: number }) => setLiveNavDetails(details),
+      }
     : request
       ? { pickupLat: request.pickup_lat, pickupLng: request.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
@@ -802,6 +841,43 @@ export default function DriverPage() {
           </div>
         </div>
       </div>
+
+      {/* Top Floating Driver Navigation Quick Pill (Always accessible on map) */}
+      {activeTrip && (activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
+        <div className="absolute top-2 sm:top-2.5 md:top-4 right-2.5 md:right-8 z-30 pointer-events-auto">
+          {(() => {
+            const isNavToDropoff = activeTrip.status === 'in_progress';
+            const targetLat = isNavToDropoff ? activeTrip.dropoff_lat : activeTrip.pickup_lat;
+            const targetLng = isNavToDropoff ? activeTrip.dropoff_lng : activeTrip.pickup_lng;
+            const currentDistKm = liveNavDetails?.distanceKm ?? (driverCoords ? calculateDistanceKm(driverCoords.lat, driverCoords.lng, targetLat, targetLng) : 0);
+            const currentEtaMins = liveNavDetails?.durationMinutes ?? estimateEtaMinutes(currentDistKm);
+            const gNavUrl = driverCoords
+              ? `https://www.google.com/maps/dir/?api=1&origin=${driverCoords.lat},${driverCoords.lng}&destination=${targetLat},${targetLng}&travelmode=driving`
+              : `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
+
+            return (
+              <a
+                href={gNavUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2.5 rounded-2xl shadow-xl border border-white/20 flex items-center gap-2 font-bold text-xs active:scale-95 transition touch-manipulation"
+                title="Launch Turn-by-Turn GPS Navigation in Google Maps"
+              >
+                <Navigation size={15} className="text-white shrink-0" />
+                <div className="text-left leading-tight">
+                  <p className="text-[9px] uppercase tracking-wider text-emerald-200 font-black">
+                    {isNavToDropoff ? 'To Dropoff' : 'To Pickup'}
+                  </p>
+                  <p className="font-mono font-black text-xs">
+                    {currentEtaMins} min ({currentDistKm.toFixed(1)} km)
+                  </p>
+                </div>
+                <ExternalLink size={12} className="opacity-80 shrink-0" />
+              </a>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Floating Main Content Panel */}
       <div 
@@ -919,6 +995,85 @@ export default function DriverPage() {
 
                   {driverTripSubTab === 'controls' ? (
                     <div className="flex flex-col gap-3">
+                      {/* Driver GPS Turn-by-Turn Navigation & Launcher Card */}
+                      {(() => {
+                        const isNavigatingToPickup = activeTrip.status === 'accepted';
+                        const isAtPickup = activeTrip.status === 'arrived';
+                        const isNavigatingToDropoff = activeTrip.status === 'in_progress';
+
+                        const targetLat = isNavigatingToDropoff ? activeTrip.dropoff_lat : activeTrip.pickup_lat;
+                        const targetLng = isNavigatingToDropoff ? activeTrip.dropoff_lng : activeTrip.pickup_lng;
+                        const targetLocationName = isNavigatingToDropoff ? activeTrip.dropoff_location : activeTrip.pickup_location;
+                        const targetStageLabel = isNavigatingToPickup 
+                          ? 'Navigate to Pickup' 
+                          : isAtPickup 
+                            ? 'At Pickup (Boarding)' 
+                            : 'Navigate to Dropoff';
+
+                        const currentDistanceKm = liveNavDetails?.distanceKm ?? (driverCoords ? calculateDistanceKm(driverCoords.lat, driverCoords.lng, targetLat, targetLng) : 0);
+                        const currentEtaMinutes = liveNavDetails?.durationMinutes ?? estimateEtaMinutes(currentDistanceKm);
+
+                        const googleMapsNavUrl = driverCoords
+                          ? `https://www.google.com/maps/dir/?api=1&origin=${driverCoords.lat},${driverCoords.lng}&destination=${targetLat},${targetLng}&travelmode=driving`
+                          : `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
+
+                        const wazeNavUrl = `https://waze.com/ul?ll=${targetLat},${targetLng}&navigate=yes`;
+
+                        return (
+                          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-xl shadow-emerald-600/25 flex flex-col gap-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 animate-ping" />
+                                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-100">
+                                  {targetStageLabel}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 font-mono text-xs font-black bg-black/30 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/20">
+                                <span>{currentEtaMinutes} min</span>
+                                <span className="opacity-60">•</span>
+                                <span>{currentDistanceKm.toFixed(1)} km</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                <Compass size={20} className="text-white" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-black text-emerald-200 uppercase tracking-wider">
+                                  {isNavigatingToDropoff ? 'Dropoff Destination' : 'Rider Pickup Point'}
+                                </p>
+                                <p className="text-sm font-bold text-white leading-snug line-clamp-2">
+                                  {targetLocationName}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 1-Tap External GPS Navigation Launchers */}
+                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/20">
+                              <a
+                                href={googleMapsNavUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white hover:bg-gray-100 text-gray-950 font-black text-xs shadow-md active:scale-95 transition touch-manipulation"
+                              >
+                                <ExternalLink size={14} className="text-blue-600 shrink-0" />
+                                <span>Google Maps</span>
+                              </a>
+                              <a
+                                href={wazeNavUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-cyan-950 font-black text-xs shadow-md active:scale-95 transition touch-manipulation"
+                              >
+                                <Navigation size={14} className="shrink-0" />
+                                <span>Waze</span>
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Rider Boarding PIN Card - Displayed prominently to driver to confirm with rider */}
                       <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/70 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 shadow-sm flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -929,7 +1084,7 @@ export default function DriverPage() {
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wider">Boarding PIN</span>
                               <span className="text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold px-2 py-0.5 rounded-full">
-                                Confirm
+                                Confirm with Rider
                               </span>
                             </div>
                             <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">

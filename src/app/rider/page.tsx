@@ -13,7 +13,7 @@ import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShie
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -120,6 +120,89 @@ export default function RiderPage() {
       }
     });
   }, [activeTrip?.driver_id, activeTrip?.status, availableDrivers]);
+
+  const [liveTrackingInfo, setLiveTrackingInfo] = useState<{
+    distanceKm: number;
+    durationMinutes: number;
+    targetType: 'pickup' | 'dropoff';
+    heading?: number;
+    speedKmh?: number;
+  } | null>(null);
+
+  // Active Trip Real-time GPS Tracking & ETA Polling
+  useEffect(() => {
+    if (!activeTrip?.id) {
+      setLiveTrackingInfo(null);
+      return;
+    }
+
+    const isTrackingActive =
+      activeTrip.status === 'accepted' ||
+      activeTrip.status === 'arrived' ||
+      activeTrip.status === 'in_progress';
+
+    if (!isTrackingActive) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const pollLiveTracking = async () => {
+      try {
+        const res = await fetch(`/api/trips/tracking?tripId=${encodeURIComponent(activeTrip.id)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted || !data.success) return;
+
+        if (data.liveCoordinates?.lat && data.liveCoordinates?.lng) {
+          setDriverCoords({
+            lat: data.liveCoordinates.lat,
+            lng: data.liveCoordinates.lng,
+          });
+        }
+
+        if (data.eta) {
+          setLiveTrackingInfo({
+            distanceKm: data.eta.distanceKm,
+            durationMinutes: data.eta.durationMinutes,
+            targetType: data.eta.targetType,
+            heading: data.liveCoordinates?.heading,
+            speedKmh: data.liveCoordinates?.speedKmh,
+          });
+        }
+
+        if (data.driverProfile && !assignedDriverInfo) {
+          setAssignedDriverInfo({
+            fullName: data.driverProfile.fullName,
+            vehicleMake: data.driverProfile.vehicleMake,
+            vehicleModel: data.driverProfile.vehicleModel,
+            licensePlate: data.driverProfile.licensePlate,
+            phone: data.driverProfile.phone,
+            rating: 5.0,
+          });
+        }
+
+        // Sync monotonic trip status progression if driver advanced the trip
+        if (data.trip?.status && data.trip.status !== activeTripRef.current?.status) {
+          const incomingPrio = (STATUS_PRIORITY as Record<string, number>)[data.trip.status] || 0;
+          const currentPrio = (STATUS_PRIORITY as Record<string, number>)[activeTripRef.current?.status || ''] || 0;
+          if (incomingPrio > currentPrio) {
+            updateActiveTripState(data.trip);
+          }
+        }
+      } catch (err) {
+        // Non-blocking tracking fetch error
+      }
+    };
+
+    pollLiveTracking();
+    const interval = setInterval(pollLiveTracking, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeTrip?.id, activeTrip?.status]);
 
   // Fetch active registered drivers in proximity to rider + subscribe to Geohash-6 WebSocket mesh
   useEffect(() => {
@@ -409,6 +492,7 @@ export default function RiderPage() {
               if (trip.status === 'accepted' && currentActive.status === 'requested') {
                 audioAlert.alertRiderOfTripStatus('accepted', trip);
               } else if (trip.status === 'arrived' && currentActive.status !== 'arrived') {
+                // Dispatch native arrival alert: Your Driver Has Arrived! 📍
                 audioAlert.alertRiderOfTripStatus('arrived', trip);
               } else if (trip.status === 'in_progress' && currentActive.status !== 'in_progress') {
                 audioAlert.alertRiderOfTripStatus('in_progress', trip);
@@ -659,8 +743,39 @@ export default function RiderPage() {
           } : undefined}
           driverLat={driverCoords?.lat}
           driverLng={driverCoords?.lng}
+          tripStatus={activeTrip?.status}
+          onRouteChange={(details) => {
+            setLiveTrackingInfo(prev => ({
+              distanceKm: details.distanceKm,
+              durationMinutes: details.durationMinutes,
+              targetType: activeTrip?.status === 'in_progress' ? 'dropoff' : 'pickup',
+              heading: prev?.heading,
+              speedKmh: prev?.speedKmh,
+            }));
+          }}
         />
       </div>
+
+      {/* Real-time Trip GPS Tracking Floating HUD Pill */}
+      {activeTrip && (activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
+        <div className="absolute top-3 left-3 md:top-4 md:left-6 pt-safe z-30 pointer-events-none">
+          <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10 flex items-center gap-2.5 pointer-events-auto">
+            <div className={`w-2.5 h-2.5 rounded-full ${activeTrip.status === 'in_progress' ? 'bg-blue-500' : 'bg-emerald-500'} animate-ping shrink-0`} />
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {activeTrip.status === 'accepted' ? 'Driver En Route' : activeTrip.status === 'arrived' ? 'Driver Outside' : 'En Route to Dropoff'}
+              </p>
+              <p className="text-xs font-black text-gray-900 dark:text-white truncate">
+                {liveTrackingInfo?.durationMinutes
+                  ? `${liveTrackingInfo.durationMinutes} min away • ${liveTrackingInfo.distanceKm.toFixed(1)} km`
+                  : activeTrip.status === 'arrived'
+                    ? 'Confirm PIN to board'
+                    : 'Live GPS Connected'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Header: Rider Safety SOS Shield + Profile or Phone Auth Button */}
       <div className="absolute top-3 right-3 md:top-4 md:right-4 pt-safe z-30 flex items-center gap-2">
@@ -906,6 +1021,53 @@ export default function RiderPage() {
 
                     {tripSubTab === 'details' ? (
                       <div className="p-3.5 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/50">
+                        {/* Live ETA & Road Distance Banner */}
+                        {activeTrip.status === 'accepted' && (
+                          <div className="mb-3 p-3 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-3 text-emerald-950 dark:text-emerald-100 animate-in fade-in">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                                <Navigation size={16} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Driver En Route</p>
+                                <p className="text-sm font-bold truncate">
+                                  {liveTrackingInfo?.durationMinutes 
+                                    ? `Arriving in ~${liveTrackingInfo.durationMinutes} min` 
+                                    : 'Approaching pickup point...'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-mono font-black bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                                {liveTrackingInfo?.distanceKm ? `${liveTrackingInfo.distanceKm.toFixed(1)} km` : 'Live GPS'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeTrip.status === 'in_progress' && (
+                          <div className="mb-3 p-3 bg-blue-500/15 dark:bg-blue-500/20 border border-blue-500/30 rounded-2xl flex items-center justify-between gap-3 text-blue-950 dark:text-blue-100 animate-in fade-in">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                                <Car size={16} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Heading to Destination</p>
+                                <p className="text-sm font-bold truncate">
+                                  {liveTrackingInfo?.durationMinutes 
+                                    ? `~${liveTrackingInfo.durationMinutes} min to dropoff` 
+                                    : 'En route to destination...'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-mono font-black bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-2xs">
+                                {liveTrackingInfo?.distanceKm ? `${liveTrackingInfo.distanceKm.toFixed(1)} km` : 'Live GPS'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 font-semibold">
                           {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
                             <span className="block mb-1 text-blue-500">
@@ -913,9 +1075,9 @@ export default function RiderPage() {
                             </span>
                           )}
                           {activeTrip.status === 'requested' && (!activeTrip.scheduled_time ? 'Finding your driver...' : 'Waiting for driver to accept scheduled ride...')}
-                          {activeTrip.status === 'accepted' && 'Your driver is on the way!'}
+                          {activeTrip.status === 'accepted' && 'Your driver is on the way to pick you up.'}
                           {activeTrip.status === 'arrived' && 'Your driver has arrived! Confirm PIN with driver to board.'}
-                          {activeTrip.status === 'in_progress' && 'Heading to destination...'}
+                          {activeTrip.status === 'in_progress' && 'Trip active: on your way to destination.'}
                         </p>
 
                         {/* Route Summary */}

@@ -33,6 +33,7 @@ interface MapProps {
   dropoffLng?: number;
   driverLat?: number;
   driverLng?: number;
+  tripStatus?: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   availableDrivers?: DriverMarkerData[];
   focusedDriverCoords?: { lat: number; lng: number } | null;
   assignedDriver?: {
@@ -43,6 +44,7 @@ interface MapProps {
     licensePlate?: string;
     rating?: number;
   };
+  onRouteChange?: (details: { distanceKm: number; durationMinutes: number }) => void;
 }
 
 // Create custom DivIcons for location markers
@@ -107,24 +109,63 @@ const createAssignedDriverIcon = (driverName?: string) => {
 };
 
 // Component to handle map bounds and routing
-const MapUpdater = ({ pickupLat, pickupLng, dropoffLat, dropoffLng, focusedDriverCoords }: any) => {
+const MapUpdater = ({
+  pickupLat,
+  pickupLng,
+  dropoffLat,
+  dropoffLng,
+  driverLat,
+  driverLng,
+  tripStatus,
+  focusedDriverCoords,
+}: any) => {
   const map = useMap();
 
   useEffect(() => {
     if (focusedDriverCoords?.lat && focusedDriverCoords?.lng) {
       map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
-    } else if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+      return;
+    }
+
+    // 1. If trip is accepted and driver is en route to pickup:
+    if (tripStatus === 'accepted' && driverLat && driverLng && pickupLat && pickupLng) {
+      const bounds = L.latLngBounds(
+        [driverLat, driverLng],
+        [pickupLat, pickupLng]
+      );
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      return;
+    }
+
+    // 2. If trip is in progress and driver is en route to destination:
+    if (tripStatus === 'in_progress' && driverLat && driverLng && dropoffLat && dropoffLng) {
+      const bounds = L.latLngBounds(
+        [driverLat, driverLng],
+        [dropoffLat, dropoffLng]
+      );
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+      return;
+    }
+
+    // 3. If driver arrived at pickup:
+    if (tripStatus === 'arrived' && pickupLat && pickupLng) {
+      map.setView([pickupLat, pickupLng], 16);
+      return;
+    }
+
+    // 4. Default pickup to dropoff bounds:
+    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
       const bounds = L.latLngBounds(
         [pickupLat, pickupLng],
         [dropoffLat, dropoffLng]
       );
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
     } else if (pickupLat && pickupLng) {
       map.setView([pickupLat, pickupLng], 15);
     } else if (dropoffLat && dropoffLng) {
       map.setView([dropoffLat, dropoffLng], 15);
     }
-  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, focusedDriverCoords]);
+  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords]);
 
   return null;
 };
@@ -137,9 +178,11 @@ const MapComponent = (props: MapProps) => {
     dropoffLng, 
     driverLat, 
     driverLng, 
+    tripStatus,
     availableDrivers = [],
     focusedDriverCoords,
-    assignedDriver 
+    assignedDriver,
+    onRouteChange
   } = props;
   
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
@@ -151,14 +194,45 @@ const MapComponent = (props: MapProps) => {
   const centerLat = pickupLat || effectiveAssignedLat || -28.7282;
   const centerLng = pickupLng || effectiveAssignedLng || 24.7623;
 
-  // Fetch route if we have both points using Mapbox Directions (with OSRM fallback)
+  // Dynamically calculate the active leg of the journey:
+  // - If tripStatus === 'accepted' && driver location exists -> route from Driver to Pickup!
+  // - If tripStatus === 'in_progress' && driver location exists -> route from Driver to Dropoff!
+  // - Otherwise -> route from Pickup to Dropoff!
   useEffect(() => {
-    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+    let originLat: number | undefined;
+    let originLng: number | undefined;
+    let destLat: number | undefined;
+    let destLng: number | undefined;
+
+    if (tripStatus === 'accepted' && effectiveAssignedLat && effectiveAssignedLng && pickupLat && pickupLng) {
+      originLat = effectiveAssignedLat;
+      originLng = effectiveAssignedLng;
+      destLat = pickupLat;
+      destLng = pickupLng;
+    } else if (tripStatus === 'in_progress' && effectiveAssignedLat && effectiveAssignedLng && dropoffLat && dropoffLng) {
+      originLat = effectiveAssignedLat;
+      originLng = effectiveAssignedLng;
+      destLat = dropoffLat;
+      destLng = dropoffLng;
+    } else if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+      originLat = pickupLat;
+      originLng = pickupLng;
+      destLat = dropoffLat;
+      destLng = dropoffLng;
+    }
+
+    if (originLat !== undefined && originLng !== undefined && destLat !== undefined && destLng !== undefined) {
       const getRoute = async () => {
         try {
-          const details = await getRouteDirections(pickupLng, pickupLat, dropoffLng, dropoffLat);
+          const details = await getRouteDirections(originLng!, originLat!, destLng!, destLat!);
           if (details && details.coordinates.length > 0) {
             setRouteCoordinates(details.coordinates);
+            if (typeof onRouteChange === 'function') {
+              onRouteChange({
+                distanceKm: details.distanceKm,
+                durationMinutes: details.durationMinutes,
+              });
+            }
           }
         } catch (e) {
           console.error('Directions request failed', e);
@@ -168,11 +242,13 @@ const MapComponent = (props: MapProps) => {
     } else {
       setRouteCoordinates([]);
     }
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng]);
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus]);
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const tileConfig = getTileLayerConfig(isDark);
+
+  const polylineColor = tripStatus === 'accepted' ? '#10b981' : '#3b82f6';
 
   return (
     <div className="w-full h-full relative z-0 select-none touch-pan-x touch-pan-y">
@@ -199,11 +275,14 @@ const MapComponent = (props: MapProps) => {
           pickupLng={pickupLng} 
           dropoffLat={dropoffLat} 
           dropoffLng={dropoffLng} 
+          driverLat={effectiveAssignedLat}
+          driverLng={effectiveAssignedLng}
+          tripStatus={tripStatus}
           focusedDriverCoords={focusedDriverCoords}
         />
 
         {routeCoordinates.length > 0 && (
-          <Polyline positions={routeCoordinates} color="#3b82f6" weight={5} lineCap="round" lineJoin="round" />
+          <Polyline positions={routeCoordinates} color={polylineColor} weight={5} lineCap="round" lineJoin="round" />
         )}
 
         {/* Pickup marker */}
