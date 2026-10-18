@@ -5,10 +5,11 @@ import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
-import { subscribeToEvents, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
+import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShieldModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
@@ -62,6 +63,7 @@ export default function RiderPage() {
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
   const [showDriversModal, setShowDriversModal] = useState(false)
+  const [showSafetyModal, setShowSafetyModal] = useState(false)
   const [focusedDriverCoords, setFocusedDriverCoords] = useState<{ lat: number; lng: number } | null>(null)
 
   const handleLocateDriverOnMap = (driver: LiveDriver) => {
@@ -114,13 +116,13 @@ export default function RiderPage() {
     });
   }, [activeTrip?.driver_id, activeTrip?.status, availableDrivers]);
 
-  // Fetch active registered drivers in proximity to rider (live updates arrive via WebSocket broadcast; 20s fallback sync)
+  // Fetch active registered drivers in proximity to rider + subscribe to Geohash-6 WebSocket mesh
   useEffect(() => {
-    const lat = pickupCoords?.lat;
-    const lng = pickupCoords?.lng;
+    const lat = pickupCoords?.lat ?? activeTrip?.pickup_lat ?? -26.2041;
+    const lng = pickupCoords?.lng ?? activeTrip?.pickup_lng ?? 28.0473;
 
     const refreshDrivers = () => {
-      getActiveDrivers(lat, lng, 25).then(drivers => {
+      getActiveDrivers(pickupCoords?.lat, pickupCoords?.lng, 25).then(drivers => {
         setAvailableDrivers(drivers);
       });
     };
@@ -128,10 +130,16 @@ export default function RiderPage() {
     refreshDrivers();
     const interval = setInterval(refreshDrivers, 19000 + Math.floor(Math.random() * 2000));
 
+    // Subscribe directly to regional Geohash-6 WebSocket channel (`solo:geo:<geohash6>`) for 0-latency streaming
+    const unsubscribeRegionalMesh = subscribeToRegionalDriverMesh(lat, lng, (data) => {
+      window.dispatchEvent(new CustomEvent('solo_driver_location_update', { detail: data }));
+    });
+
     return () => {
       clearInterval(interval);
+      unsubscribeRegionalMesh();
     };
-  }, [pickupCoords?.lat, pickupCoords?.lng]);
+  }, [pickupCoords?.lat, pickupCoords?.lng, activeTrip?.pickup_lat, activeTrip?.pickup_lng]);
 
   // Monitor authenticated rider session
   useEffect(() => {
@@ -664,8 +672,9 @@ export default function RiderPage() {
         />
       </div>
 
-      {/* Top Header: Rider Profile or Phone Auth Button */}
+      {/* Top Header: Rider Safety SOS Shield + Profile or Phone Auth Button */}
       <div className="absolute top-3 right-3 md:top-4 md:right-4 pt-safe z-30 flex items-center gap-2">
+        <SafetyFloatingButton onClick={() => setShowSafetyModal(true)} />
         {currentUser ? (
           <div className="flex items-center gap-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-3.5 md:py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
             <div className="flex items-center gap-2 pr-2 border-r border-gray-200 dark:border-zinc-800">
@@ -938,6 +947,13 @@ export default function RiderPage() {
                           <MessageCircle size={14} />
                           <span>Share Live Trip via WhatsApp</span>
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => setShowSafetyModal(true)}
+                          className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded-xl shadow-sm transition active:scale-95"
+                        >
+                          <span>🚨 SOS / Armed Response</span>
+                        </button>
                         {activeTrip.status === 'requested' && (
                           <button
                             type="button"
@@ -1090,6 +1106,27 @@ export default function RiderPage() {
           setShowDriversModal(false);
           setFocusedDriverCoords({ lat: driver.lat, lng: driver.lng });
         }}
+      />
+
+      {/* South African Rapid-Response Safety & Panic Shield Modal */}
+      <SafetyShieldModal
+        isOpen={showSafetyModal}
+        onClose={() => setShowSafetyModal(false)}
+        role="rider"
+        userId={currentUser?.id}
+        userName={currentUser?.fullName || 'SOLO Rider'}
+        userPhone={currentUser?.phone}
+        lat={driverCoords?.lat || activeTrip?.pickup_lat || pickupCoords?.lat}
+        lng={driverCoords?.lng || activeTrip?.pickup_lng || pickupCoords?.lng}
+        tripId={activeTrip?.id}
+        pickupLocation={activeTrip?.pickup_location}
+        dropoffLocation={activeTrip?.dropoff_location}
+        driverName={assignedDriverInfo?.fullName}
+        driverPhone={assignedDriverInfo?.phone}
+        vehicleMake={assignedDriverInfo?.vehicleMake}
+        vehicleModel={assignedDriverInfo?.vehicleModel}
+        licensePlate={assignedDriverInfo?.licensePlate}
+        verificationPin={activeTrip?.verification_pin}
       />
     </div>
   )

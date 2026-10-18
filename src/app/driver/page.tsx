@@ -19,6 +19,9 @@ import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
 import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
+import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShieldModal'
+import { AdaptiveTelemetryGovernor, TELEMETRY_TIER_CONFIGS, type ComputedGpsSample } from '@/utils/telemetryEngine'
+import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -87,6 +90,10 @@ export default function DriverPage() {
   const [pinError, setPinError] = useState<string | null>(null)
   const [isVerifyingPin, setIsVerifyingPin] = useState(false)
   const [isNotifyingArrival, setIsNotifyingArrival] = useState(false)
+  const [showSafetyModal, setShowSafetyModal] = useState(false)
+  const [nearbySosAlert, setNearbySosAlert] = useState<SafetyIncidentRecord | null>(null)
+  const [telemetryStatus, setTelemetryStatus] = useState<ComputedGpsSample | null>(null)
+  const telemetryGovernorRef = useRef<AdaptiveTelemetryGovernor | null>(null)
 
   const [ratingSummary, setRatingSummary] = useState<{ average: number; count: number; reviews: TripRating[] }>({ 
     average: 5.0, 
@@ -316,6 +323,19 @@ export default function DriverPage() {
     const pollInterval = setInterval(loadTrips, 14000 + Math.floor(Math.random() * 2000));
 
     const unsubscribe = subscribeToEvents((type, payload) => {
+      if (type === 'sos_emergency_alert') {
+        const sos = payload as SafetyIncidentRecord | null;
+        if (sos && sos.incidentCode) {
+          setNearbySosAlert(sos);
+          if (!sos.silentDuress) {
+            try {
+              audioAlert.playAlertSequence();
+            } catch {}
+          }
+        }
+        return;
+      }
+
       if (type === 'driver_session_preempted') {
         const payloadData = payload as { driverId: string; deviceId: string } | null;
         const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
@@ -387,23 +407,48 @@ export default function DriverPage() {
     }
   }, [isOnline, profile?.id])
 
-  // Real-time GPS Tracking
+  // Real-time Adaptive Battery-Aware GPS & WebSocket Telemetry
   useEffect(() => {
+    if (!telemetryGovernorRef.current) {
+      telemetryGovernorRef.current = new AdaptiveTelemetryGovernor();
+    }
+    const governor = telemetryGovernorRef.current;
+
     if (!isOnline) {
+      governor.releaseWakeLock();
+      setTelemetryStatus(null);
       if (profile?.id) {
         updateDriverLocation(profile.id, 0, 0, false, { deviceId: deviceIdRef.current });
       }
       return;
     }
 
+    governor.syncWakeLock(true);
+
     if (!('geolocation' in navigator)) {
       console.warn("Geolocation is not supported by your browser");
       return;
     }
 
-    const broadcastCurrentLocation = (latitude: number, longitude: number) => {
+    const broadcastCurrentLocation = (
+      latitude: number,
+      longitude: number,
+      coords?: GeolocationCoordinates,
+      forceImmediate = false
+    ) => {
       driverCoordsRef.current = { lat: latitude, lng: longitude };
       setDriverCoords({ lat: latitude, lng: longitude });
+
+      const sample = governor.evaluateGpsTick({
+        lat: latitude,
+        lng: longitude,
+        rawHeading: coords?.heading,
+        rawSpeedMetersPerSec: coords?.speed,
+        accuracyMeters: coords?.accuracy,
+        hasActiveTrip: Boolean(activeTripRef.current),
+        forceImmediate,
+      });
+      setTelemetryStatus(sample);
 
       if (profile?.id) {
         updateDriverLocation(profile.id, latitude, longitude, true, {
@@ -418,6 +463,9 @@ export default function DriverPage() {
           ratingCount: ratingSummary?.count || 0,
           tripId: activeTripRef.current?.id,
           deviceId: deviceIdRef.current,
+          heading: sample.heading,
+          speedKmh: sample.speedKmh,
+          shouldBroadcastWs: sample.shouldBroadcastWs,
         });
       }
     };
@@ -425,7 +473,12 @@ export default function DriverPage() {
     // Immediate initial location fetch
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        broadcastCurrentLocation(position.coords.latitude, position.coords.longitude);
+        broadcastCurrentLocation(
+          position.coords.latitude,
+          position.coords.longitude,
+          position.coords,
+          true
+        );
       },
       (error) => {
         console.warn("Could not get initial driver GPS location:", error);
@@ -433,30 +486,41 @@ export default function DriverPage() {
       { enableHighAccuracy: true, timeout: 5000 }
     );
 
-    // Continuous watch position on motion
+    // Continuous watch position governed by AdaptiveTelemetryGovernor
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        broadcastCurrentLocation(position.coords.latitude, position.coords.longitude);
+        broadcastCurrentLocation(
+          position.coords.latitude,
+          position.coords.longitude,
+          position.coords,
+          false
+        );
       },
       (error) => {
         console.error("Error watching position:", error);
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: !governor.getBatteryState().isLowBattery,
         maximumAge: 3000,
         timeout: 10000
       }
     );
 
-    // Periodic 30-second heartbeat to ensure stationary/parked drivers remain fresh within 5-min TTL
+    // Periodic 30-second keep-alive heartbeat so stationary/parked drivers stay fresh within 5-min TTL without draining battery
     const heartbeatInterval = setInterval(() => {
       if (driverCoordsRef.current && profile?.id) {
-        broadcastCurrentLocation(driverCoordsRef.current.lat, driverCoordsRef.current.lng);
+        broadcastCurrentLocation(
+          driverCoordsRef.current.lat,
+          driverCoordsRef.current.lng,
+          undefined,
+          false
+        );
       }
     }, 30000);
 
     // Offline cleanup when driver closes tab or navigates away
     const handleBeforeUnload = () => {
+      governor.releaseWakeLock();
       if (profile?.id) {
         updateDriverLocation(profile.id, 0, 0, false, { deviceId: deviceIdRef.current });
       }
@@ -466,6 +530,7 @@ export default function DriverPage() {
 
     return () => {
       clearInterval(heartbeatInterval);
+      governor.releaseWakeLock();
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', handleBeforeUnload);
       navigator.geolocation.clearWatch(watchId);
@@ -921,12 +986,70 @@ export default function DriverPage() {
                       : "Go online to start receiving ride requests."}
                   </p>
                   
-                  {isOnline && (
-                    <div className="bg-blue-50/80 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 p-4 rounded-2xl flex items-center justify-center gap-3 animate-pulse border border-blue-100/50 dark:border-blue-800/30">
-                      <Navigation size={20} />
-                      <span className="text-sm font-bold tracking-wide">SEARCHING FOR RIDERS</span>
+                  {nearbySosAlert && (
+                    <div className="mb-4 p-3.5 rounded-2xl bg-red-600 text-white text-left text-xs shadow-xl shadow-red-600/30 animate-pulse space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black uppercase tracking-wider">
+                          🚨 SOLO COMMUNITY SOS ({nearbySosAlert.incidentCode})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setNearbySosAlert(null)}
+                          className="text-white/80 hover:text-white font-bold px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-red-100">
+                        Emergency triggered by {nearbySosAlert.role.toUpperCase()} ({nearbySosAlert.userName}) in Sector{' '}
+                        <strong className="font-mono">{nearbySosAlert.geohash6?.toUpperCase()}</strong>
+                        {nearbySosAlert.licensePlate ? ` • Reg: ${nearbySosAlert.licensePlate}` : ''}.
+                      </p>
+                      <a
+                        href={nearbySosAlert.googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 bg-white text-red-700 font-black px-3 py-1.5 rounded-xl text-[11px]"
+                      >
+                        <MapPin size={13} />
+                        <span>Open Responder GPS Pin</span>
+                      </a>
                     </div>
                   )}
+
+                  {isOnline && (
+                    <div className="space-y-2.5">
+                      <div className="bg-blue-50/80 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 p-4 rounded-2xl flex items-center justify-center gap-3 animate-pulse border border-blue-100/50 dark:border-blue-800/30">
+                        <Navigation size={20} />
+                        <span className="text-sm font-bold tracking-wide">SEARCHING FOR RIDERS</span>
+                      </div>
+
+                      {/* Adaptive Battery-Aware & WebSocket Telemetry HUD */}
+                      <div className="p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/50 flex items-center justify-between gap-2 text-[11px] font-semibold text-emerald-900 dark:text-emerald-200">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                          <span className="truncate">
+                            {telemetryStatus
+                              ? TELEMETRY_TIER_CONFIGS[telemetryStatus.tier].label
+                              : 'WS Geohash-6 Mesh Active'}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[10px] bg-white/80 dark:bg-zinc-900 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0">
+                          {telemetryStatus
+                            ? `${telemetryStatus.geohash6.toUpperCase()} • ${telemetryStatus.speedKmh}km/h • 🔋${telemetryStatus.batteryLevel}%`
+                            : '0 DB Poll Drain'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex justify-center">
+                    <SafetyFloatingButton
+                      onClick={() => setShowSafetyModal(true)}
+                      hasActiveAlert={Boolean(nearbySosAlert)}
+                      className="w-full justify-center py-3"
+                    />
+                  </div>
 
                   <div className="mt-6 text-left space-y-3">
                     <NotificationPermissionBanner role="driver" userId={profile?.id} />
@@ -1530,6 +1653,35 @@ export default function DriverPage() {
           </div>
         </div>
       )}
+
+      {/* Floating Map Rapid-Response SOS Panic Button (Always Accessible on Map) */}
+      <div className="fixed top-20 right-3 md:top-5 md:right-6 z-30 pointer-events-auto">
+        <SafetyFloatingButton
+          onClick={() => setShowSafetyModal(true)}
+          hasActiveAlert={Boolean(nearbySosAlert)}
+        />
+      </div>
+
+      {/* South African Rapid-Response Safety & Panic Shield Modal */}
+      <SafetyShieldModal
+        isOpen={showSafetyModal}
+        onClose={() => setShowSafetyModal(false)}
+        role="driver"
+        userId={profile?.id}
+        userName={profile?.fullName || 'SOLO Driver'}
+        userPhone={profile?.phone}
+        lat={driverCoords?.lat || activeTrip?.pickup_lat}
+        lng={driverCoords?.lng || activeTrip?.pickup_lng}
+        tripId={activeTrip?.id}
+        pickupLocation={activeTrip?.pickup_location}
+        dropoffLocation={activeTrip?.dropoff_location}
+        driverName={profile?.fullName}
+        driverPhone={profile?.phone}
+        vehicleMake={profile?.vehicleMake}
+        vehicleModel={profile?.vehicleModel}
+        licensePlate={profile?.licensePlate}
+        verificationPin={activeTrip?.verification_pin}
+      />
     </div>
   )
 }

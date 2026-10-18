@@ -1244,22 +1244,27 @@ export const updateDriverLocation = async (
     ratingCount?: number;
     tripId?: string;
     deviceId?: string;
+    heading?: number;
+    speedKmh?: number;
+    shouldBroadcastWs?: boolean;
   }
 ) => {
   if (typeof window === 'undefined') return;
 
   const deviceId = metadata?.deviceId;
+  const shouldBroadcastWs = metadata?.shouldBroadcastWs ?? true;
 
   // Single-device online concurrency enforcement:
   // A driver can only be active online on 1 device at a time.
   if (isOnline && deviceId) {
     setDriverActiveSession(driverId, deviceId);
-    // Broadcast preemption event so any other active device for this driver disconnects immediately
-    broadcastEvent('driver_session_preempted', {
-      driverId,
-      deviceId,
-      timestamp: Date.now(),
-    });
+    if (shouldBroadcastWs) {
+      broadcastEvent('driver_session_preempted', {
+        driverId,
+        deviceId,
+        timestamp: Date.now(),
+      });
+    }
   } else if (!isOnline) {
     // If going offline, only clear active session if this device was the registered active device
     clearDriverActiveSession(driverId, deviceId);
@@ -1305,31 +1310,35 @@ export const updateDriverLocation = async (
     console.error('Error saving live driver to localStorage:', e);
   }
 
-  // Update Supabase in background via SoloLocationEngine (Geohash-6 Realtime Broadcast + throttled >=10m PostGIS upsert)
-  try {
-    await soloLocationEngine.publishDriverLocation({
-      driverId,
-      lat,
-      lng,
-      isOnline,
-      isAvailable: !metadata?.tripId,
-      fullName: metadata?.fullName,
-      phone: metadata?.phone,
-      vehicleMake: metadata?.vehicleMake,
-      vehicleModel: metadata?.vehicleModel,
-      vehicleYear: metadata?.vehicleYear,
-      vehicleColor: metadata?.vehicleColor,
-      licensePlate: metadata?.licensePlate,
-      rating: metadata?.rating,
-      ratingCount: metadata?.ratingCount,
-      tripId: metadata?.tripId,
-    });
-  } catch (e) {
-    console.error('Error updating driver location in Supabase:', e);
-  }
+  // Only wake mobile radio / WebSocket layer when AdaptiveTelemetryGovernor allows it
+  if (shouldBroadcastWs || !isOnline) {
+    try {
+      await soloLocationEngine.publishDriverLocation({
+        driverId,
+        lat,
+        lng,
+        heading: metadata?.heading ?? 0,
+        speedKmh: metadata?.speedKmh ?? 0,
+        isOnline,
+        isAvailable: !metadata?.tripId,
+        fullName: metadata?.fullName,
+        phone: metadata?.phone,
+        vehicleMake: metadata?.vehicleMake,
+        vehicleModel: metadata?.vehicleModel,
+        vehicleYear: metadata?.vehicleYear,
+        vehicleColor: metadata?.vehicleColor,
+        licensePlate: metadata?.licensePlate,
+        rating: metadata?.rating,
+        ratingCount: metadata?.ratingCount,
+        tripId: metadata?.tripId,
+      });
+    } catch (e) {
+      console.error('Error updating driver location in Supabase:', e);
+    }
 
-  // Broadcast realtime event
-  broadcastEvent('driver_location', driverData);
+    // Broadcast realtime event
+    broadcastEvent('driver_location', driverData);
+  }
 
   // Cross-tab local notification
   try {
@@ -1337,6 +1346,40 @@ export const updateDriverLocation = async (
   } catch (e) {
     // Ignore in non-browser environments
   }
+};
+
+/**
+ * Subscribes a Rider directly to the regional Geohash-6 WebSocket mesh (`solo:geo:<geohash6>`)
+ * so nearby moving vehicles stream over dedicated WebSockets with 0 serverless HTTP polling overhead.
+ */
+export const subscribeToRegionalDriverMesh = (
+  riderLat: number,
+  riderLng: number,
+  onDriverUpdate: (payload: any) => void
+): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+  return soloLocationEngine.subscribeToNearbyDrivers(riderLat, riderLng, (payload) => {
+    onDriverUpdate({
+      id: payload.driverId,
+      driverId: payload.driverId,
+      lat: payload.lat,
+      lng: payload.lng,
+      heading: payload.heading,
+      speedKmh: payload.speedKmh,
+      isOnline: payload.isOnline,
+      fullName: payload.fullName,
+      phone: payload.phone,
+      vehicleMake: payload.vehicleMake,
+      vehicleModel: payload.vehicleModel,
+      vehicleYear: payload.vehicleYear,
+      vehicleColor: payload.vehicleColor,
+      licensePlate: payload.licensePlate,
+      rating: payload.rating,
+      ratingCount: payload.ratingCount,
+      tripId: payload.tripId,
+      updatedAt: payload.timestamp,
+    });
+  });
 };
 
 // ----------------------------------------
@@ -1420,7 +1463,7 @@ export const getDriverRatingSummary = (driverId?: string): { average: number; co
 // ----------------------------------------
 // REAL-TIME BROADCASTS & SUBSCRIPTIONS
 // ----------------------------------------
-export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'INSERT' | 'UPDATE';
+export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'sos_emergency_alert' | 'INSERT' | 'UPDATE';
 
 let globalTripsChannel: any = null;
 let globalMessagesChannel: any = null;
@@ -1630,6 +1673,9 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'driver_session_preempted' }, (payload: any) => {
       listeners.forEach(cb => cb('driver_session_preempted', payload.payload));
+    })
+    .on('broadcast', { event: 'sos_emergency_alert' }, (payload: any) => {
+      listeners.forEach(cb => cb('sos_emergency_alert', payload.payload));
     })
     .subscribe();
 };
