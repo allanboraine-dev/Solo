@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating } from '@/lib/mockBackend'
 import { isWithinRadiusKm } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
@@ -19,7 +19,7 @@ import { isPlatformOwner } from '@/utils/owner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
 import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
-import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShieldModal'
+import SafetyShieldModal from '@/components/SafetyShieldModal'
 import { AdaptiveTelemetryGovernor, TELEMETRY_TIER_CONFIGS, type ComputedGpsSample } from '@/utils/telemetryEngine'
 import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
 
@@ -1203,15 +1203,7 @@ export default function DriverPage() {
                     </div>
                   )}
 
-                  <div className="mt-4 flex justify-center">
-                    <SafetyFloatingButton
-                      onClick={() => setShowSafetyModal(true)}
-                      hasActiveAlert={Boolean(nearbySosAlert)}
-                      className="w-full justify-center py-3"
-                    />
-                  </div>
-
-                  <div className="mt-6 text-left space-y-3">
+                  <div className="mt-4 text-left space-y-3">
                     <NotificationPermissionBanner role="driver" userId={profile?.id} />
                   </div>
                 </div>
@@ -1517,7 +1509,7 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Bottom Navigation */}
-      <div className="absolute bottom-2.5 sm:bottom-4 mb-safe inset-x-2.5 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full max-w-sm mx-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-gray-200/80 dark:border-white/10 p-1 sm:p-1.5 flex justify-between items-center rounded-2xl sm:rounded-3xl shadow-2xl z-30 pointer-events-auto">
+      <div className="absolute bottom-2.5 sm:bottom-4 mb-safe inset-x-2.5 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full max-w-md mx-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-gray-200/80 dark:border-white/10 p-1 sm:p-1.5 flex justify-between items-center gap-1 rounded-2xl sm:rounded-3xl shadow-2xl z-30 pointer-events-auto">
         <button 
           onClick={() => {
             setActiveTab('home')
@@ -1534,6 +1526,22 @@ export default function DriverPage() {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           <span className="text-[10px] mt-0.5 uppercase tracking-wider font-semibold truncate">Earnings</span>
+        </button>
+        <button 
+          type="button"
+          onClick={() => setShowSafetyModal(true)}
+          aria-label="Open SOLO South Africa Rapid-Response Safety & Panic Shield"
+          className={`relative flex flex-col items-center justify-center flex-1 py-1.5 px-1 min-h-[46px] rounded-xl sm:rounded-2xl transition-all touch-manipulation active:scale-95 border ${
+            nearbySosAlert || showSafetyModal
+              ? 'bg-red-600 text-white border-red-400 shadow-lg shadow-red-600/40 animate-pulse font-black'
+              : 'bg-red-500/10 hover:bg-red-500/20 dark:bg-red-500/15 dark:hover:bg-red-500/25 text-red-600 dark:text-red-400 border-red-500/25 font-black'
+          }`}
+        >
+          <div className="relative flex items-center justify-center">
+            <ShieldAlert size={20} className="shrink-0" />
+            <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500 animate-ping" />
+          </div>
+          <span className="text-[10px] mt-0.5 uppercase tracking-wider font-black truncate">SOS</span>
         </button>
         <button 
           onClick={() => setActiveTab('profile')}
@@ -1820,14 +1828,6 @@ export default function DriverPage() {
           </div>
         </div>
       )}
-
-      {/* Floating Map Rapid-Response SOS Panic Button (Always Accessible on Map) */}
-      <div className="fixed top-20 right-3 md:top-5 md:right-6 z-30 pointer-events-auto">
-        <SafetyFloatingButton
-          onClick={() => setShowSafetyModal(true)}
-          hasActiveAlert={Boolean(nearbySosAlert)}
-        />
-      </div>
 
       {/* South African Rapid-Response Safety & Panic Shield Modal */}
       <SafetyShieldModal
