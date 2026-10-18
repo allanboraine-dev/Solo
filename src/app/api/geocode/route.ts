@@ -329,6 +329,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    places: results.slice(0, 10),
+    places: results.slice(0, 40),
   });
 }

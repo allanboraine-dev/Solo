@@ -118,6 +118,31 @@ describe('Commercial Map & Fare Pricing Suite', () => {
     assert.ok(standaloneNumberResults.every(r => r.houseNumber === '14'));
     assert.ok(standaloneNumberResults.some(r => r.name.includes('Memorial Road')));
   });
+
+  it('supports instant local 0ms search with category filters and lists all possible options', async () => {
+    const { searchLocalPlaces } = await import('../src/utils/mapService.ts');
+
+    // 1. Empty query returns all pool places without truncation
+    const allPlaces = searchLocalPlaces('');
+    assert.ok(allPlaces.length >= 40, 'Should list all popular places (40+)');
+
+    // 2. Category filtering by streets
+    const streetsOnly = searchLocalPlaces('', null, 'streets');
+    assert.ok(streetsOnly.length >= 25, 'Should list all registered streets');
+    assert.ok(streetsOnly.every((p) => p.category === 'address'));
+
+    // 3. Category filtering by malls
+    const mallsOnly = searchLocalPlaces('', null, 'malls');
+    assert.ok(mallsOnly.length >= 5, 'Should list all major malls/shopping centres');
+
+    // 4. Instant 1-letter query matches all possible candidates without truncation
+    const mLetterPlaces = searchLocalPlaces('m');
+    assert.ok(mLetterPlaces.length > 10, 'Should return more than 10 options for "m" without artificial cap');
+
+    // 5. searchPlaces returns expanded options beyond old 10-item cap
+    const roadResults = await searchPlaces('Road');
+    assert.ok(roadResults.length > 10, 'searchPlaces should list all possible options (>10)');
+  });
 });
 
 

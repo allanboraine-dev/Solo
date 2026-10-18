@@ -1480,6 +1480,223 @@ export function normalizeSearchQuery(raw: string): string {
 }
 
 /**
+ * Instant local search against Kimberley popular places, streets, POIs, malls, and hospitals (0ms response).
+ * Automatically applies house number prefixing, title-casing, compound matching, and category filtering.
+ */
+export function searchLocalPlaces(
+  query: string,
+  proximityCoords?: { lat: number; lng: number } | null,
+  categoryFilter?: string
+): SearchResultPlace[] {
+  const prox = proximityCoords || DEFAULT_PROXIMITY;
+  const cleanQuery = (query || '').trim();
+  const normalizedQuery = normalizeSearchQuery(cleanQuery);
+  const { houseNumber: parsedHouseNo, remainder: streetOrPlaceQuery } = parseHouseNumberFromQuery(cleanQuery);
+
+  let pool = KIMBERLEY_POPULAR_PLACES;
+  if (categoryFilter && categoryFilter !== 'all') {
+    pool = pool.filter((p) => {
+      const pName = p.name.toLowerCase();
+      if (categoryFilter === 'streets') return p.category === 'address';
+      if (categoryFilter === 'malls') {
+        return (
+          p.category === 'building' &&
+          (pName.includes('mall') ||
+            pName.includes('spar') ||
+            pName.includes('centre') ||
+            pName.includes('center') ||
+            pName.includes('shoprite') ||
+            pName.includes('checkers'))
+        );
+      }
+      if (categoryFilter === 'hospitals') {
+        return pName.includes('hospital') || pName.includes('clinic') || pName.includes('mediclinic');
+      }
+      if (categoryFilter === 'transport') {
+        return (
+          p.category === 'poi' ||
+          pName.includes('taxi') ||
+          pName.includes('airport') ||
+          pName.includes('station') ||
+          pName.includes('rank')
+        );
+      }
+      if (categoryFilter === 'suburbs') return p.category === 'area';
+      return true;
+    });
+  }
+
+  // If query is empty, return pool sorted by proximity
+  if (!cleanQuery) {
+    return [...pool].sort((a, b) => {
+      const distA = calculateDistanceKm(prox.lat, prox.lng, a.lat, a.lon);
+      const distB = calculateDistanceKm(prox.lat, prox.lng, b.lat, b.lon);
+      return distA - distB;
+    });
+  }
+
+  const results: SearchResultPlace[] = [];
+  const seenKeys = new Set<string>();
+
+  const addUnique = (place: SearchResultPlace) => {
+    if (Number.isNaN(place.lat) || Number.isNaN(place.lon)) return;
+    const dedupeKey = `${place.name.toLowerCase()}|${place.lat.toFixed(3)}|${place.lon.toFixed(3)}`;
+    if (!seenKeys.has(dedupeKey)) {
+      seenKeys.add(dedupeKey);
+      results.push(place);
+    }
+  };
+
+  // 1. If user typed a standalone house number (e.g. "14"), suggest all Kimberley streets with that house number
+  if (parsedHouseNo && (!streetOrPlaceQuery || streetOrPlaceQuery.trim().length === 0)) {
+    const streets = pool.filter((p) => p.category === 'address');
+    for (const streetPlace of streets) {
+      addUnique({
+        ...streetPlace,
+        id: `${streetPlace.id}-${parsedHouseNo}`,
+        name: `${parsedHouseNo} ${streetPlace.name}`,
+        display_name: `${parsedHouseNo} ${streetPlace.display_name}`,
+        houseNumber: parsedHouseNo,
+        street: streetPlace.street || streetPlace.name,
+        category: 'address',
+      });
+    }
+    return results;
+  }
+
+  const lowerClean = cleanQuery.toLowerCase();
+  const lowerNormalized = normalizedQuery.toLowerCase();
+  const cleanNoSpace = lowerClean.replace(/[\s\-_]+/g, '');
+  const normalizedNoSpace = lowerNormalized.replace(/[\s\-_]+/g, '');
+
+  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
+  const normalizedRemainder = normalizeSearchQuery(streetOrPlaceQuery || '').toLowerCase();
+  const remainderNoSpace = cleanRemainder.replace(/[\s\-_]+/g, '');
+  const normRemainderNoSpace = normalizedRemainder.replace(/[\s\-_]+/g, '');
+
+  for (const popular of pool) {
+    const popularNameLower = popular.name.toLowerCase();
+    const popularStreetLower = (popular.street || '').toLowerCase();
+    const popularBuildingLower = (popular.buildingName || '').toLowerCase();
+    const popularDisplayLower = popular.display_name.toLowerCase();
+
+    const popularNameNoSpace = popularNameLower.replace(/[\s\-_]+/g, '');
+    const popularStreetNoSpace = popularStreetLower.replace(/[\s\-_]+/g, '');
+    const popularBuildingNoSpace = popularBuildingLower.replace(/[\s\-_]+/g, '');
+    const popularDisplayNoSpace = popularDisplayLower.replace(/[\s\-_]+/g, '');
+
+    const isMatch =
+      popularNameLower.includes(lowerClean) ||
+      popularStreetLower.includes(lowerClean) ||
+      popularBuildingLower.includes(lowerClean) ||
+      popularDisplayLower.includes(lowerClean) ||
+      popularNameLower.includes(lowerNormalized) ||
+      popularStreetLower.includes(lowerNormalized) ||
+      popularDisplayLower.includes(lowerNormalized) ||
+      (cleanRemainder.length >= 1 &&
+        (popularNameLower.includes(cleanRemainder) ||
+          popularStreetLower.includes(cleanRemainder) ||
+          popularBuildingLower.includes(cleanRemainder) ||
+          popularDisplayLower.includes(cleanRemainder))) ||
+      (normalizedRemainder.length >= 1 &&
+        (popularNameLower.includes(normalizedRemainder) ||
+          popularStreetLower.includes(normalizedRemainder) ||
+          popularDisplayLower.includes(normalizedRemainder))) ||
+      (cleanNoSpace.length >= 2 &&
+        (popularNameNoSpace.includes(cleanNoSpace) ||
+          popularStreetNoSpace.includes(cleanNoSpace) ||
+          popularBuildingNoSpace.includes(cleanNoSpace) ||
+          popularDisplayNoSpace.includes(cleanNoSpace))) ||
+      (normalizedNoSpace.length >= 2 &&
+        (popularNameNoSpace.includes(normalizedNoSpace) ||
+          popularStreetNoSpace.includes(normalizedNoSpace) ||
+          popularDisplayNoSpace.includes(normalizedNoSpace))) ||
+      (remainderNoSpace.length >= 2 &&
+        (popularNameNoSpace.includes(remainderNoSpace) ||
+          popularStreetNoSpace.includes(remainderNoSpace) ||
+          popularBuildingNoSpace.includes(remainderNoSpace) ||
+          popularDisplayNoSpace.includes(remainderNoSpace))) ||
+      (normRemainderNoSpace.length >= 2 &&
+        (popularNameNoSpace.includes(normRemainderNoSpace) ||
+          popularStreetNoSpace.includes(normRemainderNoSpace) ||
+          popularDisplayNoSpace.includes(normRemainderNoSpace)));
+
+    if (isMatch) {
+      if (popular.category === 'address') {
+        const matchWithHouse = parsedHouseNo
+          ? {
+              ...popular,
+              id: `${popular.id}-${parsedHouseNo}`,
+              name: `${parsedHouseNo} ${popular.name}`,
+              display_name: `${parsedHouseNo} ${popular.display_name}`,
+              houseNumber: parsedHouseNo,
+              street: popular.street || popular.name,
+              category: 'address' as const,
+            }
+          : popular;
+        addUnique(matchWithHouse);
+      } else {
+        const matchWithHouse =
+          parsedHouseNo && (popularNameLower.includes(cleanRemainder) || cleanRemainder.length === 0)
+            ? {
+                ...popular,
+                id: `${popular.id}-${parsedHouseNo}`,
+                name: `${parsedHouseNo} ${popular.name}`,
+                display_name: `${parsedHouseNo} ${popular.display_name}`,
+                houseNumber: parsedHouseNo,
+              }
+            : popular;
+        addUnique(matchWithHouse);
+      }
+    }
+  }
+
+  // Sort by relevance then proximity
+  const lowerQ = cleanQuery.toLowerCase();
+  const lowerTokens = lowerQ.split(/\s+/).filter(Boolean);
+
+  results.sort((a, b) => {
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+
+    const getScore = (place: SearchResultPlace, name: string) => {
+      let score = 0;
+      if (parsedHouseNo && place.houseNumber && place.houseNumber.toLowerCase() === parsedHouseNo.toLowerCase()) {
+        score += 150;
+      }
+      if (name === lowerQ) score += 100;
+      else if (name.startsWith(lowerQ)) score += 60;
+      else if (name.includes(lowerQ)) score += 40;
+
+      if (
+        streetOrPlaceQuery &&
+        (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))
+      ) {
+        score += 50;
+      }
+
+      const allTokens = lowerTokens.length > 1 && lowerTokens.every((t) => name.includes(t));
+      if (allTokens) score += 30;
+
+      if (place.category === 'address') score += 35;
+      else if (place.category === 'building' || place.category === 'poi') score += 15;
+
+      return score;
+    };
+
+    const sA = getScore(a, aName);
+    const sB = getScore(b, bName);
+    if (sA !== sB) return sB - sA;
+
+    const dA = calculateDistanceKm(prox.lat, prox.lng, a.lat, a.lon);
+    const dB = calculateDistanceKm(prox.lat, prox.lng, b.lat, b.lon);
+    return dA - dB;
+  });
+
+  return results;
+}
+
+/**
  * Forward Geocoding: Search South African house numbers, building/complex names, street addresses, landmarks, and POIs
  * Completely case-insensitive with automatic title-case expansion, compound name resolution, and proximity sorting
  */
@@ -1487,7 +1704,7 @@ export async function searchPlaces(
   query: string,
   proximityCoords?: { lat: number; lng: number } | null
 ): Promise<SearchResultPlace[]> {
-  if (!query || query.trim().length < 2) return [];
+  if (!query || query.trim().length === 0) return [];
 
   const cleanQuery = query.trim();
   const normalizedQuery = normalizeSearchQuery(cleanQuery);
@@ -1507,115 +1724,8 @@ export async function searchPlaces(
   };
 
   // 1. Instant match against local/popular Kimberley landmarks & major streets (0ms response)
-  const lowerClean = cleanQuery.toLowerCase();
-  const lowerNormalized = normalizedQuery.toLowerCase();
-  const cleanNoSpace = lowerClean.replace(/[\s\-_]+/g, '');
-  const normalizedNoSpace = lowerNormalized.replace(/[\s\-_]+/g, '');
-
-  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
-  const normalizedRemainder = normalizeSearchQuery(streetOrPlaceQuery || '').toLowerCase();
-  const remainderNoSpace = cleanRemainder.replace(/[\s\-_]+/g, '');
-  const normRemainderNoSpace = normalizedRemainder.replace(/[\s\-_]+/g, '');
-
-  // 1.1 If user typed a standalone house number (e.g. "14"), suggest top Kimberley streets for that house number
-  if (parsedHouseNo && (!streetOrPlaceQuery || streetOrPlaceQuery.trim().length === 0)) {
-    const popularKimberleyStreets = KIMBERLEY_POPULAR_PLACES.filter((p) => p.category === 'address').slice(0, 8);
-    for (const streetPlace of popularKimberleyStreets) {
-      addUniqueResult({
-        ...streetPlace,
-        id: `${streetPlace.id}-${parsedHouseNo}`,
-        name: `${parsedHouseNo} ${streetPlace.name}`,
-        display_name: `${parsedHouseNo} ${streetPlace.display_name}`,
-        houseNumber: parsedHouseNo,
-        street: streetPlace.street || streetPlace.name,
-        category: 'address',
-      });
-    }
-  }
-
-  // 1.2 Match against all Kimberley places, giving exact street addresses priority
-  for (const popular of KIMBERLEY_POPULAR_PLACES) {
-    const popularNameLower = popular.name.toLowerCase();
-    const popularStreetLower = (popular.street || '').toLowerCase();
-    const popularBuildingLower = (popular.buildingName || '').toLowerCase();
-    const popularDisplayLower = popular.display_name.toLowerCase();
-
-    const popularNameNoSpace = popularNameLower.replace(/[\s\-_]+/g, '');
-    const popularStreetNoSpace = popularStreetLower.replace(/[\s\-_]+/g, '');
-    const popularBuildingNoSpace = popularBuildingLower.replace(/[\s\-_]+/g, '');
-    const popularDisplayNoSpace = popularDisplayLower.replace(/[\s\-_]+/g, '');
-
-    const isMatch =
-      popularNameLower.includes(lowerClean) ||
-      popularStreetLower.includes(lowerClean) ||
-      popularBuildingLower.includes(lowerClean) ||
-      popularDisplayLower.includes(lowerClean) ||
-      popularNameLower.includes(lowerNormalized) ||
-      popularStreetLower.includes(lowerNormalized) ||
-      popularDisplayLower.includes(lowerNormalized) ||
-      (cleanRemainder.length >= 2 && (
-        popularNameLower.includes(cleanRemainder) ||
-        popularStreetLower.includes(cleanRemainder) ||
-        popularBuildingLower.includes(cleanRemainder) ||
-        popularDisplayLower.includes(cleanRemainder)
-      )) ||
-      (normalizedRemainder.length >= 2 && (
-        popularNameLower.includes(normalizedRemainder) ||
-        popularStreetLower.includes(normalizedRemainder) ||
-        popularDisplayLower.includes(normalizedRemainder)
-      )) ||
-      (cleanNoSpace.length >= 3 && (
-        popularNameNoSpace.includes(cleanNoSpace) ||
-        popularStreetNoSpace.includes(cleanNoSpace) ||
-        popularBuildingNoSpace.includes(cleanNoSpace) ||
-        popularDisplayNoSpace.includes(cleanNoSpace)
-      )) ||
-      (normalizedNoSpace.length >= 3 && (
-        popularNameNoSpace.includes(normalizedNoSpace) ||
-        popularStreetNoSpace.includes(normalizedNoSpace) ||
-        popularDisplayNoSpace.includes(normalizedNoSpace)
-      )) ||
-      (remainderNoSpace.length >= 3 && (
-        popularNameNoSpace.includes(remainderNoSpace) ||
-        popularStreetNoSpace.includes(remainderNoSpace) ||
-        popularBuildingNoSpace.includes(remainderNoSpace) ||
-        popularDisplayNoSpace.includes(remainderNoSpace)
-      )) ||
-      (normRemainderNoSpace.length >= 3 && (
-        popularNameNoSpace.includes(normRemainderNoSpace) ||
-        popularStreetNoSpace.includes(normRemainderNoSpace) ||
-        popularDisplayNoSpace.includes(normRemainderNoSpace)
-      ));
-
-    if (isMatch) {
-      if (popular.category === 'address') {
-        const matchWithHouse = parsedHouseNo
-          ? {
-              ...popular,
-              id: `${popular.id}-${parsedHouseNo}`,
-              name: `${parsedHouseNo} ${popular.name}`,
-              display_name: `${parsedHouseNo} ${popular.display_name}`,
-              houseNumber: parsedHouseNo,
-              street: popular.street || popular.name,
-              category: 'address' as const,
-            }
-          : popular;
-        addUniqueResult(matchWithHouse);
-      } else {
-        // Building / POI match: only attach house number if query explicitly targeted it
-        const matchWithHouse = parsedHouseNo && (popularNameLower.includes(cleanRemainder) || cleanRemainder.length === 0)
-          ? {
-              ...popular,
-              id: `${popular.id}-${parsedHouseNo}`,
-              name: `${parsedHouseNo} ${popular.name}`,
-              display_name: `${parsedHouseNo} ${popular.display_name}`,
-              houseNumber: parsedHouseNo,
-            }
-          : popular;
-        addUniqueResult(matchWithHouse);
-      }
-    }
-  }
+  const localMatches = searchLocalPlaces(cleanQuery, prox);
+  localMatches.forEach((p) => addUniqueResult(p));
 
   // 2. Client-side: Query our internal API route /api/geocode (which handles multi-provider cascaded search with house numbers)
   if (typeof window !== 'undefined') {
@@ -1638,7 +1748,7 @@ export async function searchPlaces(
   }
 
   // 3. Query Mapbox Geocoding directly if needed
-  if (MAPBOX_TOKEN && combinedResults.length < 8) {
+  if (MAPBOX_TOKEN && combinedResults.length < 25) {
     const queryVariants = Array.from(
       new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
     ).filter((q): q is string => Boolean(q && q.length >= 2));
@@ -1647,7 +1757,7 @@ export async function searchPlaces(
       try {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           qVar
-        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
+        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=10&access_token=${MAPBOX_TOKEN}`;
         const res = await fetch(endpoint);
         if (res.ok) {
           const data = await res.json();
@@ -1660,12 +1770,12 @@ export async function searchPlaces(
       } catch (err) {
         console.warn('Mapbox geocoding error:', err);
       }
-      if (combinedResults.length >= 8) break;
+      if (combinedResults.length >= 35) break;
     }
   }
 
   // 4. Query Photon API (OpenStreetMap-based, high accuracy for South African addresses, CORS-friendly)
-  if (combinedResults.length < 8) {
+  if (combinedResults.length < 25) {
     try {
       const photonQueries = Array.from(
         new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
@@ -1674,7 +1784,7 @@ export async function searchPlaces(
       for (const pQuery of photonQueries) {
         const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
           pQuery
-        )}&lat=${prox.lat}&lon=${prox.lng}&limit=8`;
+        )}&lat=${prox.lat}&lon=${prox.lng}&limit=10`;
         const pRes = await fetch(photonUrl);
         if (pRes.ok) {
           const pData = await pRes.json();
@@ -1687,7 +1797,7 @@ export async function searchPlaces(
             });
           }
         }
-        if (combinedResults.length >= 8) break;
+        if (combinedResults.length >= 35) break;
       }
     } catch (err) {
       console.warn('Photon geocoding error:', err);
@@ -1697,6 +1807,7 @@ export async function searchPlaces(
   // 5. Prioritize by relevance match first, exact house number matches, then proximity
   const lowerQ = cleanQuery.toLowerCase();
   const lowerTokens = lowerQ.split(/\s+/).filter(Boolean);
+  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
 
   combinedResults.sort((a, b) => {
     const aName = a.name.toLowerCase();
@@ -1716,7 +1827,10 @@ export async function searchPlaces(
       else if (name.includes(lowerQ)) score += 40;
 
       // If query had a street and this place matches it
-      if (streetOrPlaceQuery && (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))) {
+      if (
+        streetOrPlaceQuery &&
+        (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))
+      ) {
         score += 50;
       }
 
@@ -1746,8 +1860,9 @@ export async function searchPlaces(
     return distA - distB;
   });
 
-  return combinedResults.slice(0, 10);
+  return combinedResults.slice(0, 50);
 }
+
 
 /**
  * Reverse Geocoding: Converts GPS coordinates into a detailed South African street/building address
