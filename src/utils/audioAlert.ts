@@ -594,6 +594,82 @@ class AudioAlertManager {
   }
 
   /**
+   * Plays an uplifting, crisp 3-tone notification chime (F5 -> A5 -> C6)
+   * in the Driver Verification Command Centre when a new driver registers.
+   */
+  public playAdminNewDriverChime(): void {
+    if (typeof window === 'undefined') return;
+    this.forcePlaybackAudioSession();
+
+    // 1. Play Web Audio API crisp notification
+    const ctx = this.getSharedAudioContext();
+    if (ctx) {
+      try {
+        const scheduleNotes = () => {
+          const now = ctx.currentTime;
+          const notes = [
+            { freq: 698.46, start: 0.0, dur: 0.12 }, // F5
+            { freq: 880.00, start: 0.12, dur: 0.14 }, // A5
+            { freq: 1046.50, start: 0.26, dur: 0.25 }, // C6
+          ];
+
+          const masterGain = ctx.createGain();
+          masterGain.gain.setValueAtTime(0.85, now);
+          masterGain.connect(ctx.destination);
+
+          notes.forEach(({ freq, start, dur }) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + start);
+
+            gain.gain.setValueAtTime(0.001, now + start);
+            gain.gain.linearRampToValueAtTime(0.8, now + start + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+            osc.connect(gain);
+            gain.connect(masterGain);
+
+            osc.start(now + start);
+            osc.stop(now + start + dur);
+          });
+        };
+
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(scheduleNotes).catch(() => scheduleNotes());
+        } else {
+          scheduleNotes();
+        }
+      } catch (e) {
+        console.warn('[AudioAlert] Admin chime failed:', e);
+      }
+    }
+
+    // 2. Play synthesized status PCM WAV on HTMLAudioElement as backup
+    try {
+      const uri = this.getStatusChimeWavUri();
+      if (uri && typeof Audio !== 'undefined') {
+        const audio = new Audio(uri);
+        audio.volume = 1.0;
+        (audio as any).playsInline = true;
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      }
+    } catch {}
+
+    // 3. Mobile haptic pulse if opened on admin phone/tablet
+    try {
+      const nav = window.navigator || (typeof navigator !== 'undefined' ? navigator : null);
+      if (nav && 'vibrate' in nav && typeof (nav as any).vibrate === 'function') {
+        (nav as any).vibrate([100, 50, 100]);
+      }
+    } catch {}
+  }
+
+  /**
    * Plays a single 1.2-second high-decibel emergency police siren wail cycle
    * using the EXACT same discrete-note Web Audio architecture as `playTripAlertChime`
    * (guaranteed to play on all mobile WebKit/Blink devices without ramp freezes).

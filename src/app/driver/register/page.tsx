@@ -143,6 +143,34 @@ export default function DriverRegistration() {
         localStorage.setItem('all_registered_drivers', JSON.stringify(filteredDrivers))
       } catch {}
 
+      // Dispatch immediate notification to Driver Verification Command Centre
+      try {
+        const signupNotice = {
+          id: `alert-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          driverId,
+          fullName,
+          phone,
+          email,
+          vehicleMake,
+          vehicleModel,
+          licensePlate,
+          prdpNumber,
+          createdAt: new Date().toISOString(),
+        };
+
+        // 1. BroadcastChannel across all open browser windows/tabs
+        if (typeof BroadcastChannel !== 'undefined') {
+          const ch = new BroadcastChannel('solo_driver_signup_channel');
+          ch.postMessage({ type: 'NEW_DRIVER_SIGNUP', alert: signupNotice });
+          ch.close();
+        }
+
+        // 2. LocalStorage trigger event for cross-tab listeners
+        localStorage.setItem('solo_new_driver_signup_alert', JSON.stringify(signupNotice));
+      } catch (broadcastErr) {
+        console.warn('Signup alert dispatch notice:', broadcastErr);
+      }
+
       // 3. Upload KYC Documents to Server & Storage
       const documentsToUpload: { file: File | null; type: KycDocType; label: string }[] = [
         { file: licenseFrontFile, type: 'license_front', label: "Driver's License (Front)" },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { isPlatformOwner } from '@/utils/owner';
-import { getAllKycDriverProfiles, getAllKycDocuments } from '@/utils/kycStore';
+import { getAllKycDriverProfiles, getAllKycDocuments, getRecentDriverSignupAlerts } from '@/utils/kycStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,6 +270,7 @@ export async function GET(req: NextRequest) {
       success: true,
       drivers: filtered,
       metrics,
+      signupAlerts: getRecentDriverSignupAlerts(20),
     });
   } catch (err: unknown) {
     const error = err as Error;

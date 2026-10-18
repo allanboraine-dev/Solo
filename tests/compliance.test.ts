@@ -12,6 +12,9 @@ import {
   updateKycDocumentStatus,
   approveAllKycDocuments,
   resetKycStore,
+  recordDriverSignupAlert,
+  getRecentDriverSignupAlerts,
+  markDriverSignupAlertRead,
 } from '../src/utils/kycStore.ts';
 
 // Helper simulating compliance determination logic
@@ -355,6 +358,58 @@ describe('Admin Driver Compliance & KYC Verification Suite', () => {
       resetKycStore();
       assert.strictEqual(getAllKycDriverProfiles().length, 0);
       assert.strictEqual(getAllKycDocuments().length, 0);
+      assert.strictEqual(getRecentDriverSignupAlerts().length, 0);
+    });
+
+    it('records and retrieves update notifications for Driver Verification Command Centre when new drivers sign up', () => {
+      resetKycStore();
+
+      // Driver 1 registers
+      const alert1 = recordDriverSignupAlert({
+        driverId: 'driver-kagiso-001',
+        fullName: 'Kagiso Tau',
+        email: 'kagiso@solo.co.za',
+        phone: '+27835551234',
+        vehicleMake: 'Toyota',
+        vehicleModel: 'Corolla Quest',
+        licensePlate: 'NC 582-991',
+        prdpNumber: 'PRDP-NC-8812',
+      });
+
+      assert.ok(alert1.id);
+      assert.strictEqual(alert1.fullName, 'Kagiso Tau');
+      assert.strictEqual(alert1.read, false);
+
+      // Driver 2 registers
+      const alert2 = recordDriverSignupAlert({
+        driverId: 'driver-lerato-002',
+        fullName: 'Lerato Khumalo',
+        email: 'lerato@solo.co.za',
+        phone: '+27827774321',
+        vehicleMake: 'Volkswagen',
+        vehicleModel: 'Polo Vivo',
+        licensePlate: 'NC 331-402',
+      });
+
+      const alerts = getRecentDriverSignupAlerts();
+      assert.strictEqual(alerts.length, 2);
+      // Newest first
+      assert.strictEqual(alerts[0].driverId, 'driver-lerato-002');
+      assert.strictEqual(alerts[1].driverId, 'driver-kagiso-001');
+
+      // Command centre marks alert as read
+      markDriverSignupAlertRead(alert1.id);
+      const updatedAlerts = getRecentDriverSignupAlerts();
+      const readAlert = updatedAlerts.find((a) => a.id === alert1.id);
+      assert.strictEqual(readAlert?.read, true);
+    });
+
+    it('verifies audioAlert provides non-crashing playAdminNewDriverChime in SSR/Node environment', async () => {
+      const { audioAlert } = await import('../src/utils/audioAlert.ts');
+      assert.doesNotThrow(() => {
+        audioAlert.playAdminNewDriverChime();
+      });
     });
   });
 });
+

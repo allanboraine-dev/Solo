@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -25,10 +25,17 @@ import {
   UserCheck,
   Crown,
   Users,
+  Bell,
+  Volume2,
+  VolumeX,
+  Radio,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
 import { isPlatformOwner } from "@/utils/owner";
+import { audioAlert } from "@/utils/audioAlert";
+import { createClient } from "@/utils/supabase/client";
+import { DriverSignupAlert } from "@/utils/kycStore";
 
 const REJECTION_PRESETS = [
   "Document is expired according to license card date",
@@ -55,6 +62,14 @@ export default function AdminComplianceDashboard() {
     "all" | "pending_review" | "verified" | "rejected" | "incomplete"
   >("all");
 
+  // Real-time Driver Verification Command Centre Notification States
+  const [liveAlert, setLiveAlert] = useState<DriverSignupAlert | null>(null);
+  const [signupAlerts, setSignupAlerts] = useState<DriverSignupAlert[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [desktopAlertsEnabled, setDesktopAlertsEnabled] = useState(false);
+  const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
+  const lastAlertIdRef = useRef<string>("");
+
   // Inspection & Review Modal States
   const [selectedDriver, setSelectedDriver] = useState<DriverKycSummary | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DriverDocument | null>(null);
@@ -66,14 +81,118 @@ export default function AdminComplianceDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
-  const fetchComplianceData = async () => {
-    setLoading(true);
+  const handleNewDriverAlert = (alert: DriverSignupAlert) => {
+    if (!alert || !alert.fullName) return;
+    if (lastAlertIdRef.current === alert.id) return;
+    lastAlertIdRef.current = alert.id;
+
+    setLiveAlert(alert);
+    setSignupAlerts((prev) => {
+      const exists = prev.some(
+        (a) => a.id === alert.id || (a.driverId && a.driverId === alert.driverId)
+      );
+      if (exists) return prev;
+      return [alert, ...prev];
+    });
+
+    // 1. Play distinct notification chime if audio alerts are enabled
+    if (soundEnabled) {
+      audioAlert.playAdminNewDriverChime();
+    }
+
+    // 2. Trigger native OS desktop notification if window is minimized / backgrounded
+    if (
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      try {
+        const vehicleInfo = [alert.vehicleMake, alert.vehicleModel, alert.licensePlate]
+          .filter(Boolean)
+          .join(" ");
+        const n = new Notification(`🚨 New Driver Signup: ${alert.fullName}`, {
+          body: `${vehicleInfo || "New applicant"} - Tap to inspect & verify documents.`,
+          icon: "/driver-icon-192.png",
+          badge: "/icon-192.png",
+          tag: `driver-signup-${alert.driverId || alert.id}`,
+        });
+        n.onclick = () => {
+          window.focus();
+          inspectDriverById(alert.driverId, alert);
+          n.close();
+        };
+      } catch {}
+    }
+
+    // 3. Immediately refresh compliance data so new driver shows up in the table
+    fetchComplianceData(false);
+  };
+
+  const inspectDriverById = (driverId: string, fallbackAlert?: DriverSignupAlert) => {
+    const existing = drivers.find((d) => d.id === driverId);
+    if (existing) {
+      setSelectedDriver(existing);
+    } else if (fallbackAlert) {
+      const provisional: DriverKycSummary = {
+        id: fallbackAlert.driverId,
+        fullName: fallbackAlert.fullName,
+        phone: fallbackAlert.phone,
+        email: fallbackAlert.email,
+        vehicleMake: fallbackAlert.vehicleMake,
+        vehicleModel: fallbackAlert.vehicleModel,
+        licensePlate: fallbackAlert.licensePlate,
+        prdpNumber: fallbackAlert.prdpNumber || "",
+        isVerified: false,
+        subscriptionPlan: "trial",
+        createdAt: fallbackAlert.createdAt || new Date().toISOString(),
+        documents: [],
+        totalDocs: 0,
+        approvedCount: 0,
+        pendingCount: 0,
+        rejectedCount: 0,
+        complianceStatus: "incomplete",
+      };
+      setSelectedDriver(provisional);
+      fetchComplianceData(false);
+    }
+  };
+
+  const requestDesktopNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Browser desktop notifications are not supported in this browser.");
+      return;
+    }
+
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === "granted") {
+        setDesktopAlertsEnabled(true);
+        showToast("✓ Desktop notifications enabled for driver signups");
+        new Notification("SOLO Command Centre Alerts Active", {
+          body: "You will receive desktop alerts when new drivers register on the platform.",
+          icon: "/driver-icon-192.png",
+        });
+      } else {
+        setDesktopAlertsEnabled(false);
+        alert("Notifications were disabled. Please allow notifications in your browser settings.");
+      }
+    } catch (e) {
+      console.warn("Notification permission request error:", e);
+    }
+  };
+
+  const fetchComplianceData = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const res = await fetch(
         `/api/admin/drivers-kyc?status=${statusFilter}&search=${encodeURIComponent(searchQuery)}`
       );
       const data = await res.json();
       let serverDrivers: DriverKycSummary[] = data.drivers || [];
+
+      if (Array.isArray(data.signupAlerts) && data.signupAlerts.length > 0) {
+        setSignupAlerts(data.signupAlerts);
+      }
 
       // Check localStorage for local driver registrations so local test drivers appear
       if (typeof window !== "undefined") {
@@ -162,7 +281,7 @@ export default function AdminComplianceDashboard() {
     } catch (err) {
       console.error("Error loading compliance data:", err);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -177,8 +296,66 @@ export default function AdminComplianceDashboard() {
       if (urlSearch) {
         setSearchQuery(urlSearch);
       }
+
+      const storedSound = localStorage.getItem("solo_admin_sound_enabled");
+      if (storedSound !== null) {
+        setSoundEnabled(storedSound === "true");
+      }
+      if ("Notification" in window && Notification.permission === "granted") {
+        setDesktopAlertsEnabled(true);
+      }
     }
   }, []);
+
+  // Multi-source Real-time Update Listeners (BroadcastChannel + LocalStorage + Supabase Channel + Polling)
+  useEffect(() => {
+    // 1. BroadcastChannel across all open browser tabs/windows
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        bc = new BroadcastChannel("solo_driver_signup_channel");
+        bc.onmessage = (e) => {
+          if (e.data?.type === "NEW_DRIVER_SIGNUP" && e.data.alert) {
+            handleNewDriverAlert(e.data.alert);
+          }
+        };
+      } catch {}
+    }
+
+    // 2. Cross-tab storage listener
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "solo_new_driver_signup_alert" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          handleNewDriverAlert(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    // 3. Supabase Realtime Channel
+    const supabase = createClient();
+    const realtimeChannel = supabase
+      .channel("solo-admin-alerts")
+      .on("broadcast", { event: "NEW_DRIVER_SIGNUP" }, (msg: any) => {
+        if (msg.payload) {
+          handleNewDriverAlert(msg.payload);
+        }
+      })
+      .subscribe();
+
+    // 4. Background polling heartbeat every 8 seconds
+    const pollInterval = setInterval(() => {
+      fetchComplianceData(false);
+    }, 8000);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener("storage", onStorage);
+      supabase.removeChannel(realtimeChannel);
+      clearInterval(pollInterval);
+    };
+  }, [soundEnabled, drivers]);
 
   useEffect(() => {
     fetchComplianceData();
@@ -409,33 +586,147 @@ export default function AdminComplianceDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start md:self-center">
+          <div className="flex items-center flex-wrap gap-2 self-start md:self-center">
+            {/* Realtime Live Indicator */}
+            <div className="hidden lg:flex items-center gap-1.5 py-2 px-3 bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 rounded-xl text-xs font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>Command Centre Live</span>
+            </div>
+
+            {/* Audio Chime Notification Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !soundEnabled;
+                setSoundEnabled(next);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("solo_admin_sound_enabled", String(next));
+                }
+                if (next) {
+                  audioAlert.playAdminNewDriverChime();
+                  showToast("🔔 Driver signup audio chime enabled");
+                } else {
+                  showToast("🔕 Driver signup audio chime muted");
+                }
+              }}
+              className={`flex items-center gap-1.5 py-2.5 px-3.5 rounded-xl font-bold text-xs transition border active:scale-95 ${
+                soundEnabled
+                  ? "bg-blue-600/20 border-blue-500/40 text-blue-300 hover:bg-blue-600/30"
+                  : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:bg-zinc-800"
+              }`}
+              title="Toggle Audio Chime when new drivers register"
+            >
+              {soundEnabled ? <Volume2 size={15} className="text-blue-400" /> : <VolumeX size={15} />}
+              <span>{soundEnabled ? "Chime: On" : "Chime: Off"}</span>
+            </button>
+
+            {/* Browser Desktop Push Notification Toggle */}
+            <button
+              type="button"
+              onClick={requestDesktopNotificationPermission}
+              className={`flex items-center gap-1.5 py-2.5 px-3.5 rounded-xl font-bold text-xs transition border active:scale-95 ${
+                desktopAlertsEnabled
+                  ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
+                  : "bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300"
+              }`}
+              title="Receive desktop alerts when new drivers sign up"
+            >
+              <Bell size={15} className={desktopAlertsEnabled ? "text-emerald-400" : "text-zinc-400"} />
+              <span className="hidden sm:inline">{desktopAlertsEnabled ? "Desktop Alerts: Active" : "Enable Desktop Alerts"}</span>
+              <span className="sm:hidden">Alerts</span>
+            </button>
+
             <Link
               href="/admin"
-              className="flex items-center gap-2 py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-bold text-xs transition active:scale-95"
+              className="flex items-center gap-2 py-2.5 px-3.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-bold text-xs transition active:scale-95"
             >
               <Users size={14} />
-              <span>Manager Overview</span>
+              <span>Overview</span>
             </Link>
 
             <Link
               href="/admin/simulator"
-              className="flex items-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition shadow-md shadow-blue-600/20 active:scale-95"
+              className="flex items-center gap-2 py-2.5 px-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition shadow-md shadow-blue-600/20 active:scale-95"
             >
               <Zap size={14} className="text-amber-300" />
-              <span>Dual-Window Simulator</span>
+              <span>Simulator</span>
             </Link>
 
             <button
-              onClick={fetchComplianceData}
+              onClick={() => fetchComplianceData(true)}
               disabled={loading}
-              className="flex items-center gap-2 py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-bold text-xs transition active:scale-95"
+              className="flex items-center gap-2 py-2.5 px-3.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-xl font-bold text-xs transition active:scale-95"
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
               <span>Refresh</span>
             </button>
           </div>
         </div>
+
+        {/* Real-time Driver Signup Alert Banner */}
+        {liveAlert && (
+          <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-emerald-500/20 border-2 border-amber-500/80 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in slide-in-from-top-6 duration-300">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="p-3.5 rounded-2xl bg-amber-500 text-black font-black shrink-0 animate-pulse shadow-lg shadow-amber-500/30">
+                <Bell size={24} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500 text-black shadow-xs">
+                    🚨 New Driver Signup Alert
+                  </span>
+                  <span className="text-xs text-amber-200/80 font-medium">Verification Action Required</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  {liveAlert.fullName} just registered on SOLO
+                </h3>
+                <p className="text-xs sm:text-sm text-zinc-300 flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-blue-300 font-semibold">
+                    <Car size={14} />
+                    {liveAlert.vehicleMake} {liveAlert.vehicleModel} ({liveAlert.licensePlate || "Pending Plate"})
+                  </span>
+                  {liveAlert.phone && (
+                    <>
+                      <span className="text-zinc-600">•</span>
+                      <span className="inline-flex items-center gap-1 text-emerald-300 font-semibold">
+                        <Phone size={14} />
+                        {liveAlert.phone}
+                      </span>
+                    </>
+                  )}
+                  {liveAlert.email && (
+                    <>
+                      <span className="text-zinc-600">•</span>
+                      <span className="text-zinc-400">{liveAlert.email}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  inspectDriverById(liveAlert.driverId, liveAlert);
+                  setLiveAlert(null);
+                }}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-black text-xs sm:text-sm flex items-center gap-2 transition active:scale-95 shadow-xl shadow-amber-500/25"
+              >
+                <span>Inspect & Verify KYC</span>
+                <ChevronRight size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLiveAlert(null)}
+                className="p-3 rounded-2xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition"
+                title="Dismiss Alert"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

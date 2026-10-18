@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { saveKycDriverProfile } from '@/utils/kycStore';
+import { saveKycDriverProfile, recordDriverSignupAlert } from '@/utils/kycStore';
 import { isPlatformOwner } from '@/utils/owner';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +49,31 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    // 2. Also attempt to save into Supabase driver_profiles
+    // 2. Record update notification for Driver Verification Command Centre
+    const signupAlert = recordDriverSignupAlert({
+      driverId,
+      fullName: fullName || 'New Driver',
+      email: email || '',
+      phone: phone || '',
+      vehicleMake: vehicleMake || '',
+      vehicleModel: vehicleModel || '',
+      licensePlate: licensePlate || '',
+      prdpNumber: prdpNumber || '',
+    });
+
+    // 3. Broadcast Realtime notification to Driver Verification Command Centre
+    try {
+      const channel = supabase.channel('solo-admin-alerts');
+      channel.send({
+        type: 'broadcast',
+        event: 'NEW_DRIVER_SIGNUP',
+        payload: signupAlert,
+      }).catch(() => {});
+    } catch (realtimeErr) {
+      console.warn('[DriverRegisterAPI] Supabase broadcast notice:', realtimeErr);
+    }
+
+    // 4. Also attempt to save into Supabase driver_profiles
     try {
       const dbPayload = {
         id: driverId,
@@ -84,6 +108,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       driver: savedDriver,
+      alert: signupAlert,
       message: 'SOLO driver profile registered and available in manager console',
     });
   } catch (err: unknown) {

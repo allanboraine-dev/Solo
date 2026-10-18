@@ -17,11 +17,70 @@ export interface KycDriverProfile {
   verificationNotes?: string | null;
 }
 
+export interface DriverSignupAlert {
+  id: string;
+  driverId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  licensePlate: string;
+  prdpNumber?: string;
+  createdAt: string;
+  read?: boolean;
+}
+
 // In-memory persistent collections across Next.js API lifecycle (real registered drivers only)
 const memoryDrivers = new Map<string, KycDriverProfile>();
 const memoryDocuments = new Map<string, Map<KycDocType, DriverDocument>>();
+const memorySignupAlerts: DriverSignupAlert[] = [];
 
 const MANDATORY_DOC_TYPES: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
+
+/**
+ * Record a new driver signup alert for the command centre
+ */
+export function recordDriverSignupAlert(
+  alert: Omit<DriverSignupAlert, 'id' | 'createdAt'> & { id?: string; createdAt?: string }
+): DriverSignupAlert {
+  const newAlert: DriverSignupAlert = {
+    id: alert.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `alert-${Date.now()}`),
+    driverId: alert.driverId,
+    fullName: alert.fullName || 'New Driver',
+    email: alert.email || '',
+    phone: alert.phone || '',
+    vehicleMake: alert.vehicleMake || '',
+    vehicleModel: alert.vehicleModel || '',
+    licensePlate: alert.licensePlate || '',
+    prdpNumber: alert.prdpNumber || '',
+    createdAt: alert.createdAt || new Date().toISOString(),
+    read: false,
+  };
+
+  memorySignupAlerts.unshift(newAlert);
+  if (memorySignupAlerts.length > 100) {
+    memorySignupAlerts.length = 100;
+  }
+  return newAlert;
+}
+
+/**
+ * Retrieve recent driver signup alerts
+ */
+export function getRecentDriverSignupAlerts(limit = 30): DriverSignupAlert[] {
+  return memorySignupAlerts.slice(0, limit);
+}
+
+/**
+ * Mark a driver signup alert as acknowledged / read
+ */
+export function markDriverSignupAlertRead(alertId: string): void {
+  const found = memorySignupAlerts.find((a) => a.id === alertId);
+  if (found) {
+    found.read = true;
+  }
+}
 
 /**
  * Register or update driver profile in the in-memory store
@@ -233,4 +292,5 @@ export function approveAllKycDocuments(
 export function resetKycStore(): void {
   memoryDrivers.clear();
   memoryDocuments.clear();
+  memorySignupAlerts.length = 0;
 }
