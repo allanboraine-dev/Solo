@@ -32,6 +32,21 @@ describe('PWA Mobile Installation & Offline Optimization Suite', () => {
     assert.ok(manifest.shortcuts.length >= 2, 'Must have at least 2 quick shortcuts');
   });
 
+  it('validates Driver and Rider portal manifests open directly to /driver and /rider when installed', () => {
+    const driverManifestPath = path.join(rootDir, 'public', 'manifest-driver.json');
+    const riderManifestPath = path.join(rootDir, 'public', 'manifest-rider.json');
+    assert.strictEqual(fs.existsSync(driverManifestPath), true, 'manifest-driver.json must exist');
+    assert.strictEqual(fs.existsSync(riderManifestPath), true, 'manifest-rider.json must exist');
+
+    const driverManifest = JSON.parse(fs.readFileSync(driverManifestPath, 'utf8'));
+    const riderManifest = JSON.parse(fs.readFileSync(riderManifestPath, 'utf8'));
+
+    assert.ok(driverManifest.start_url.startsWith('/driver'), 'Driver PWA must start at /driver');
+    assert.strictEqual(driverManifest.display, 'standalone');
+    assert.ok(riderManifest.start_url.startsWith('/rider'), 'Rider PWA must start at /rider');
+    assert.strictEqual(riderManifest.display, 'standalone');
+  });
+
   it('confirms all required PWA PNG app icons exist with valid content', () => {
     const requiredIcons = [
       'icon-192.png',

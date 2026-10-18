@@ -2,28 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Download } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { usePWA } from "@/lib/PWAContext";
 
 export function Navbar() {
   const pathname = usePathname();
+  const { isStandalone, installedRole, installApp } = usePWA();
 
   const isRiderApp = pathname?.startsWith("/rider");
   const isDriverApp = pathname?.startsWith("/driver");
 
+  // In standalone installed PWA mode, tapping the brand logo stays inside the installed portal
+  const brandHref = isStandalone
+    ? isDriverApp || installedRole === "driver"
+      ? "/driver"
+      : isRiderApp || installedRole === "rider"
+      ? "/rider"
+      : "/"
+    : "/";
+
   return (
     <div className="fixed top-2.5 md:top-4 pt-safe left-0 right-0 flex justify-center z-[1000] pointer-events-none px-3 md:px-4">
       <nav className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3 bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-gray-200/60 dark:border-white/10 rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 w-full max-w-2xl pointer-events-auto transition-all">
-        <div className="flex gap-4 md:gap-6 items-center">
-          <Link href="/" className="flex items-center gap-2 font-extrabold text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
+        <div className="flex gap-3 md:gap-6 items-center">
+          <Link href={brandHref} className="flex items-center gap-2 font-extrabold text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
             <img
-              src="/icon-192.png"
+              src={isDriverApp ? "/driver-icon-192.png" : isRiderApp ? "/rider-icon-192.png" : "/icon-192.png"}
               alt="SOLO Logo"
               className="w-7 h-7 md:w-8 md:h-8 rounded-lg shadow-sm object-cover border border-emerald-500/30"
             />
             <span>SOLO</span>
           </Link>
           
-          {!isDriverApp && (
+          {!isDriverApp && (!isStandalone || installedRole !== "driver") && (
             <Link
               href="/rider"
               className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 border border-blue-500/20 px-2.5 py-1 rounded-full transition-all"
@@ -37,7 +49,7 @@ export function Navbar() {
             </Link>
           )}
           
-          {!isRiderApp && (
+          {!isRiderApp && (!isStandalone || installedRole !== "rider") && (
             <Link
               href="/driver"
               className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1 rounded-full transition-all"
@@ -53,6 +65,24 @@ export function Navbar() {
         </div>
         
         <div className="flex items-center gap-2">
+          {!isStandalone && (isDriverApp || isRiderApp) && (
+            <button
+              type="button"
+              onClick={() => installApp(isDriverApp ? "driver" : "rider")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                isDriverApp
+                  ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                  : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30"
+              }`}
+              title={isDriverApp ? "Install SOLO Driver App" : "Install SOLO Rider App"}
+            >
+              <Download size={13} />
+              <span className="hidden sm:inline">
+                Install {isDriverApp ? "Driver" : "Rider"} App
+              </span>
+              <span className="sm:hidden">Install</span>
+            </button>
+          )}
           <div className="relative pl-1 md:pl-2">
              <ThemeToggle />
           </div>

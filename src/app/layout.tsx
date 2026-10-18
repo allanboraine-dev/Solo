@@ -73,6 +73,36 @@ export default function RootLayout({
                 syncViewport();
                 window.addEventListener('resize', syncViewport, { passive: true });
                 window.addEventListener('orientationchange', syncViewport, { passive: true });
+
+                try {
+                  var path = window.location.pathname;
+                  if (path.indexOf('/driver') === 0) {
+                    localStorage.setItem('solo_installed_app_role', 'driver');
+                    document.cookie = 'solo_installed_app_role=driver; path=/; max-age=31536000; SameSite=Lax';
+                  } else if (path.indexOf('/rider') === 0) {
+                    localStorage.setItem('solo_installed_app_role', 'rider');
+                    document.cookie = 'solo_installed_app_role=rider; path=/; max-age=31536000; SameSite=Lax';
+                  } else if (path === '/') {
+                    var isStandalone =
+                      window.matchMedia('(display-mode: standalone)').matches ||
+                      window.navigator.standalone === true ||
+                      window.location.search.indexOf('source=pwa') !== -1;
+                    if (isStandalone) {
+                      var role = localStorage.getItem('solo_installed_app_role');
+                      if (!role) {
+                        var match = document.cookie.match(/(?:^|;\\s*)solo_installed_app_role=(driver|rider)/);
+                        if (match) role = match[1];
+                      }
+                      if (!role) {
+                        if (localStorage.getItem('solo_driver_session')) role = 'driver';
+                        else if (localStorage.getItem('solo_rider_session')) role = 'rider';
+                      }
+                      if (role === 'driver' || role === 'rider') {
+                        window.location.replace('/' + role + '?source=pwa');
+                      }
+                    }
+                  }
+                } catch (e) {}
               })();
             `,
           }}

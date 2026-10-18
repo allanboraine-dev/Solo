@@ -1,0 +1,47 @@
+{
+  "id": "/driver",
+  "name": "SOLO Driver | Partner Portal",
+  "short_name": "SOLO Driver",
+  "description": "SOLO Zero-Commission Driver Portal. Accept rides and keep 100% of your fares.",
+  "start_url": "/driver?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "categories": ["travel", "transportation", "business"],
+  "icons": [
+    {
+      "src": "/driver-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/driver-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/driver-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/driver-icon-192.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Driver Portal",
+      "short_name": "Driver",
+      "description": "Go online and accept rides",
+      "url": "/driver",
+      "icons": [{ "src": "/driver-icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
