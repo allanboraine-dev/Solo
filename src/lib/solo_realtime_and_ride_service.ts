@@ -21,6 +21,9 @@ import { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
 export function encodeGeohash(lat: number, lng: number, precision = 6): string {
+  const safeLat = Number.isFinite(lat) ? Math.max(-90, Math.min(90, lat)) : -26.2041;
+  const safeLng = Number.isFinite(lng) ? Math.max(-180, Math.min(180, lng)) : 28.0473;
+  const safePrecision = Number.isFinite(precision) ? Math.max(1, Math.min(12, Math.floor(precision))) : 6;
   let idx = 0;
   let bit = 0;
   let evenBit = true;
@@ -30,10 +33,10 @@ export function encodeGeohash(lat: number, lng: number, precision = 6): string {
   let lngMin = -180,
     lngMax = 180;
 
-  while (geohash.length < precision) {
+  while (geohash.length < safePrecision) {
     if (evenBit) {
       const lngMid = (lngMin + lngMax) / 2;
-      if (lng >= lngMid) {
+      if (safeLng >= lngMid) {
         idx = idx * 2 + 1;
         lngMin = lngMid;
       } else {
@@ -42,7 +45,7 @@ export function encodeGeohash(lat: number, lng: number, precision = 6): string {
       }
     } else {
       const latMid = (latMin + latMax) / 2;
-      if (lat >= latMid) {
+      if (safeLat >= latMid) {
         idx = idx * 2 + 1;
         latMin = latMid;
       } else {
@@ -295,6 +298,48 @@ export class SoloLocationEngine {
           updated_at: new Date(now).toISOString(),
         });
       }
+    }
+  }
+
+  /**
+   * Subscribes a Rider to the regional Geohash-6 WebSocket channel (`geo:<geohash6>`)
+   * so nearby moving drivers stream over WebSockets with 0 database polling overhead.
+   */
+  subscribeToNearbyDrivers(
+    riderLat: number,
+    riderLng: number,
+    onDriverUpdate: (payload: DriverGpsPayload) => void
+  ): () => void {
+    if (typeof window === 'undefined' || !this.supabase) {
+      return () => {};
+    }
+    const safeLat = Number.isFinite(riderLat) ? riderLat : -26.2041;
+    const safeLng = Number.isFinite(riderLng) ? riderLng : 28.0473;
+    const geohash6 = encodeGeohash(safeLat, safeLng, 6);
+
+    try {
+      const channel = this.supabase.channel(`geo:${geohash6}`, {
+        config: { broadcast: { ack: false } },
+      });
+
+      channel
+        .on('broadcast', { event: 'driver_gps' }, (msg) => {
+          const payload = msg?.payload as DriverGpsPayload | undefined;
+          if (payload) {
+            onDriverUpdate(payload);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        try {
+          this.supabase.removeChannel(channel);
+        } catch {
+          // Ignore channel cleanup errors
+        }
+      };
+    } catch {
+      return () => {};
     }
   }
 }

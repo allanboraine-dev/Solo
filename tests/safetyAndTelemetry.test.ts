@@ -12,8 +12,20 @@ import {
   buildWhatsAppEmergencySosUrl,
   triggerRapidResponseSos,
 } from '../src/utils/safetyDispatch.ts';
+import {
+  encodeGeohash,
+  SoloLocationEngine,
+} from '../src/lib/solo_realtime_and_ride_service.ts';
 
 describe('SOLO Adaptive WebSocket Telemetry & SA Rapid-Response Safety Suite', () => {
+  it('exposes subscribeToNearbyDrivers on SoloLocationEngine and guards encodeGeohash against NaN', () => {
+    assert.strictEqual(typeof SoloLocationEngine.prototype.subscribeToNearbyDrivers, 'function');
+    const validHash = encodeGeohash(-26.1076, 28.0567, 6);
+    assert.strictEqual(validHash.length, 6);
+    const nanHash = encodeGeohash(Number.NaN, Number.NaN, 6);
+    assert.strictEqual(nanHash.length, 6);
+  });
+
   it('selects ACTIVE_TRIP_HIGH_PRECISION tier (3s WS) during active rides', () => {
     const tier = selectOptimalTelemetryTier({
       hasActiveTrip: true,

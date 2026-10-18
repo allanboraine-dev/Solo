@@ -82,6 +82,14 @@ class AudioAlertManager {
   }
 
   /**
+   * Plays both the acoustic chime and haptic vibration sequence
+   */
+  public playAlertSequence(): void {
+    this.playTripAlertChime();
+    this.triggerDeviceVibration();
+  }
+
+  /**
    * Dispatches system/browser notification to the driver,
    * preferring ServiceWorker.showNotification on mobile so the mobile device
    * plays its native configured notification alert sound.

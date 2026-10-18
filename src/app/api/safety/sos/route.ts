@@ -164,7 +164,6 @@ export async function POST(req: NextRequest) {
                 body: `${role.toUpperCase()} emergency in Sector ${geohash6.toUpperCase()} ${licensePlate ? `• Vehicle ${licensePlate}` : ''}. Tap to view live GPS pin.`,
                 url: `/driver`,
                 tag: `sos-${code}`,
-                requireInteraction: true,
               }
             )
           )

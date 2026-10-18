@@ -1357,29 +1357,36 @@ export const subscribeToRegionalDriverMesh = (
   riderLng: number,
   onDriverUpdate: (payload: any) => void
 ): (() => void) => {
-  if (typeof window === 'undefined') return () => {};
-  return soloLocationEngine.subscribeToNearbyDrivers(riderLat, riderLng, (payload) => {
-    onDriverUpdate({
-      id: payload.driverId,
-      driverId: payload.driverId,
-      lat: payload.lat,
-      lng: payload.lng,
-      heading: payload.heading,
-      speedKmh: payload.speedKmh,
-      isOnline: payload.isOnline,
-      fullName: payload.fullName,
-      phone: payload.phone,
-      vehicleMake: payload.vehicleMake,
-      vehicleModel: payload.vehicleModel,
-      vehicleYear: payload.vehicleYear,
-      vehicleColor: payload.vehicleColor,
-      licensePlate: payload.licensePlate,
-      rating: payload.rating,
-      ratingCount: payload.ratingCount,
-      tripId: payload.tripId,
-      updatedAt: payload.timestamp,
+  if (typeof window === 'undefined' || typeof soloLocationEngine?.subscribeToNearbyDrivers !== 'function') {
+    return () => {};
+  }
+  try {
+    return soloLocationEngine.subscribeToNearbyDrivers(riderLat, riderLng, (payload) => {
+      onDriverUpdate({
+        id: payload.driverId,
+        driverId: payload.driverId,
+        lat: payload.lat,
+        lng: payload.lng,
+        heading: payload.heading,
+        speedKmh: payload.speedKmh,
+        isOnline: payload.isOnline,
+        fullName: payload.fullName,
+        phone: payload.phone,
+        vehicleMake: payload.vehicleMake,
+        vehicleModel: payload.vehicleModel,
+        vehicleYear: payload.vehicleYear,
+        vehicleColor: payload.vehicleColor,
+        licensePlate: payload.licensePlate,
+        rating: payload.rating,
+        ratingCount: payload.ratingCount,
+        tripId: payload.tripId,
+        updatedAt: payload.timestamp,
+      });
     });
-  });
+  } catch (err) {
+    console.warn('[Rider Mesh] WebSocket regional subscription fallback:', err);
+    return () => {};
+  }
 };
 
 // ----------------------------------------
