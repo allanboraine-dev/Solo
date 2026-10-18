@@ -242,6 +242,11 @@ export default function CustomSearchInput({
                       : 'hover:bg-blue-50/60 dark:hover:bg-zinc-800/70 active:bg-blue-100/60 dark:active:bg-zinc-800'
                   }`}
                   onMouseEnter={() => setActiveIndex(index)}
+                  onPointerDown={(e) => {
+                    // Prevent virtual keyboard blur from cancelling the tap on mobile
+                    e.preventDefault();
+                    handleSelect(place);
+                  }}
                   onClick={() => handleSelect(place)}
                 >
                   <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
