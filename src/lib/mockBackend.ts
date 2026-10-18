@@ -347,6 +347,34 @@ export const markTripCompleted = (tripId: string): void => {
   }
 };
 
+export const getDismissedTripIds = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem('solo_dismissed_trips');
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    return new Set(ids);
+  } catch {
+    return new Set();
+  }
+};
+
+export const isTripDismissed = (tripId: string): boolean => {
+  return getDismissedTripIds().has(tripId);
+};
+
+export const markTripDismissed = (tripId: string): void => {
+  if (typeof window === 'undefined' || !tripId) return;
+  try {
+    const current = Array.from(getDismissedTripIds());
+    if (!current.includes(tripId)) {
+      current.push(tripId);
+      localStorage.setItem('solo_dismissed_trips', JSON.stringify(current.slice(-300)));
+    }
+  } catch (e) {
+    console.error('Error recording dismissed trip locally:', e);
+  }
+};
+
 const resolveMonotonicStatus = (
   tripId: string,
   candidateStatus: MockTrip['status'],

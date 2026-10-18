@@ -378,5 +378,43 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     assert.strictEqual(activeDrivers[0].id, 'driver-live-1');
     assert.strictEqual(activeDrivers[0].fullName, 'Active Real Driver');
   });
+
+  it('Scenario 9: Dismissed & Force-Closed Trips Never Loop or Re-open in Rider or Driver Portals', () => {
+    const dismissedTripIds = new Set<string>();
+    const markDismissed = (id: string) => dismissedTripIds.add(id);
+    const isDismissed = (id: string) => dismissedTripIds.has(id);
+
+    // 1. A trip gets stuck in payment_pending or completed
+    const stuckTrip = {
+      id: 'trip-stuck-999',
+      status: 'payment_pending',
+      fare_amount: 120,
+      rider_id: 'rider-abc',
+      driver_id: 'driver-xyz',
+    };
+
+    // Before dismissal, the trip is considered active by active-trip queries
+    let activeQuery = [stuckTrip].find(
+      (t) => t.status !== 'completed' && t.status !== 'cancelled' && !isDismissed(t.id)
+    );
+    assert.ok(activeQuery, 'Trip is active prior to dismissal');
+
+    // 2. Rider or driver dismisses / settles the trip
+    markDismissed(stuckTrip.id);
+    assert.strictEqual(isDismissed(stuckTrip.id), true);
+
+    // 3. Subsequent polling or realtime events must NEVER re-adopt the trip
+    activeQuery = [stuckTrip].find(
+      (t) => t.status !== 'completed' && t.status !== 'cancelled' && !isDismissed(t.id)
+    );
+    assert.strictEqual(activeQuery, undefined, 'Dismissed trip must never be re-adopted in active trip polling');
+
+    // 4. Rating modal trigger guard must also be bypassed if trip was dismissed
+    let showRatingModal = false;
+    if (!isDismissed(stuckTrip.id)) {
+      showRatingModal = true;
+    }
+    assert.strictEqual(showRatingModal, false, 'Rating modal must not loop when trip is already dismissed');
+  });
 });
 

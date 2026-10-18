@@ -5,7 +5,7 @@ import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
-import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver, type MockMessage } from '@/lib/mockBackend'
+import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver, type MockMessage } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -13,7 +13,7 @@ import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShie
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -322,20 +322,25 @@ export default function RiderPage() {
       const myRiderId = getRiderSessionId(currentUser?.id);
 
       if (currentActive) {
-        // Discard if current active does not belong to this session
+        // Discard if current active does not belong to this session or has already been dismissed
         if (
-          currentActive.id !== storedActiveTripId &&
-          currentActive.rider_id !== myRiderId &&
-          myRiderId !== '00000000-0000-0000-0000-000000000000'
+          isTripDismissed(currentActive.id) ||
+          (currentActive.id !== storedActiveTripId &&
+            currentActive.rider_id !== myRiderId &&
+            myRiderId !== '00000000-0000-0000-0000-000000000000')
         ) {
           updateActiveTripState(null);
           setDriverCoords(null);
+          setIsProcessingPayment(false);
+          setPaymentError(null);
           return;
         }
 
         if (completedIds.has(currentActive.id) || isTripCompleted(currentActive.id)) {
-          setRatingTrip(currentActive);
-          setShowRatingModal(true);
+          if (!isTripDismissed(currentActive.id)) {
+            setRatingTrip(currentActive);
+            setShowRatingModal(true);
+          }
           updateActiveTripState(null);
           setDriverCoords(null);
           setIsProcessingPayment(false);
@@ -354,8 +359,10 @@ export default function RiderPage() {
           if (matched.status === 'completed') {
             markTripCompleted(matched.id);
             audioAlert.alertRiderOfTripStatus('completed', matched);
-            setRatingTrip(matched);
-            setShowRatingModal(true);
+            if (!isTripDismissed(matched.id)) {
+              setRatingTrip(matched);
+              setShowRatingModal(true);
+            }
             updateActiveTripState(null);
             setDriverCoords(null);
             setIsProcessingPayment(false);
@@ -387,8 +394,10 @@ export default function RiderPage() {
                 status: 'completed',
               };
               markTripCompleted(completedTrip.id);
-              setRatingTrip(completedTrip);
-              setShowRatingModal(true);
+              if (!isTripDismissed(completedTrip.id)) {
+                setRatingTrip(completedTrip);
+                setShowRatingModal(true);
+              }
               updateActiveTripState(null);
               setDriverCoords(null);
               setIsProcessingPayment(false);
@@ -408,6 +417,8 @@ export default function RiderPage() {
           t.status !== 'completed' &&
           t.status !== 'cancelled' &&
           !completedIds.has(t.id) &&
+          !isTripCompleted(t.id) &&
+          !isTripDismissed(t.id) &&
           !isStaleRequestedTrip(t) &&
           (t.id === storedActiveTripId || (t.rider_id === myRiderId && myRiderId !== '00000000-0000-0000-0000-000000000000'))
       );
@@ -489,8 +500,10 @@ export default function RiderPage() {
             ? { ...currentActive, ...trip, status: 'completed' }
             : trip;
           audioAlert.alertRiderOfTripStatus('completed', completedSnapshot);
-          setRatingTrip(completedSnapshot);
-          setShowRatingModal(true);
+          if (!isTripDismissed(trip.id)) {
+            setRatingTrip(completedSnapshot);
+            setShowRatingModal(true);
+          }
           updateActiveTripState(null);
           setDriverCoords(null);
           setIsProcessingPayment(false);
@@ -500,7 +513,7 @@ export default function RiderPage() {
           updateActiveTripState(null);
           setDriverCoords(null);
           setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
-        } else if (!isTripCompleted(trip.id) && !isStaleRequestedTrip(trip)) {
+        } else if (!isTripCompleted(trip.id) && !isTripDismissed(trip.id) && !isStaleRequestedTrip(trip)) {
           if (!currentActive) {
             setDeclineNotice(null);
             updateActiveTripState(trip);
@@ -521,6 +534,7 @@ export default function RiderPage() {
             }
           }
         }
+
       } else if (type === 'driver_location') {
         handleDriverLocationUpdate(payload);
       } else if (type === 'new_message') {
@@ -714,6 +728,7 @@ export default function RiderPage() {
 
   const handleRatingSubmit = async (data: { stars: number; tags: string[]; comment: string }) => {
     if (ratingTrip) {
+      markTripDismissed(ratingTrip.id);
       await saveTripRating({
         id: crypto.randomUUID(),
         trip_id: ratingTrip.id,
@@ -730,9 +745,69 @@ export default function RiderPage() {
   }
 
   const handleRatingSkip = () => {
+    if (ratingTrip) {
+      markTripDismissed(ratingTrip.id);
+    }
     setShowRatingModal(false);
     setRatingTrip(null);
   }
+
+  const handleSettleWithCash = async () => {
+    if (!activeTrip) return;
+    const current = activeTrip;
+    markTripCompleted(current.id);
+    markTripDismissed(current.id);
+    await completeTripAtomic(current.id, 'cash', current);
+    await saveTrip({ ...current, status: 'completed' });
+    setRatingTrip(current);
+    setShowRatingModal(true);
+    updateActiveTripState(null);
+    setDriverCoords(null);
+    setIsProcessingPayment(false);
+    setPaymentError(null);
+  };
+
+  const handleForceCloseTrip = async () => {
+    if (!activeTrip) return;
+    const current = activeTrip;
+    markTripCompleted(current.id);
+    markTripDismissed(current.id);
+    await completeTripAtomic(current.id, 'cash', current);
+    updateActiveTripState(null);
+    setDriverCoords(null);
+    setIsProcessingPayment(false);
+    setPaymentError(null);
+  };
+
+  const handleCancelActiveTrip = async () => {
+    if (!activeTrip) return;
+    const isRequestedOnly = activeTrip.status === 'requested';
+    if (!isRequestedOnly) {
+      const confirmEnd = window.confirm("Are you sure you want to cancel / end this active trip?");
+      if (!confirmEnd) return;
+    }
+    const myRiderId = getRiderSessionId(currentUser?.id);
+    const storedActiveTripId = getRiderActiveTripId();
+    if (
+      activeTrip.id !== storedActiveTripId &&
+      activeTrip.rider_id !== myRiderId &&
+      myRiderId !== '00000000-0000-0000-0000-000000000000'
+    ) {
+      console.warn('[Rider] Refusing to cancel trip belonging to another rider session');
+      return;
+    }
+    const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
+    markTripDismissed(activeTrip.id);
+    updateActiveTripState(null);
+    setDriverCoords(null);
+    setIsProcessingPayment(false);
+    setPaymentError(null);
+    try {
+      await saveTrip(cancelled);
+    } catch (e) {
+      console.error('Error cancelling trip:', e);
+    }
+  };
 
   const handleLocationSelect = (type: 'pickup' | 'dropoff', lat: number, lng: number) => {
     if (type === 'pickup') setPickupCoords({ lat, lng })
@@ -1262,31 +1337,13 @@ export default function RiderPage() {
                           >
                             <span>🚨 SOS</span>
                           </button>
-                          {activeTrip.status === 'requested' && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!activeTrip) return;
-                                const myRiderId = getRiderSessionId(currentUser?.id);
-                                const storedActiveTripId = getRiderActiveTripId();
-                                if (
-                                  activeTrip.id !== storedActiveTripId &&
-                                  activeTrip.rider_id !== myRiderId &&
-                                  myRiderId !== '00000000-0000-0000-0000-000000000000'
-                                ) {
-                                  console.warn('[Rider] Refusing to cancel trip belonging to another rider session');
-                                  return;
-                                }
-                                const cancelled: MockTrip = { ...activeTrip, status: 'cancelled' };
-                                updateActiveTripState(null);
-                                setDriverCoords(null);
-                                await saveTrip(cancelled);
-                              }}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-2 rounded-xl transition"
-                            >
-                              <span>Cancel Request</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={handleCancelActiveTrip}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-2 rounded-xl transition touch-manipulation"
+                          >
+                            <span>{activeTrip.status === 'requested' ? 'Cancel Request' : 'Cancel / End Trip'}</span>
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -1314,7 +1371,16 @@ export default function RiderPage() {
       {activeTrip?.status === 'payment_pending' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-between mb-1">
+            {/* Top Close Button */}
+            <button
+              type="button"
+              onClick={handleForceCloseTrip}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors touch-manipulation"
+              title="Close modal"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex items-center justify-between mb-1 pr-8">
               <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Settle Fare</h2>
               <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
                 <ShieldCheck size={13} />
@@ -1362,7 +1428,7 @@ export default function RiderPage() {
             <button 
               onClick={handlePayDriver}
               disabled={isProcessingPayment}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95 touch-manipulation"
             >
               {isProcessingPayment ? (
                 <>
@@ -1376,6 +1442,23 @@ export default function RiderPage() {
                 </>
               )}
             </button>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleSettleWithCash}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md flex justify-center items-center gap-2 active:scale-95 text-sm touch-manipulation"
+              >
+                <span>💵 Paid Directly to Driver (Cash / Card)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleForceCloseTrip}
+                className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 py-1 transition text-center underline touch-manipulation"
+              >
+                Dismiss &amp; Close Trip
+              </button>
+            </div>
           </div>
         </div>
       )}

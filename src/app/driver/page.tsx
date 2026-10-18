@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -268,7 +268,7 @@ export default function DriverPage() {
       const currentActive = activeTripRef.current;
 
       if (currentActive) {
-        if (completedIds.has(currentActive.id) || declinedIds.has(currentActive.id)) {
+        if (completedIds.has(currentActive.id) || declinedIds.has(currentActive.id) || isTripDismissed(currentActive.id)) {
           updateActiveTripState(null);
           setShowFareCollection(false);
           return;
@@ -279,6 +279,7 @@ export default function DriverPage() {
             if (currentInDb.status === 'completed') {
               markTripCompleted(currentInDb.id);
             }
+            markTripDismissed(currentInDb.id);
             updateActiveTripState(null);
             setShowFareCollection(false);
             return;
@@ -299,7 +300,8 @@ export default function DriverPage() {
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
           (driverId ? t.driver_id === driverId : false) &&
           !declinedIds.has(t.id) &&
-          !completedIds.has(t.id)
+          !completedIds.has(t.id) &&
+          !isTripDismissed(t.id)
       );
 
       if (active) {
@@ -417,12 +419,14 @@ export default function DriverPage() {
           }
         } else if (currentActive && trip.id === currentActive.id && trip.status === 'completed') {
           markTripCompleted(trip.id);
+          markTripDismissed(trip.id);
           completeTripAtomic(trip.id, 'cash', trip);
           updateActiveTripState(null);
           setRequest(null);
           setShowFareCollection(false);
           alert("Payment Received! Trip Completed.");
         } else if (currentActive && trip.id === currentActive.id && trip.status === 'cancelled') {
+          markTripDismissed(trip.id);
           updateActiveTripState(null);
           setRequest(null);
           setShowFareCollection(false);
@@ -430,6 +434,7 @@ export default function DriverPage() {
           currentActive &&
           trip.id === currentActive.id &&
           !isTripCompleted(trip.id) &&
+          !isTripDismissed(trip.id) &&
           !isTripDeclined(trip.id, driverId)
         ) {
           const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
@@ -437,7 +442,7 @@ export default function DriverPage() {
           if (incomingPrio > activePrio) {
             updateActiveTripState(trip);
           }
-        } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id)) {
+        } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id) || isTripDismissed(trip.id)) {
           setRequest(prev => (prev && prev.id === trip.id ? null : prev));
         }
       }
@@ -757,6 +762,7 @@ export default function DriverPage() {
     if (current) {
       const tripToComplete = current;
       markTripCompleted(tripToComplete.id);
+      markTripDismissed(tripToComplete.id);
       updateActiveTripState(null);
       setRequest(null);
       setShowFareCollection(false);
@@ -764,7 +770,40 @@ export default function DriverPage() {
       await completeTripAtomic(tripToComplete.id, 'cash', tripToComplete);
       await saveTrip({ ...tripToComplete, status: 'completed' });
     }
-  }
+  };
+
+  const handleCancelActiveTrip = async () => {
+    const current = activeTripRef.current || activeTrip;
+    if (!current) return;
+    const confirmCancel = window.confirm("Are you sure you want to cancel / end this trip?");
+    if (!confirmCancel) return;
+
+    markTripDismissed(current.id);
+    const cancelledTrip: MockTrip = { ...current, status: 'cancelled' };
+    updateActiveTripState(null);
+    setShowFareCollection(false);
+    setRequest(null);
+    try {
+      await saveTrip(cancelledTrip);
+      broadcastEvent('trip_updated', cancelledTrip);
+    } catch (e) {
+      console.error('Error cancelling trip from driver portal:', e);
+    }
+  };
+
+  const handleForceCloseFareModal = async () => {
+    const current = activeTripRef.current || activeTrip;
+    if (current) {
+      markTripCompleted(current.id);
+      markTripDismissed(current.id);
+      updateActiveTripState(null);
+      setShowFareCollection(false);
+      setRequest(null);
+      await completeTripAtomic(current.id, 'cash', current);
+    } else {
+      setShowFareCollection(false);
+    }
+  };
 
   // Define map pins and routing for pending request or active trip
   const mapProps = activeTrip 
@@ -1250,6 +1289,15 @@ export default function DriverPage() {
                           className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black active:scale-95 transition touch-manipulation shadow-2xs"
                         >
                           <span>🚨 SOS / Security</span>
+                        </button>
+                      </div>
+                      <div className="pt-1 text-center">
+                        <button
+                          type="button"
+                          onClick={handleCancelActiveTrip}
+                          className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 py-1.5 px-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/40 transition touch-manipulation"
+                        >
+                          Cancel / End Trip
                         </button>
                       </div>
                     </div>
@@ -1859,6 +1907,23 @@ export default function DriverPage() {
                 className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"
               >
                 <span>💵 Paid via Cash</span>
+              </button>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/5 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleForceCloseFareModal}
+                className="w-full py-2.5 px-3 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 font-bold text-xs hover:bg-gray-200 dark:hover:bg-zinc-700 transition active:scale-95 touch-manipulation"
+              >
+                Settle &amp; Close Trip
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelActiveTrip}
+                className="text-xs text-red-500 hover:text-red-600 font-semibold underline text-center w-full py-1 transition touch-manipulation"
+              >
+                Cancel / Void This Trip
               </button>
             </div>
           </div>
