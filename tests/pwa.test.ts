@@ -43,8 +43,11 @@ describe('PWA Mobile Installation & Offline Optimization Suite', () => {
 
     assert.ok(driverManifest.start_url.startsWith('/driver'), 'Driver PWA must start at /driver');
     assert.strictEqual(driverManifest.display, 'standalone');
+    assert.strictEqual(driverManifest.scope, '/driver');
     assert.ok(riderManifest.start_url.startsWith('/rider'), 'Rider PWA must start at /rider');
     assert.strictEqual(riderManifest.display, 'standalone');
+    assert.strictEqual(riderManifest.scope, '/rider');
+    assert.notStrictEqual(driverManifest.scope, riderManifest.scope, 'Driver and Rider must have distinct non-overlapping scopes so both can be installed on the same device');
   });
 
   it('confirms all required PWA PNG app icons exist with valid content', () => {

@@ -162,11 +162,18 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     // Check if we navigated to /driver?install=driver or /rider?install=rider from the home page
     const params = new URLSearchParams(window.location.search);
     const installParam = params.get('install');
-    if (installParam === 'driver' || installParam === 'rider') {
-      persistInstalledRole(installParam);
-      setInstalledRole(installParam);
-      setGuideRole(installParam);
-      syncDocumentManifestAndIcons(installParam);
+    if (installParam === 'driver' || installParam === 'rider' || installParam === 'true') {
+      const activeRole: PortalRole =
+        installParam === 'driver' || installParam === 'rider'
+          ? installParam
+          : pathname?.startsWith('/driver')
+          ? 'driver'
+          : 'rider';
+
+      persistInstalledRole(activeRole);
+      setInstalledRole(activeRole);
+      setGuideRole(activeRole);
+      syncDocumentManifestAndIcons(activeRole);
       setShowIosGuide(true);
 
       // Clean up the ?install= query parameter without reloading
@@ -269,41 +276,44 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         ? 'driver'
         : pathname?.startsWith('/rider')
         ? 'rider'
-        : installedRole || 'rider');
-
-    // 1. Persist the target portal role and dynamically switch manifest + icons
-    persistInstalledRole(targetRole);
-    setInstalledRole(targetRole);
-    setGuideRole(targetRole);
-    syncDocumentManifestAndIcons(targetRole);
+        : 'rider');
 
     const targetPath = `/${targetRole}`;
 
-    // 2. If native Android/Chrome install prompt is ready, trigger it
-    if (deferredPrompt) {
-      // Give browser 60ms to register the updated <link rel="manifest"> href
-      await new Promise((resolve) => setTimeout(resolve, 60));
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setIsBannerDismissed(true);
-        setShowIosGuide(false);
-        if (!pathname?.startsWith(targetPath)) {
-          router.push(targetPath);
-        }
-      }
-      return;
-    }
-
-    // 3. On iOS Safari (or when native prompt isn't available yet):
-    // Navigate to the target portal (/driver or /rider) BEFORE the user taps "Add to Home Screen"
-    // so iOS Safari and Android browsers bookmark /driver or /rider directly instead of "/"!
+    // 1. If we are NOT on the target portal URL, navigate there first!
+    // Why:
+    // Chromium & Safari enforce that the active document URL must be within the manifest's scope.
+    // Driver manifest scope is /driver, Rider manifest scope is /rider.
+    // Navigating to the target portal ensures the correct manifest is active and prevents
+    // attempting to install from a different scope or triggering the other app.
     if (!pathname?.startsWith(targetPath)) {
       router.push(`${targetPath}?install=${targetRole}`);
       return;
     }
 
+    // 2. Persist the target portal role and dynamically switch manifest + icons
+    persistInstalledRole(targetRole);
+    setInstalledRole(targetRole);
+    setGuideRole(targetRole);
+    syncDocumentManifestAndIcons(targetRole);
+
+    // 3. If native Android/Chrome install prompt is ready on this portal, trigger it
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          setDeferredPrompt(null);
+          setIsBannerDismissed(true);
+          setShowIosGuide(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('deferredPrompt error:', err);
+      }
+    }
+
+    // 4. On iOS or when native prompt has already been dismissed / requires manual install
     setShowIosGuide(true);
   };
 
@@ -417,9 +427,9 @@ export function PWAProvider({ children }: { children: ReactNode }) {
                     <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
                       <Smartphone size={18} />
                     </div>
-                    <span>
-                      2. Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
-                    </span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed">
+                    💡 <strong>Dual-App Tip:</strong> If your browser says &quot;App already installed&quot;, refresh the Rider app or remove the previous single-app shortcut so Android recognizes the independent <strong>/driver</strong> portal scope.
                   </div>
                 </div>
               )}
