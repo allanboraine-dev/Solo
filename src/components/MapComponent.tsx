@@ -12,9 +12,18 @@ export interface DriverMarkerData {
   lat: number;
   lng: number;
   name?: string;
+  phone?: string;
   vehicle?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+  vehicleYear?: number;
+  vehicleColor?: string;
   licensePlate?: string;
   rating?: number;
+  ratingCount?: number;
+  distanceKm?: number;
+  etaMinutes?: number;
+  isOnline?: boolean;
 }
 
 interface MapProps {
@@ -25,6 +34,7 @@ interface MapProps {
   driverLat?: number;
   driverLng?: number;
   availableDrivers?: DriverMarkerData[];
+  focusedDriverCoords?: { lat: number; lng: number } | null;
   assignedDriver?: {
     lat: number;
     lng: number;
@@ -97,11 +107,13 @@ const createAssignedDriverIcon = (driverName?: string) => {
 };
 
 // Component to handle map bounds and routing
-const MapUpdater = ({ pickupLat, pickupLng, dropoffLat, dropoffLng }: any) => {
+const MapUpdater = ({ pickupLat, pickupLng, dropoffLat, dropoffLng, focusedDriverCoords }: any) => {
   const map = useMap();
 
   useEffect(() => {
-    if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
+    if (focusedDriverCoords?.lat && focusedDriverCoords?.lng) {
+      map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
+    } else if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
       const bounds = L.latLngBounds(
         [pickupLat, pickupLng],
         [dropoffLat, dropoffLng]
@@ -112,7 +124,7 @@ const MapUpdater = ({ pickupLat, pickupLng, dropoffLat, dropoffLng }: any) => {
     } else if (dropoffLat && dropoffLng) {
       map.setView([dropoffLat, dropoffLng], 15);
     }
-  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng]);
+  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, focusedDriverCoords]);
 
   return null;
 };
@@ -126,6 +138,7 @@ const MapComponent = (props: MapProps) => {
     driverLat, 
     driverLng, 
     availableDrivers = [],
+    focusedDriverCoords,
     assignedDriver 
   } = props;
   
@@ -168,6 +181,7 @@ const MapComponent = (props: MapProps) => {
         zoom={14} 
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
+        // @ts-ignore Leaflet mobile tap emulation override
         tap={false}
         bounceAtZoomLimits={false}
       >
@@ -185,6 +199,7 @@ const MapComponent = (props: MapProps) => {
           pickupLng={pickupLng} 
           dropoffLat={dropoffLat} 
           dropoffLng={dropoffLng} 
+          focusedDriverCoords={focusedDriverCoords}
         />
 
         {routeCoordinates.length > 0 && (
@@ -215,27 +230,76 @@ const MapComponent = (props: MapProps) => {
           if (effectiveAssignedLat !== undefined && effectiveAssignedLng !== undefined && Math.abs(driver.lat - effectiveAssignedLat) < 0.0001 && Math.abs(driver.lng - effectiveAssignedLng) < 0.0001) {
             return null;
           }
+          const vehicleTitle = driver.vehicle || [driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Registered Vehicle';
+          const vehicleSub = [driver.vehicleColor, driver.vehicleYear].filter(Boolean).join(' • ');
+
           return (
             <Marker 
               key={driver.id} 
               position={[driver.lat, driver.lng]} 
-              icon={createAvailableCarIcon(driver.vehicle)}
+              icon={createAvailableCarIcon(vehicleTitle)}
               zIndexOffset={500}
             >
               <Popup>
-                <div className="p-1 font-sans text-xs">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-bold text-gray-900">{driver.name || 'Registered Driver'}</div>
-                    <div className="text-amber-500 font-bold flex items-center gap-0.5 text-[11px] whitespace-nowrap">
+                <div className="p-1 font-sans text-xs min-w-[210px]">
+                  {/* Driver Header */}
+                  <div className="flex items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-1.5 mb-1.5">
+                    <div>
+                      <div className="font-bold text-gray-900 dark:text-white text-sm">{driver.name || 'Registered Driver'}</div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                        <span>✓</span>
+                        <span>Verified SOLO Driver</span>
+                      </div>
+                    </div>
+                    <div className="text-amber-500 font-bold flex items-center gap-0.5 text-xs whitespace-nowrap bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
                       <span>★</span>
                       <span>{driver.rating ? driver.rating.toFixed(1) : '5.0'}</span>
+                      {driver.ratingCount ? <span className="text-[10px] text-gray-400 font-normal">({driver.ratingCount})</span> : null}
                     </div>
                   </div>
-                  {driver.vehicle && <div className="text-gray-500 mt-0.5">{driver.vehicle}</div>}
-                  {driver.licensePlate && <div className="text-gray-400 text-[10px] uppercase font-mono">{driver.licensePlate}</div>}
-                  <div className="text-green-600 font-bold mt-1 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
-                    Available Now
+
+                  {/* Vehicle Information */}
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center gap-1.5 text-gray-800 dark:text-gray-200 font-semibold text-xs">
+                      <span className="text-sm">🚗</span>
+                      <span>{vehicleTitle}</span>
+                    </div>
+                    {vehicleSub && (
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 pl-5">
+                        {vehicleSub}
+                      </div>
+                    )}
+                    {driver.licensePlate && (
+                      <div className="pl-5 pt-0.5">
+                        <span className="font-mono font-bold text-[10px] bg-amber-300 text-black px-1.5 py-0.5 rounded border border-black/50 uppercase tracking-wider inline-flex items-center gap-1 shadow-xs">
+                          <span>🇿🇦</span>
+                          <span>{driver.licensePlate}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Drive Distance & Live Telematics */}
+                  <div className="pt-1.5 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px]">
+                    {driver.distanceKm !== undefined ? (
+                      <div className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                        <span>📍</span>
+                        <span>{driver.distanceKm.toFixed(1)} km away</span>
+                        {driver.etaMinutes !== undefined && (
+                          <span className="text-gray-500 dark:text-gray-400 font-normal">• ~{driver.etaMinutes} min</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-emerald-600 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                        Available Now
+                      </div>
+                    )}
+                    {driver.distanceKm !== undefined && (
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1 rounded">
+                        Online
+                      </span>
+                    )}
                   </div>
                 </div>
               </Popup>

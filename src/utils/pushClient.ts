@@ -137,3 +137,40 @@ export async function dispatchRideRequestPush(params: {
   }
 }
 
+/**
+ * Dispatches an arrival alert to the rider with the trip verification PIN
+ */
+export async function dispatchDriverArrivedPush(params: {
+  tripId: string;
+  driverName: string;
+  otpPin: string;
+}): Promise<boolean> {
+  try {
+    const payload = {
+      title: 'Your Driver Has Arrived! 📍',
+      body: `${params.driverName} is waiting at the pickup location. Share PIN ${params.otpPin} to start trip.`,
+      role: 'rider' as const,
+      icon: '/rider-icon-192.png',
+      url: `/rider?tripId=${params.tripId}`,
+      tripId: params.tripId,
+      tag: `trip-arrived-${params.tripId}`,
+    };
+
+    const res = await fetch('/api/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        role: 'rider',
+        payload,
+      }),
+    });
+
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data.success;
+  } catch (err) {
+    console.warn('[PushClient] Failed to dispatch driver arrival push notification:', err);
+    return false;
+  }
+}
+

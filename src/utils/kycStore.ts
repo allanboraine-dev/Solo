@@ -113,9 +113,11 @@ export function getKycDocumentsForDriver(driverId: string): DriverDocument[] {
  */
 export function getAllKycDocuments(): DriverDocument[] {
   const all: DriverDocument[] = [];
-  for (const driverMap of memoryDocuments.values()) {
-    all.push(...driverMap.values());
-  }
+  memoryDocuments.forEach((driverMap) => {
+    driverMap.forEach((doc) => {
+      all.push(doc);
+    });
+  });
   return all;
 }
 

@@ -26,7 +26,7 @@ import {
   Crown,
   Users,
 } from "lucide-react";
-import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
+import { DriverDocument, KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
 import { isPlatformOwner } from "@/utils/owner";
 
