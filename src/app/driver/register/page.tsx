@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { uploadDriverKycDocument } from '@/utils/kyc'
 import { KycDocType } from '@/types/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
-import { User, Car, FileText, ChevronRight, ShieldCheck, AlertCircle } from 'lucide-react'
+import { User, Car, FileText, ChevronRight, ShieldCheck, AlertCircle, CreditCard, Banknote } from 'lucide-react'
 import Link from 'next/link'
 import { isPlatformOwner } from '@/utils/owner'
 
@@ -24,11 +24,12 @@ export default function DriverRegistration() {
   const [password, setPassword] = useState('')
   const [phone, setPhone] = useState('')
 
-  // Step 2: Vehicle Details
+  // Step 2: Vehicle & Payment Equipment Details
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
   const [licensePlate, setLicensePlate] = useState('')
   const [prdpNumber, setPrdpNumber] = useState('')
+  const [hasSpeedpointConfirmed, setHasSpeedpointConfirmed] = useState(false)
   
   // Step 3: Real KYC Document Files
   const [licenseFrontFile, setLicenseFrontFile] = useState<File | null>(null)
@@ -221,15 +222,25 @@ export default function DriverRegistration() {
           <p className="text-blue-100 text-sm">
             Keep 100% of your rider fares. 7-day free trial, then flat R499/month.
           </p>
+
+          {/* Driver Payment & Equipment Requirements Strip */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-white/15 border border-white/25 px-3 py-1 rounded-xl text-white">
+              <CreditCard size={13} /> Speedpoint Machine Required (Card/Tap)
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-400/20 border border-emerald-300/30 px-3 py-1 rounded-xl text-emerald-100">
+              <Banknote size={13} /> Cash Payments Accepted (100% Direct)
+            </span>
+          </div>
           
-          <div className="flex items-center gap-2 mt-8">
+          <div className="flex items-center gap-2 mt-6">
             <div className={`h-2 flex-1 rounded-full ${step >= 1 ? 'bg-white' : 'bg-blue-400/30'}`}></div>
             <div className={`h-2 flex-1 rounded-full ${step >= 2 ? 'bg-white' : 'bg-blue-400/30'}`}></div>
             <div className={`h-2 flex-1 rounded-full ${step >= 3 ? 'bg-white' : 'bg-blue-400/30'}`}></div>
           </div>
           <div className="flex justify-between text-xs mt-2 text-blue-100 font-medium">
             <span>1. Personal Info</span>
-            <span>2. Vehicle</span>
+            <span>2. Vehicle &amp; Speedpoint</span>
             <span>3. KYC Documents</span>
           </div>
         </div>
@@ -265,7 +276,7 @@ export default function DriverRegistration() {
                 <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="+27 82 123 4567" />
               </div>
               <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
-                Continue to Vehicle Info <ChevronRight size={18} />
+                Continue to Vehicle &amp; Payment Setup <ChevronRight size={18} />
               </button>
             </form>
           )}
@@ -273,7 +284,7 @@ export default function DriverRegistration() {
           {step === 2 && (
             <form onSubmit={handleNext} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
-                <Car className="text-blue-500" /> Vehicle Information
+                <Car className="text-blue-500" /> Vehicle &amp; Payment Equipment
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -293,6 +304,42 @@ export default function DriverRegistration() {
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">PrDP Number</label>
                 <input required type="text" value={prdpNumber} onChange={e => setPrdpNumber(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Professional Driving Permit Number" />
               </div>
+
+              {/* Mandatory Speedpoint Machine & Cash Payment Requirement Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/60 dark:from-emerald-950/40 dark:to-teal-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-600 text-white shrink-0 shadow-sm">
+                    <CreditCard size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-black text-emerald-950 dark:text-emerald-100">
+                        Driver Requirement: Speedpoint Machine &amp; Cash
+                      </h3>
+                      <span className="text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                        Mandatory
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1 leading-relaxed">
+                      Because SOLO charges <strong>0% commission</strong>, riders pay you <strong>100% directly</strong> at the end of every trip. All SOLO drivers are required to carry a working <strong>Speedpoint machine</strong> (e.g. Yoco, iKhokha, Vodapay, or bank POS) to accept card/tap payments, while <strong>Cash payment</strong> remains a standard option for riders.
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-3 pt-2 border-t border-emerald-200/70 dark:border-emerald-800/50 cursor-pointer select-none">
+                  <input
+                    required
+                    type="checkbox"
+                    checked={hasSpeedpointConfirmed}
+                    onChange={(e) => setHasSpeedpointConfirmed(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded accent-emerald-600 shrink-0"
+                  />
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-snug">
+                    I confirm I have a working Speedpoint / card machine in my vehicle to accept card payments, and I also accept Cash payments from riders.
+                  </span>
+                </label>
+              </div>
+
               <div className="flex gap-4 mt-6">
                 <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition">
                   Back

@@ -73,7 +73,7 @@ export default function Home() {
               </div>
               <h2 className="text-3xl font-bold mb-3 tracking-tight">Rider App</h2>
               <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
-                Book a ride instantly anywhere in South Africa. Pay fair metered rates with 0% platform commissions added to your fare.
+                Book a ride instantly anywhere in South Africa. Pay your driver directly via their in-car <strong>Speedpoint machine</strong> (Card/Tap) or <strong>Cash</strong> with 0% platform markup.
               </p>
             </Link>
             
@@ -111,7 +111,7 @@ export default function Home() {
               </div>
               <h2 className="text-3xl font-bold mb-3 tracking-tight">Driver Portal</h2>
               <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
-                Keep 100% of your rider fares. Enjoy a 7-day free trial, then a flat R499/pm SaaS fee. Take full control of your transport business.
+                Keep 100% of your rider fares paid directly via your required in-car <strong>Speedpoint machine</strong> or <strong>Cash</strong>. 7-day free trial, then a flat R499/pm SaaS fee.
               </p>
             </div>
 

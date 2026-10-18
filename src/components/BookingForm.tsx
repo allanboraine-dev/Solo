@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star } from 'lucide-react'
+import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
@@ -57,6 +57,7 @@ export default function BookingForm({
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [isBooking, setIsBooking] = useState(false)
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'speedpoint' | 'cash'>('speedpoint')
 
   const [realPickupCoords, setRealPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [realDropoffCoords, setRealDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
@@ -305,6 +306,47 @@ export default function BookingForm({
         </div>
       )}
 
+      {/* Ride Payment Options: Mandatory Driver Speedpoint Machine or Cash */}
+      <div className="p-2.5 rounded-2xl bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/80 dark:border-white/5 space-y-1.5">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            Ride Payment Method
+          </span>
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            0% Commission • Direct to Driver
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPaymentMethod('speedpoint')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+              paymentMethod === 'speedpoint'
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <CreditCard size={14} className="shrink-0" />
+            <span className="truncate">Speedpoint (Card)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaymentMethod('cash')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+              paymentMethod === 'cash'
+                ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <Banknote size={14} className="shrink-0" />
+            <span className="truncate">Cash Payment</span>
+          </button>
+        </div>
+        <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1 leading-tight">
+          All SOLO drivers are required to carry a working <strong>Speedpoint machine</strong> in-car for card/tap payments, alongside accepting <strong>Cash</strong>.
+        </p>
+      </div>
+
       {/* Primary Request Ride Button Placed Immediately Below Inputs/Fare for 0-Scroll Mobile Access */}
       <button 
         onClick={handleBook}
@@ -314,7 +356,7 @@ export default function BookingForm({
         {isBooking ? (
           <div className="w-5 h-5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
         ) : fare !== null ? (
-          `Request Ride • R${fare}`
+          `Request Ride • R${fare} (${paymentMethod === 'speedpoint' ? 'Speedpoint' : 'Cash'})`
         ) : (
           'Select Pickup & Dropoff to Book'
         )}

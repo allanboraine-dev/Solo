@@ -1272,6 +1272,12 @@ export default function DriverPage() {
                     <span className="text-gray-500 text-sm font-medium">License Plate</span>
                     <span className="font-bold text-sm uppercase bg-black/5 dark:bg-white/10 px-2 py-1 rounded">{profile?.licensePlate}</span>
                   </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200/50 dark:border-white/5 gap-2">
+                    <span className="text-gray-500 text-sm font-medium">Ride Payments</span>
+                    <span className="font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      <CreditCard size={12} /> Speedpoint (Required) &amp; Cash
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-500 text-sm font-medium">Subscription</span>
                     <span className="font-bold text-sm">
@@ -1482,6 +1488,21 @@ export default function DriverPage() {
                 <h2 className="text-2xl font-bold mb-4 tracking-tight text-center">Driver Manual</h2>
                 
                 <div className="space-y-4 text-left">
+                  <div className="bg-emerald-50/90 dark:bg-emerald-950/30 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/60">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <h3 className="font-bold text-emerald-950 dark:text-emerald-200 flex items-center gap-2 text-sm">
+                        <CreditCard size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Mandatory Requirement: Speedpoint &amp; Cash</span>
+                      </h3>
+                      <span className="text-[10px] font-black uppercase bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                        Required
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-900/90 dark:text-emerald-300 leading-relaxed">
+                      All SOLO drivers are required to carry a working <b>Speedpoint machine</b> (e.g. Yoco, iKhokha, Vodapay, or bank POS) in their vehicle to accept card/tap payments from riders. <b>Cash payment</b> remains intact as a standard payment option. You keep 100% of both Speedpoint and Cash fares immediately.
+                    </p>
+                  </div>
+
                   <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
                     <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">1. Going Online</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Tap the Power button top right to go online and receive requests. You'll see a green radar when active.</p>
@@ -1493,8 +1514,8 @@ export default function DriverPage() {
                   </div>
 
                   <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
-                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">3. Collecting Fare</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Tap <b>Confirm Dropoff</b>. Choose to receive cash or your own card machine, or request the rider to pay via the app.</p>
+                    <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">3. Collecting Fare (Speedpoint or Cash)</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Tap <b>Confirm Dropoff</b>. Collect the fare directly from the rider using your required in-car <b>Speedpoint machine</b> (Card/Tap) or <b>Cash</b>.</p>
                   </div>
 
                   <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
@@ -1574,7 +1595,7 @@ export default function DriverPage() {
             </button>
             <div className="text-center mb-5">
               <h2 className="text-xl sm:text-2xl font-black mb-1">Collect Fare</h2>
-              <p className="text-gray-500 text-xs sm:text-sm">Collect payment directly from rider via cash or your own POS.</p>
+              <p className="text-gray-500 text-xs sm:text-sm">Accept payment directly from the rider via your required Speedpoint machine or Cash.</p>
             </div>
             
             <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-5 mb-5 border border-green-100 dark:border-green-900/50 flex flex-col items-center">
@@ -1583,12 +1604,19 @@ export default function DriverPage() {
               <span className="text-[11px] text-green-700 dark:text-green-400/80 font-medium mt-2 text-center">100% of this fare belongs to you (0% platform commission)</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
+              <button 
+                onClick={handleCashPayment}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"
+              >
+                <CreditCard size={18} />
+                <span>Paid via Speedpoint Machine (Card / Tap)</span>
+              </button>
               <button 
                 onClick={handleCashPayment}
                 className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-black/10 dark:shadow-white/10 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"
               >
-                Paid via Cash / Own POS
+                <span>💵 Paid via Cash</span>
               </button>
             </div>
           </div>
