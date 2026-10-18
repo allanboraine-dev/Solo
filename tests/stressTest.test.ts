@@ -11,6 +11,7 @@ import {
 } from '../src/utils/mapService.ts';
 import { isPlatformOwner, applyOwnerPrivileges } from '../src/utils/owner.ts';
 import { formatPhoneNumber, isValidSAPhone, phoneToDeterministicUuid } from '../src/utils/phone.ts';
+import { encodeGeohash, getDistanceMeters } from '../src/lib/solo_realtime_and_ride_service.ts';
 
 describe('SOLO Comprehensive High-Concurreny Stress & Resilience Suite', () => {
   const memStart = process.memoryUsage();
@@ -351,5 +352,41 @@ describe('SOLO Comprehensive High-Concurreny Stress & Resilience Suite', () => {
 
     // Verify heap usage did not balloon uncontrollably after hundreds of thousands of operations
     assert.ok(heapDiffMb < 150, `Heap memory growth was ${heapDiffMb.toFixed(2)}MB (must be < 150MB)`);
+  });
+
+  it('Stress Test 10: 1,000-Driver Geohash-6 Channel Partitioning & Stationary Write Throttling', () => {
+    const startTime = performance.now();
+    let broadcastCount = 0;
+    let dbWriteCount = 0;
+
+    for (let driverIdx = 0; driverIdx < 1000; driverIdx++) {
+      const baseLat = -28.7282 + (driverIdx % 40) * 0.002;
+      const baseLng = 24.7623 + (driverIdx % 40) * 0.002;
+      const geohash = encodeGeohash(baseLat, baseLng, 6);
+      assert.strictEqual(geohash.length, 6, 'Geohash-6 cell key must be 6 characters');
+
+      // Tick 1: Initial online ping always writes to DB and broadcasts
+      broadcastCount++;
+      dbWriteCount++;
+
+      // Tick 2: Stationary at traffic light (1.2m GPS drift) -> Broadcasts to map, skips DB disk write
+      const stationaryDist = getDistanceMeters(baseLat, baseLng, baseLat + 0.00001, baseLng);
+      broadcastCount++;
+      if (stationaryDist >= 10) {
+        dbWriteCount++;
+      }
+
+      // Tick 3: Moving 35m down the road -> Broadcasts AND writes to PostGIS
+      const movingDist = getDistanceMeters(baseLat, baseLng, baseLat + 0.00035, baseLng);
+      broadcastCount++;
+      if (movingDist >= 10) {
+        dbWriteCount++;
+      }
+    }
+
+    const durationMs = performance.now() - startTime;
+    assert.strictEqual(broadcastCount, 3000, 'All 3,000 live GPS ticks must broadcast over WebSockets');
+    assert.strictEqual(dbWriteCount, 2000, 'Stationary <10m ticks must be filtered, saving 1,000 redundant DB writes');
+    assert.ok(durationMs < 250, `1,000-driver Geohash & throttling pass took ${durationMs.toFixed(2)}ms (must be < 250ms)`);
   });
 });

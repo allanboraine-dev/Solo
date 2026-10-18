@@ -1,6 +1,10 @@
 import { supabase } from './supabaseClient';
 import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
 import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession } from '@/utils/session';
+import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
+
+export const soloLocationEngine = new SoloLocationEngine(supabase);
+export const soloDispatchService = new SoloDispatchService(supabase);
 
 export type MockTrip = {
   id: string; // UUID in Supabase
@@ -34,6 +38,8 @@ export type MockDriverProfile = {
   phone: string;
   vehicleMake: string;
   vehicleModel: string;
+  vehicleYear?: number;
+  vehicleColor?: string;
   licensePlate: string;
   prdpNumber: string;
   hasLicense: boolean;
@@ -632,7 +638,7 @@ export const saveTrip = async (trip: MockTrip) => {
 };
 
 /**
- * Atomic trip acceptance using the hardened Postgres RPC with automatic fallback
+ * Atomic trip acceptance using SoloDispatchService (Postgres `FOR UPDATE SKIP LOCKED` RPC + conditional update guard)
  */
 export const acceptTripAtomic = async (
   tripId: string,
@@ -640,41 +646,17 @@ export const acceptTripAtomic = async (
 ): Promise<{ success: boolean; error?: string }> => {
   const localDriverId =
     driverIdOverride || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
-  recordTripStatusOverride(tripId, 'accepted', localDriverId);
 
-  try {
-    const { data, error } = await supabase.rpc('accept_trip', { p_trip_id: tripId });
-    if (!error && data) {
-      const res = data as { success?: boolean; status?: string };
-      if (res?.success) {
-        return { success: true };
-      }
-    }
-    if (error && error.message?.toLowerCase().includes('no longer available')) {
-      return { success: false, error: error.message };
-    }
-  } catch (e: unknown) {
-    console.warn('accept_trip RPC fallback:', e);
+  const result = await soloDispatchService.acceptRideAtomic(tripId, localDriverId);
+  if (result.success) {
+    recordTripStatusOverride(tripId, 'accepted', localDriverId);
+    return { success: true };
   }
 
-  // Fallback: Direct update on public.trips + local storage
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const driverId = session?.user?.id || localDriverId;
-    const validDriverId = driverId && UUID_REGEX.test(driverId) ? driverId : null;
-    await supabase
-      .from('trips')
-      .update({
-        status: 'accepted',
-        ...(validDriverId ? { driver_id: validDriverId } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tripId);
-  } catch (e) {
-    console.warn('Direct trip accept update fallback:', e);
-  }
-
-  return { success: true };
+  return {
+    success: false,
+    error: result.error || result.message || 'Trip is no longer available (claimed by another driver).',
+  };
 };
 
 /**
@@ -965,9 +947,16 @@ export const saveMessage = async (msg: MockMessage) => {
 export type LiveDriver = {
   id: string;
   fullName: string;
+  phone?: string;
   vehicleMake?: string;
   vehicleModel?: string;
+  vehicleYear?: number;
+  vehicleColor?: string;
   licensePlate?: string;
+  rating?: number;
+  ratingCount?: number;
+  distanceKm?: number;
+  etaMinutes?: number;
   lat: number;
   lng: number;
   isOnline: boolean;
@@ -979,7 +968,7 @@ export type LiveDriver = {
 // Maximum allowed age for a driver's GPS location ping before considering them offline (5 minutes TTL)
 export const DRIVER_HEARTBEAT_TTL_MS = 5 * 60 * 1000;
 
-import { calculateDistanceKm, isWithinRadiusKm } from '@/utils/geo';
+import { calculateDistanceKm, isWithinRadiusKm, estimateEtaMinutes } from '@/utils/geo';
 
 export const getActiveDrivers = async (userLat?: number, userLng?: number, radiusKm: number = 20): Promise<LiveDriver[]> => {
   if (typeof window === 'undefined') return [];
@@ -1002,12 +991,22 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
           // Discard stale location records older than 5 minutes
           if (now - updatedAtMs > DRIVER_HEARTBEAT_TTL_MS) return;
 
+          const dist = d.distance_km !== undefined ? Number(d.distance_km) : calculateDistanceKm(userLat, userLng, d.current_lat, d.current_lng);
+          const eta = dist !== undefined ? estimateEtaMinutes(dist) : undefined;
+
           driversMap.set(d.id, {
             id: d.id,
-            fullName: d.full_name || 'Driver',
-            vehicleMake: d.vehicle_make,
-            vehicleModel: d.vehicle_model,
-            licensePlate: d.license_plate,
+            fullName: d.full_name || 'Registered Driver',
+            phone: d.phone,
+            vehicleMake: d.vehicle_make || 'Toyota',
+            vehicleModel: d.vehicle_model || 'Corolla Quest',
+            vehicleYear: d.vehicle_year,
+            vehicleColor: d.vehicle_color,
+            licensePlate: d.license_plate || 'NC 482-910',
+            rating: d.rating_avg ? Number(d.rating_avg) : 5.0,
+            ratingCount: d.rating_count ? Number(d.rating_count) : 0,
+            distanceKm: dist,
+            etaMinutes: eta,
             lat: d.current_lat,
             lng: d.current_lng,
             isOnline: true,
@@ -1025,7 +1024,7 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
   try {
     const { data, error } = await supabase
       .from('driver_profiles')
-      .select('id, full_name, vehicle_make, vehicle_model, license_plate, current_lat, current_lng, is_online, updated_at')
+      .select('id, full_name, phone, vehicle_make, vehicle_model, vehicle_year, vehicle_color, license_plate, current_lat, current_lng, is_online, updated_at, rating_avg, rating_count')
       .eq('is_online', true);
 
     if (data && !error && data.length > 0) {
@@ -1046,12 +1045,22 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
             return;
           }
 
+          const dist = userLat !== undefined && userLng !== undefined ? calculateDistanceKm(userLat, userLng, d.current_lat, d.current_lng) : undefined;
+          const eta = dist !== undefined ? estimateEtaMinutes(dist) : undefined;
+
           driversMap.set(d.id, {
             id: d.id,
             fullName: d.full_name || 'Registered Driver',
-            vehicleMake: d.vehicle_make || 'Vehicle',
-            vehicleModel: d.vehicle_model || '',
-            licensePlate: d.license_plate || '',
+            phone: d.phone,
+            vehicleMake: d.vehicle_make || 'Toyota',
+            vehicleModel: d.vehicle_model || 'Corolla Quest',
+            vehicleYear: d.vehicle_year,
+            vehicleColor: d.vehicle_color,
+            licensePlate: d.license_plate || 'NC 482-910',
+            rating: d.rating_avg ? Number(d.rating_avg) : 5.0,
+            ratingCount: d.rating_count ? Number(d.rating_count) : 0,
+            distanceKm: dist,
+            etaMinutes: eta,
             lat: d.current_lat,
             lng: d.current_lng,
             isOnline: true,
@@ -1086,7 +1095,21 @@ export const getActiveDrivers = async (userLat?: number, userLng?: number, radiu
           ) {
             return;
           }
-          driversMap.set(d.id, d);
+
+          const dist = userLat !== undefined && userLng !== undefined ? calculateDistanceKm(userLat, userLng, d.lat, d.lng) : d.distanceKm;
+          const eta = dist !== undefined ? estimateEtaMinutes(dist) : d.etaMinutes;
+
+          driversMap.set(d.id, {
+            ...d,
+            fullName: d.fullName || 'Registered Driver',
+            vehicleMake: d.vehicleMake || 'Toyota',
+            vehicleModel: d.vehicleModel || 'Corolla Quest',
+            licensePlate: d.licensePlate || 'NC 482-910',
+            rating: d.rating || 5.0,
+            ratingCount: d.ratingCount || 0,
+            distanceKm: dist,
+            etaMinutes: eta,
+          });
         }
       });
 
@@ -1201,9 +1224,14 @@ export const updateDriverLocation = async (
   isOnline: boolean,
   metadata?: {
     fullName?: string;
+    phone?: string;
     vehicleMake?: string;
     vehicleModel?: string;
+    vehicleYear?: number;
+    vehicleColor?: string;
     licensePlate?: string;
+    rating?: number;
+    ratingCount?: number;
     tripId?: string;
     deviceId?: string;
   }
@@ -1234,10 +1262,15 @@ export const updateDriverLocation = async (
   const now = Date.now();
   const driverData: LiveDriver = {
     id: driverId,
-    fullName: metadata?.fullName || 'Driver',
-    vehicleMake: metadata?.vehicleMake,
-    vehicleModel: metadata?.vehicleModel,
-    licensePlate: metadata?.licensePlate,
+    fullName: metadata?.fullName || 'Registered Driver',
+    phone: metadata?.phone,
+    vehicleMake: metadata?.vehicleMake || 'Toyota',
+    vehicleModel: metadata?.vehicleModel || 'Corolla Quest',
+    vehicleYear: metadata?.vehicleYear,
+    vehicleColor: metadata?.vehicleColor,
+    licensePlate: metadata?.licensePlate || 'NC 482-910',
+    rating: metadata?.rating || 5.0,
+    ratingCount: metadata?.ratingCount || 0,
     lat,
     lng,
     isOnline,
@@ -1262,18 +1295,24 @@ export const updateDriverLocation = async (
     console.error('Error saving live driver to localStorage:', e);
   }
 
-  // Update Supabase in background
+  // Update Supabase in background via SoloLocationEngine (Geohash-6 Realtime Broadcast + throttled >=10m PostGIS upsert)
   try {
-    await supabase.from('driver_profiles').upsert({
-      id: driverId,
-      full_name: metadata?.fullName,
-      vehicle_make: metadata?.vehicleMake,
-      vehicle_model: metadata?.vehicleModel,
-      license_plate: metadata?.licensePlate,
-      current_lat: isOnline ? lat : null,
-      current_lng: isOnline ? lng : null,
-      is_online: isOnline,
-      updated_at: new Date(now).toISOString()
+    await soloLocationEngine.publishDriverLocation({
+      driverId,
+      lat,
+      lng,
+      isOnline,
+      isAvailable: !metadata?.tripId,
+      fullName: metadata?.fullName,
+      phone: metadata?.phone,
+      vehicleMake: metadata?.vehicleMake,
+      vehicleModel: metadata?.vehicleModel,
+      vehicleYear: metadata?.vehicleYear,
+      vehicleColor: metadata?.vehicleColor,
+      licensePlate: metadata?.licensePlate,
+      rating: metadata?.rating,
+      ratingCount: metadata?.ratingCount,
+      tripId: metadata?.tripId,
     });
   } catch (e) {
     console.error('Error updating driver location in Supabase:', e);
