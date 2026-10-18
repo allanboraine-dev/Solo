@@ -59,8 +59,17 @@ export default function Home() {
           {/* Rider App Card */}
           <div className="group relative flex flex-col p-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl shadow-2xl dark:shadow-none border border-white/40 dark:border-white/10 rounded-[2.5rem] hover:border-blue-500/50 hover:shadow-blue-500/20 hover:-translate-y-2 transition-all duration-300">
             <Link href="/rider" className="block mb-6 flex-1">
-              <div className="p-5 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-800/20 text-blue-600 rounded-3xl w-fit mb-6 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
-                <User size={36} />
+              <div className="flex items-center justify-between mb-6">
+                <div className="relative p-1 rounded-[1.5rem] bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-xl shadow-blue-500/25 group-hover:scale-110 transition-all duration-300">
+                  <img
+                    src="/rider-icon-512.png"
+                    alt="SOLO Rider Portal Icon"
+                    className="w-16 h-16 md:w-20 md:h-20 rounded-[1.25rem] object-cover border border-white/20"
+                  />
+                </div>
+                <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-3 py-1 rounded-full">
+                  0% Rider Markup
+                </span>
               </div>
               <h2 className="text-3xl font-bold mb-3 tracking-tight">Rider App</h2>
               <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-light">
@@ -71,9 +80,10 @@ export default function Home() {
             <div className="mt-auto space-y-3">
               <Link 
                 href="/rider" 
-                className="flex items-center justify-center gap-2 w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm"
+                className="flex items-center justify-center gap-2.5 w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm"
               >
-                <User size={18} /> Book a Ride Now
+                <img src="/rider-icon-192.png" alt="" className="w-5 h-5 rounded-md object-cover border border-white/30" />
+                <span>Book a Ride Now</span>
               </Link>
               <button 
                 onClick={() => installApp('rider')} 
@@ -88,8 +98,12 @@ export default function Home() {
           <div className="group relative flex flex-col p-10 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl shadow-2xl dark:shadow-none border border-white/40 dark:border-white/10 rounded-[2.5rem] hover:border-green-500/50 hover:shadow-green-500/20 hover:-translate-y-2 transition-all duration-300">
             <div className="block mb-6 flex-1">
               <div className="flex items-center justify-between mb-6">
-                <div className="p-5 bg-gradient-to-br from-green-100 to-green-50 dark:from-green-900/40 dark:to-green-800/20 text-green-600 rounded-3xl w-fit group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
-                  <Car size={36} />
+                <div className="relative p-1 rounded-[1.5rem] bg-gradient-to-br from-emerald-500 via-teal-400 to-green-600 shadow-xl shadow-emerald-500/25 group-hover:scale-110 transition-all duration-300">
+                  <img
+                    src="/driver-icon-512.png"
+                    alt="SOLO Driver Portal Icon"
+                    className="w-16 h-16 md:w-20 md:h-20 rounded-[1.25rem] object-cover border border-white/20"
+                  />
                 </div>
                 <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 rounded-full">
                   7 Days Free Trial

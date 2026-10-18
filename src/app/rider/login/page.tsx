@@ -237,14 +237,12 @@ export default function RiderLoginPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4">
       <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-zinc-800 relative">
         <div className="text-center mb-8">
-          <div
-            className={`w-16 h-16 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${
-              channel === 'whatsapp'
-                ? 'bg-emerald-600 shadow-emerald-600/30'
-                : 'bg-blue-600 shadow-blue-600/30'
-            }`}
-          >
-            {step === 'phone' ? <MessageCircle size={32} /> : <ShieldCheck size={32} />}
+          <div className="relative w-18 h-18 p-1 rounded-[1.35rem] bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-xl shadow-blue-500/30 mx-auto mb-4 w-fit">
+            <img
+              src="/rider-icon-192.png"
+              alt="SOLO Rider Portal"
+              className="w-16 h-16 rounded-2xl object-cover border border-white/20"
+            />
           </div>
           <h1 className="text-3xl font-black mb-2 text-gray-900 dark:text-white">
             {step === 'phone' ? 'WhatsApp Sign In' : 'Confirm via WhatsApp'}

@@ -40,6 +40,13 @@ export default function DriverLogin() {
     <div className="min-h-screen bg-gray-50 dark:bg-black p-4 flex items-center justify-center">
       <div className="max-w-md w-full bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-gray-800">
         <div className="text-center mb-8">
+          <div className="relative p-1 rounded-[1.35rem] bg-gradient-to-br from-emerald-500 via-teal-400 to-green-600 shadow-xl shadow-emerald-500/25 mx-auto mb-4 w-fit">
+            <img
+              src="/driver-icon-192.png"
+              alt="SOLO Driver Portal"
+              className="w-16 h-16 rounded-2xl object-cover border border-white/20"
+            />
+          </div>
           <h1 className="text-3xl font-black mb-2">Driver Login</h1>
           <p className="text-gray-500">Welcome back to SOLO.</p>
         </div>

@@ -24,14 +24,30 @@ export function Navbar() {
           </Link>
           
           {!isDriverApp && (
-            <Link href="/rider" className="text-xs md:text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              Rider
+            <Link
+              href="/rider"
+              className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 border border-blue-500/20 px-2.5 py-1 rounded-full transition-all"
+            >
+              <img
+                src="/rider-icon-192.png"
+                alt="Rider Portal"
+                className="w-5 h-5 rounded-md object-cover border border-blue-400/40 shadow-2xs"
+              />
+              <span>Rider</span>
             </Link>
           )}
           
           {!isRiderApp && (
-            <Link href="/driver" className="text-xs md:text-sm font-semibold text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 transition-colors">
-              Driver
+            <Link
+              href="/driver"
+              className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1 rounded-full transition-all"
+            >
+              <img
+                src="/driver-icon-192.png"
+                alt="Driver Portal"
+                className="w-5 h-5 rounded-md object-cover border border-emerald-400/40 shadow-2xs"
+              />
+              <span>Driver</span>
             </Link>
           )}
         </div>

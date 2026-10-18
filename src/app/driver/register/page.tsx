@@ -204,9 +204,16 @@ export default function DriverRegistration() {
         
         {/* Header */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-black tracking-tight">Drive with SOLO</h1>
-            <span className="flex items-center gap-1 text-xs font-bold bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-3">
+              <img
+                src="/driver-icon-192.png"
+                alt="SOLO Driver Portal"
+                className="w-12 h-12 rounded-2xl object-cover border-2 border-white/30 shadow-lg shrink-0"
+              />
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Drive with SOLO</h1>
+            </div>
+            <span className="flex items-center gap-1 text-xs font-bold bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm shrink-0">
               <ShieldCheck size={14} />
               Zero Commission
             </span>

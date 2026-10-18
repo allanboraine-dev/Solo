@@ -682,8 +682,15 @@ export default function RiderPage() {
         {currentUser ? (
           <div className="flex items-center gap-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-3.5 md:py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
             <div className="flex items-center gap-2 pr-2 border-r border-gray-200 dark:border-zinc-800">
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs uppercase shadow-sm">
-                {currentUser.fullName ? currentUser.fullName.charAt(0) : <User size={14} />}
+              <div className="relative shrink-0">
+                <img
+                  src="/rider-icon-192.png"
+                  alt="Rider Avatar"
+                  className="w-8 h-8 md:w-9 md:h-9 rounded-xl object-cover border border-blue-500/40 shadow-sm"
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-600 text-white text-[8px] font-black flex items-center justify-center ring-2 ring-white dark:ring-zinc-950">
+                  {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'R'}
+                </span>
               </div>
               <div className="text-left">
                 <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white max-w-[110px] sm:max-w-none truncate">{currentUser.fullName}</p>
@@ -703,7 +710,7 @@ export default function RiderPage() {
             onClick={() => setShowAuthModal(true)}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 md:px-4 md:py-2.5 rounded-2xl shadow-lg shadow-blue-600/30 text-xs font-bold transition active:scale-95"
           >
-            <Phone size={14} />
+            <img src="/rider-icon-192.png" alt="" className="w-4 h-4 rounded-md object-cover border border-white/30" />
             <span>Sign In</span>
           </button>
         )}
@@ -734,8 +741,12 @@ export default function RiderPage() {
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 <div className="mb-3 md:mb-5 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 md:p-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/30 shrink-0">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+                    <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-lg shadow-blue-500/30 shrink-0">
+                      <img
+                        src="/rider-icon-192.png"
+                        alt="SOLO Rider Portal"
+                        className="w-11 h-11 md:w-12 md:h-12 rounded-[0.9rem] object-cover border border-white/20"
+                      />
                     </div>
                     <div>
                       <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight">Where to?</h1>
@@ -950,8 +961,15 @@ export default function RiderPage() {
                           <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
-                                  {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : <User size={18} />}
+                                <div className="relative shrink-0">
+                                  <img
+                                    src="/driver-icon-192.png"
+                                    alt="Assigned Driver Avatar"
+                                    className="w-11 h-11 rounded-2xl object-cover border border-emerald-500/40 shadow-md"
+                                  />
+                                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-zinc-950">
+                                    {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : '✓'}
+                                  </span>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 flex-wrap">

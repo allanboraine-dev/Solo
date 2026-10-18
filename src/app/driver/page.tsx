@@ -725,7 +725,21 @@ export default function DriverPage() {
 
       {/* Floating Header */}
       <div className="absolute top-2 sm:top-2.5 md:top-4 pt-safe left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 z-30 pointer-events-auto">
-        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-white/40 dark:border-white/10 p-2.5 sm:p-3.5 md:p-5 flex justify-between items-center gap-2 transition-all">
+        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-white/40 dark:border-white/10 p-2.5 sm:p-3.5 md:p-5 flex justify-between items-center gap-2.5 transition-all">
+          <div className="relative shrink-0">
+            <img
+              src="/driver-icon-192.png"
+              alt="SOLO Driver Portal Avatar"
+              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover shadow-md border-2 transition-all ${
+                isOnline ? 'border-emerald-500 shadow-emerald-500/20' : 'border-zinc-700/50'
+              }`}
+            />
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-zinc-950 ${
+                isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'
+              }`}
+            />
+          </div>
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-center gap-1 sm:gap-1.5 flex-nowrap overflow-hidden">
               <h1 className="text-sm sm:text-base md:text-lg font-black tracking-tight shrink-0">SOLO</h1>
@@ -1106,8 +1120,21 @@ export default function DriverPage() {
                     </div>
                   )}
                   <div className="mb-6 flex justify-center">
-                    <div className={`p-5 rounded-3xl ${isOnline ? 'bg-gradient-to-br from-green-400 to-green-600 text-white shadow-lg shadow-green-500/30' : 'bg-gray-100 text-gray-400 dark:bg-zinc-800'}`}>
-                      <Car size={36} />
+                    <div className={`relative p-1.5 rounded-[1.75rem] transition-all duration-500 ${
+                      isOnline
+                        ? 'bg-gradient-to-br from-emerald-400 via-teal-500 to-green-600 shadow-2xl shadow-emerald-500/35 scale-105'
+                        : 'bg-zinc-200 dark:bg-zinc-800 opacity-75 grayscale-[35%]'
+                    }`}>
+                      <img
+                        src="/driver-icon-512.png"
+                        alt="SOLO Driver Emblem"
+                        className="w-20 h-20 rounded-[1.4rem] object-cover border border-white/20 shadow-inner"
+                      />
+                      <span
+                        className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${
+                          isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'
+                        }`}
+                      />
                     </div>
                   </div>
                   <h2 className="text-3xl font-bold mb-3 tracking-tight">
@@ -1219,9 +1246,16 @@ export default function DriverPage() {
 
             {activeTab === 'profile' && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500 text-center">
-                <div className="mb-6 flex justify-center">
-                  <div className="p-6 rounded-full bg-gray-100 dark:bg-zinc-900 text-gray-400">
-                    <User size={48} />
+                <div className="mb-5 flex justify-center">
+                  <div className="relative p-1 rounded-[1.75rem] bg-gradient-to-br from-emerald-500 via-teal-400 to-green-600 shadow-xl shadow-emerald-500/25">
+                    <img
+                      src="/driver-icon-512.png"
+                      alt="Driver Profile Avatar"
+                      className="w-20 h-20 rounded-[1.45rem] object-cover border border-white/20"
+                    />
+                    <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center ring-2 ring-white dark:ring-zinc-950 shadow-sm">
+                      {profile?.fullName ? profile.fullName.charAt(0).toUpperCase() : 'D'}
+                    </span>
                   </div>
                 </div>
                 <h2 className="text-2xl font-bold mb-1 tracking-tight">{profile?.fullName}</h2>
