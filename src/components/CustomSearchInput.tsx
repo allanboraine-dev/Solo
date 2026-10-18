@@ -17,6 +17,10 @@ import {
   ShoppingBag,
   GraduationCap,
   HeartPulse,
+  ArrowLeft,
+  Search,
+  LocateFixed,
+  ChevronRight,
 } from 'lucide-react'
 
 interface CustomSearchInputProps {
@@ -24,8 +28,10 @@ interface CustomSearchInputProps {
   onChange: (val: string) => void;
   onSelect: (feature: SearchResultPlace) => void;
   placeholder: string;
+  label?: string;
   proximityCoords?: { lat: number; lng: number } | null;
   hasRightAction?: boolean;
+  onGetCurrentLocation?: () => void;
 }
 
 export default function CustomSearchInput({
@@ -33,11 +39,15 @@ export default function CustomSearchInput({
   onChange,
   onSelect,
   placeholder,
+  label,
   proximityCoords,
   hasRightAction = false,
+  onGetCurrentLocation,
 }: CustomSearchInputProps) {
   const [results, setResults] = useState<SearchResultPlace[]>([])
   const [isOpen, setIsOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState<number>(-1)
   const [hasSearched, setHasSearched] = useState(false)
@@ -47,6 +57,16 @@ export default function CustomSearchInput({
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const suppressNextSearchRef = useRef(false)
   const isUserTypingRef = useRef(false)
+
+  // Track mobile viewport (<768px)
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Parse house number & street remainder from currently typed input
   const { houseNumber: currentHouseNo, remainder: currentRemainder } = parseHouseNumberFromQuery(value || '')
@@ -116,6 +136,7 @@ export default function CustomSearchInput({
     suppressNextSearchRef.current = true
     onSelect(place)
     setIsOpen(false)
+    setIsMobileModalOpen(false)
     setActiveIndex(-1)
   }
 
@@ -180,17 +201,25 @@ export default function CustomSearchInput({
         <input
           type="text"
           value={value}
+          onClick={() => {
+            if (isMobile) {
+              setIsMobileModalOpen(true)
+            }
+          }}
           onChange={(e) => {
             isUserTypingRef.current = true
             onChange(e.target.value)
-            setIsOpen(true)
+            if (isMobile) {
+              setIsMobileModalOpen(true)
+            } else {
+              setIsOpen(true)
+            }
           }}
           onFocus={() => {
-            setIsOpen(true)
-            if (typeof window !== 'undefined' && window.innerWidth < 768) {
-              setTimeout(() => {
-                wrapperRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 120)
+            if (isMobile) {
+              setIsMobileModalOpen(true)
+            } else {
+              setIsOpen(true)
             }
           }}
           onKeyDown={handleKeyDown}
@@ -227,10 +256,11 @@ export default function CustomSearchInput({
         ) : null}
       </div>
 
-      {isOpen && (
+      {/* Desktop Suggestions Dropdown (md+ screens) */}
+      {isOpen && !isMobile && (
         <div
           ref={listRef}
-          className="absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-52 md:max-h-72 overflow-y-auto overscroll-contain custom-scrollbar flex flex-col animate-in fade-in zoom-in-95 duration-150"
+          className="hidden md:flex absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto overscroll-contain custom-scrollbar flex-col animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/90 dark:bg-zinc-800/60 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between sticky top-0 z-10">
             <span className="flex items-center gap-1.5">
@@ -270,7 +300,6 @@ export default function CustomSearchInput({
                   }`}
                   onMouseEnter={() => setActiveIndex(index)}
                   onPointerDown={(e) => {
-                    // Prevent virtual keyboard blur from cancelling the tap on mobile
                     e.preventDefault();
                     handleSelect(place);
                   }}
@@ -354,6 +383,232 @@ export default function CustomSearchInput({
               )}
             </div>
           ) : null}
+        </div>
+      )}
+
+      {/* Dedicated Full-Screen Mobile Search Overlay (only active on mobile when user taps search) */}
+      {isMobileModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 flex flex-col md:hidden animate-in fade-in zoom-in-95 duration-150">
+          {/* Mobile Top Navigation Bar */}
+          <div className="pt-safe px-4 py-3 border-b border-gray-200 dark:border-zinc-800 flex items-center gap-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setIsMobileModalOpen(false)}
+              className="p-2 -ml-2 rounded-full text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800 transition"
+              aria-label="Back to map"
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                {label || (hasRightAction ? 'Pickup Location' : 'Destination / Dropoff')}
+              </h2>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                {currentHouseNo
+                  ? `Enter street name for House #${currentHouseNo}`
+                  : 'Enter house number, street name, or building'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMobileModalOpen(false)}
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50"
+            >
+              Done
+            </button>
+          </div>
+
+          {/* Mobile Search Input Header */}
+          <div className="p-3.5 border-b border-gray-100 dark:border-zinc-800/80 bg-gray-50/70 dark:bg-zinc-900/50 space-y-2.5">
+            <div className="relative flex items-center bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-2xl shadow-sm">
+              <Search size={18} className="absolute left-3.5 text-gray-400 shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                value={value}
+                onChange={(e) => {
+                  isUserTypingRef.current = true;
+                  onChange(e.target.value);
+                  setIsOpen(true);
+                }}
+                autoCapitalize="words"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
+                placeholder={placeholder}
+                className="w-full py-3.5 pl-11 pr-10 bg-transparent text-base font-semibold text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+              />
+              {isLoading ? (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : value ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    isUserTypingRef.current = false;
+                    onChange('');
+                    setResults([]);
+                    setActiveIndex(-1);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full"
+                >
+                  <X size={16} />
+                </button>
+              ) : null}
+            </div>
+
+            {/* Quick Action: Use Current Location (GPS) button */}
+            {onGetCurrentLocation && (
+              <button
+                type="button"
+                onClick={() => {
+                  onGetCurrentLocation();
+                  setIsMobileModalOpen(false);
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 active:scale-[0.99] transition"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-blue-600 text-white">
+                    <LocateFixed size={15} />
+                  </div>
+                  <span className="text-xs font-bold text-blue-900 dark:text-blue-100">
+                    Use Current GPS Location
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Locate Me →</span>
+              </button>
+            )}
+
+            {/* House Number Quick Street Suggestion Chips (when user types e.g. "14") */}
+            {currentHouseNo && (
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0 mr-0.5">
+                  Quick #{currentHouseNo}:
+                </span>
+                {['Memorial Rd', 'Carrington Rd', 'Du Toitspan', 'Lennox St', 'Barkly Rd', 'Oliver Rd'].map((st) => (
+                  <button
+                    key={`mob-chip-${st}`}
+                    type="button"
+                    onClick={() => {
+                      isUserTypingRef.current = true;
+                      onChange(`${currentHouseNo} ${st}`);
+                    }}
+                    className="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-800 dark:text-gray-200 active:bg-blue-50"
+                  >
+                    {currentHouseNo} {st}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Results / Suggestion List */}
+          <div className="flex-1 overflow-y-auto overscroll-contain pb-safe divide-y divide-gray-100 dark:divide-zinc-800/60 custom-scrollbar">
+            {/* List Header */}
+            <div className="px-4 py-2 bg-gray-50/80 dark:bg-zinc-900/60 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={12} className="text-amber-500" />
+                {isQueryShort
+                  ? 'Popular Kimberley Destinations'
+                  : currentHouseNo
+                  ? `Suggested Addresses for #${currentHouseNo}`
+                  : 'Matching Locations'}
+              </span>
+              <span className="text-[10px] text-gray-400 lowercase">
+                {activePlacesList.length} {activePlacesList.length === 1 ? 'place' : 'places'}
+              </span>
+            </div>
+
+            {activePlacesList.length > 0 ? (
+              activePlacesList.map((place) => {
+                const subLabel = [place.street, place.suburb, place.city].filter(Boolean).join(', ');
+
+                return (
+                  <div
+                    key={`mob-${place.id}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleSelect(place);
+                    }}
+                    onClick={() => handleSelect(place)}
+                    className="p-4 flex items-start gap-3.5 active:bg-blue-50 dark:active:bg-zinc-800/80 transition cursor-pointer"
+                  >
+                    <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                      {getCategoryIcon(place)}
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <span className="font-bold text-sm text-gray-900 dark:text-gray-100 leading-snug">
+                          {place.name}
+                        </span>
+                        {place.houseNumber && (
+                          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                            #{place.houseNumber}
+                          </span>
+                        )}
+                        {place.category === 'address' && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                            Street Address
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                        {place.display_name || subLabel}
+                      </span>
+                    </div>
+                    <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 shrink-0 mt-2" />
+                  </div>
+                );
+              })
+            ) : hasSearched && !isLoading ? (
+              <div className="p-6 text-center flex flex-col items-center justify-center gap-3 text-gray-500 dark:text-gray-400">
+                {currentHouseNo && currentRemainder && currentRemainder.trim().length >= 2 ? (
+                  <div
+                    className="w-full text-left p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 active:bg-blue-100 transition cursor-pointer flex items-center justify-between"
+                    onClick={() => {
+                      handleSelect({
+                        id: `mob-custom-house-${Date.now()}`,
+                        name: `${currentHouseNo} ${currentRemainder.trim()}`,
+                        display_name: `${currentHouseNo} ${currentRemainder.trim()}, Kimberley, Northern Cape, South Africa`,
+                        lat: proximityCoords?.lat || -28.7282,
+                        lon: proximityCoords?.lng || 24.7623,
+                        houseNumber: currentHouseNo,
+                        street: currentRemainder.trim(),
+                        city: 'Kimberley',
+                        category: 'address',
+                      });
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0">
+                        <Home size={18} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                          Use &ldquo;{currentHouseNo} {currentRemainder.trim()}&rdquo;
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Direct pin for House #{currentHouseNo} on this street
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Select →</span>
+                  </div>
+                ) : (
+                  <>
+                    <MapPin size={28} className="text-gray-300 dark:text-gray-600 mb-1" />
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                      No matching location found
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">
+                      Try typing a house number followed by a street name (e.g. &ldquo;14 Memorial Road&rdquo; or &ldquo;12 Carrington Road&rdquo;).
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>

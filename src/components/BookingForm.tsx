@@ -216,11 +216,13 @@ export default function BookingForm({
           <div className="relative flex items-center bg-white dark:bg-black border border-gray-200 dark:border-white/10 focus-within:border-blue-500/50 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-2xl shadow-sm">
             <div className="w-full">
               <CustomSearchInput 
+                label="Pickup Location"
                 placeholder="Pickup: House no, building, or street"
                 value={pickup}
                 onChange={setPickup}
                 hasRightAction={true}
                 proximityCoords={realPickupCoords}
+                onGetCurrentLocation={handleGetCurrentLocation}
                 onSelect={(feature) => {
                   const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                   setRealPickupCoords(coords);
@@ -260,6 +262,7 @@ export default function BookingForm({
           <div className="relative flex items-center bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-white/5 focus-within:border-black dark:focus-within:border-white focus-within:bg-white dark:focus-within:bg-black rounded-2xl shadow-sm">
             <div className="w-full">
               <CustomSearchInput 
+                label="Destination / Dropoff"
                 placeholder="Dropoff: House no, building, or street"
                 value={dropoff}
                 onChange={setDropoff}
