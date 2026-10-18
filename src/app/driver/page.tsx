@@ -976,7 +976,7 @@ export default function DriverPage() {
             activeTab === 'home' && isHomeSheetMinimized
               ? 'hidden md:flex'
               : activeTab === 'home' && activeTrip
-                ? 'pb-4 md:pb-6'
+                ? (driverTripSubTab === 'chat' ? 'pb-10 md:pb-6' : 'pb-4 md:pb-6')
                 : 'pb-28 md:pb-8'
           }`}>
             {activeTab === 'home' && (
@@ -1255,7 +1255,7 @@ export default function DriverPage() {
                     </div>
                   ) : (
                     /* Dedicated Full-Height Rider Chat View + Sticky Quick Trip Progression Bar */
-                    <div className="flex-1 flex flex-col min-h-[260px] gap-2">
+                    <div className="flex-1 flex flex-col min-h-[320px] md:min-h-[380px] gap-2 pb-2">
                       <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/50 shrink-0">
                         <span className="text-xs font-bold text-blue-900 dark:text-blue-200">
                           PIN: <strong className="font-mono">{activeTrip.verification_pin || '----'}</strong>
@@ -1291,7 +1291,7 @@ export default function DriverPage() {
                           </button>
                         )}
                       </div>
-                      <div className="flex-1 min-h-[220px] flex flex-col border border-gray-200/70 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black shadow-inner">
+                      <div className="flex-1 min-h-[260px] md:min-h-[320px] flex flex-col border border-gray-200/70 dark:border-white/10 rounded-2xl overflow-hidden bg-white dark:bg-black shadow-inner">
                         <Chat tripId={activeTrip.id} role="driver" />
                       </div>
                     </div>

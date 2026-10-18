@@ -98,7 +98,7 @@ export default function Chat({ tripId, role }: ChatProps) {
       {/* Scrollable Message History (isolated scroll container) */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-3 space-y-2 min-h-[120px] max-h-[220px] md:max-h-[260px]"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-3 space-y-2"
       >
         {messages.length === 0 && (
           <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
@@ -137,8 +137,8 @@ export default function Chat({ tripId, role }: ChatProps) {
         ))}
       </div>
 
-      {/* Keyboard-Friendly Input Bar */}
-      <div className="p-2 border-t border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 flex items-center gap-2 shrink-0">
+      {/* Keyboard-Friendly Input Bar (Always fully displayed & pinned) */}
+      <div className="p-2 sm:p-2.5 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center gap-2 shrink-0 z-20">
         <input 
           ref={inputRef}
           type="text" 
@@ -151,16 +151,17 @@ export default function Chat({ tripId, role }: ChatProps) {
           }}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder={`Message ${role === 'rider' ? 'driver' : 'rider'}...`}
-          className="flex-1 px-3 py-2 text-base sm:text-sm border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-black outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+          className="flex-1 min-w-0 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-black outline-none focus:border-blue-500 text-gray-900 dark:text-white"
         />
         <button 
           type="button"
           onClick={handleSend}
           disabled={!input.trim()}
-          className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold disabled:opacity-40 shrink-0 flex items-center gap-1 active:scale-95 transition"
+          className="px-3.5 sm:px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold disabled:opacity-40 shrink-0 flex items-center justify-center gap-1.5 active:scale-95 transition min-w-[76px] h-10 shadow-sm whitespace-nowrap cursor-pointer touch-manipulation"
+          title="Send message"
         >
-          <Send size={14} />
-          <span>Send</span>
+          <Send size={15} className="shrink-0" />
+          <span className="shrink-0 font-bold">Send</span>
         </button>
       </div>
     </div>
