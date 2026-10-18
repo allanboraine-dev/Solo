@@ -954,6 +954,12 @@ export default function DriverPage() {
                           <span className="text-gray-400 font-semibold shrink-0">Dropoff:</span>
                           <span className="font-bold text-gray-800 dark:text-gray-100 truncate">{activeTrip.dropoff_location}</span>
                         </div>
+                        <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60 dark:border-white/5">
+                          <span className="text-gray-400 font-semibold">Occupants:</span>
+                          <span className="font-bold text-blue-600 dark:text-blue-400">
+                            {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
+                          </span>
+                        </div>
                       </div>
 
                       {activeTrip.status === 'accepted' && (

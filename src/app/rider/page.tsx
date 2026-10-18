@@ -941,6 +941,12 @@ export default function RiderPage() {
                             <span className="w-2 h-2 rounded-none bg-emerald-500 shrink-0" />
                             <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{activeTrip.dropoff_location}</span>
                           </div>
+                          <div className="flex items-center justify-between pt-1 text-[11px]">
+                            <span className="font-medium text-gray-500 dark:text-gray-400">Trip Occupants:</span>
+                            <span className="font-bold text-blue-600 dark:text-blue-400">
+                              {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Driver Arrived PIN Alert */}

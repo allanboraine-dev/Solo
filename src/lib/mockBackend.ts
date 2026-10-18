@@ -17,6 +17,7 @@ export type MockTrip = {
   dropoff_lat: number;
   dropoff_lng: number;
   fare_amount: number;
+  passenger_count?: 1 | 2; // Maximum 2 riders per trip
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   verification_pin?: string;
   scheduled_time?: string;
@@ -479,6 +480,9 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         { created_at: dbTrip.created_at, scheduled_time: dbTrip.scheduled_time }
       );
 
+      const rawPassengerCount = Number(dbTrip.passenger_count || existing?.passenger_count || 1);
+      const clampedPassengerCount: 1 | 2 = rawPassengerCount >= 2 ? 2 : 1;
+
       const mapped: MockTrip = {
         id: dbTrip.id,
         rider_id: dbTrip.rider_id,
@@ -490,6 +494,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         dropoff_lat: dbTrip.dropoff_lat,
         dropoff_lng: dbTrip.dropoff_lng,
         fare_amount: Number(dbTrip.fare_amount),
+        passenger_count: clampedPassengerCount,
         status: dbStatus,
         verification_pin: dbTrip.verification_pin || existing?.verification_pin,
         scheduled_time: dbTrip.scheduled_time || existing?.scheduled_time,
@@ -505,6 +510,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         mergedMap.set(mapped.id, {
           ...mapped,
           ...existing,
+          passenger_count: existing.passenger_count || mapped.passenger_count || 1,
           driver_id: existing.driver_id || mapped.driver_id,
           status: winningStatus,
         });
@@ -527,8 +533,11 @@ export const saveTrip = async (trip: MockTrip) => {
   }
   recordTripStatusOverride(trip.id, trip.status, trip.driver_id);
 
+  const safePassengers: 1 | 2 = trip.passenger_count && Number(trip.passenger_count) >= 2 ? 2 : 1;
+
   const enrichedTrip: MockTrip = {
     ...trip,
+    passenger_count: safePassengers,
     rider_id: ensureValidUuid(trip.rider_id),
     verification_pin: trip.verification_pin || Math.floor(1000 + Math.random() * 9000).toString(),
     created_at: trip.created_at || new Date().toISOString(),

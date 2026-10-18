@@ -37,6 +37,12 @@ export default function TripRequestModal({ request, onAccept, onDecline }: TripR
               <span className="text-gray-500 dark:text-gray-400 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Dropoff</span>
               <span className="font-medium text-xs sm:text-sm text-gray-900 dark:text-gray-100 break-words">{request.dropoff_location}</span>
             </div>
+            <div className="flex justify-between items-center border-t border-gray-200/50 dark:border-white/10 pt-2.5">
+              <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-wider">Occupants</span>
+              <span className="font-bold text-xs px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                {request.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
+              </span>
+            </div>
             <div className="flex justify-between items-center border-t border-gray-200/50 dark:border-white/10 pt-3 mt-1">
               <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-wider">Estimated Fare</span>
               <span className="font-black text-xl sm:text-2xl text-green-600 dark:text-green-400">R{request.fare_amount}</span>

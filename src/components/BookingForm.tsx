@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote } from 'lucide-react'
+import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
@@ -58,6 +58,7 @@ export default function BookingForm({
   const [isBooking, setIsBooking] = useState(false)
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'speedpoint' | 'cash'>('speedpoint')
+  const [occupantCount, setOccupantCount] = useState<1 | 2>(1)
 
   const [realPickupCoords, setRealPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [realDropoffCoords, setRealDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
@@ -159,6 +160,7 @@ export default function BookingForm({
         dropoff_lat: realDropoffCoords.lat,
         dropoff_lng: realDropoffCoords.lng,
         fare_amount: fare,
+        passenger_count: occupantCount,
         status: 'requested',
         scheduled_time: pickupTime || undefined,
       };
@@ -306,6 +308,44 @@ export default function BookingForm({
         </div>
       )}
 
+      {/* Number of Occupants Selector: Maximum 2 Riders Per Trip */}
+      <div className="p-2.5 rounded-2xl bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/80 dark:border-white/5 space-y-1.5">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            Number of Occupants
+          </span>
+          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+            Max 2 Riders Per Trip
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setOccupantCount(1)}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+              occupantCount === 1
+                ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <User size={14} className="shrink-0" />
+            <span className="truncate">1 Rider (Solo)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOccupantCount(2)}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+              occupantCount === 2
+                ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            <Users size={14} className="shrink-0" />
+            <span className="truncate">2 Riders (Max)</span>
+          </button>
+        </div>
+      </div>
+
       {/* Ride Payment Options: Mandatory Driver Speedpoint Machine or Cash */}
       <div className="p-2.5 rounded-2xl bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/80 dark:border-white/5 space-y-1.5">
         <div className="flex items-center justify-between px-1">
@@ -356,7 +396,7 @@ export default function BookingForm({
         {isBooking ? (
           <div className="w-5 h-5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
         ) : fare !== null ? (
-          `Request Ride • R${fare} (${paymentMethod === 'speedpoint' ? 'Speedpoint' : 'Cash'})`
+          `Request Ride • R${fare} • ${occupantCount} ${occupantCount === 1 ? 'Rider' : 'Riders'} (${paymentMethod === 'speedpoint' ? 'Speedpoint' : 'Cash'})`
         ) : (
           'Select Pickup & Dropoff to Book'
         )}
