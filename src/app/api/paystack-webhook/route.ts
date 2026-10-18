@@ -36,27 +36,46 @@ export async function POST(req: Request) {
       const metadata = data.metadata || {}
       const paymentType = metadata.payment_type
 
-      // 1. SOLO DRIVER SAAS SUBSCRIPTION
-      if (paymentType === 'solo_saas_subscription' || metadata.driverId) {
+      // 1. SOLO DRIVER SAAS SUBSCRIPTION (Both initial upgrades and automated 7-day trial renewals)
+      const isDriverSub = 
+        paymentType === 'solo_saas_subscription' ||
+        paymentType === 'driver_trial_card_capture' ||
+        metadata.driverId ||
+        (data.plan && data.plan.amount === 49900) ||
+        data.amount === 49900;
+
+      if (isDriverSub && paymentType !== 'solo_trip_fare') {
         const driverId = metadata.driverId
-        if (driverId) {
-          const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          const { error } = await supabase
+        const customerEmail = data.customer?.email
+        const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+        try {
+          let query = supabase
             .from('driver_profiles')
             .update({
               subscription_plan: 'paid',
               subscription_status: 'active',
               subscription_active: true,
               subscription_expires_at: thirtyDaysFromNow,
+              next_billing_date: thirtyDaysFromNow,
               updated_at: new Date().toISOString(),
             })
-            .eq('id', driverId)
+
+          if (driverId) {
+            query = query.eq('id', driverId)
+          } else if (customerEmail) {
+            query = query.eq('email', customerEmail)
+          }
+
+          const { error } = await query
 
           if (error) {
-            console.error(`Failed to activate subscription for driver ${driverId}:`, error)
+            console.error(`Failed to activate subscription for driver (ID: ${driverId}, Email: ${customerEmail}):`, error)
           } else {
-            console.log(`[Paystack Webhook] Successfully upgraded driver ${driverId} to paid subscription. (Ref: ${data.reference})`)
+            console.log(`[Paystack Webhook] Successfully upgraded driver (ID: ${driverId || 'N/A'}, Email: ${customerEmail}) to paid subscription. (Ref: ${data.reference})`)
           }
+        } catch (dbErr) {
+          console.warn('[Paystack Webhook] DB error updating driver:', dbErr)
         }
       }
 

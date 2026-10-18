@@ -1573,10 +1573,21 @@ export default function DriverPage() {
                       ) : profile?.subscriptionPlan === 'paid' ? (
                         <span className="text-blue-600 dark:text-blue-400">Active (Paid R499/mo)</span>
                       ) : (
-                        <span className="text-green-600 dark:text-green-400">Active (7-Day Trial)</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          Active (7-Day Trial — {Math.max(0, Math.ceil(((profile?.trialEndsAt || (profile?.trialStartedAt ? profile.trialStartedAt + 7 * 86400000 : Date.now())) - Date.now()) / 86400000))}d left)
+                        </span>
                       )}
                     </span>
                   </div>
+                  {!isOwner && profile?.subscriptionPlan === 'trial' && profile?.cardLast4 && (
+                    <div className="py-1.5 px-3 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <CreditCard size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        Card Linked: {profile.cardBrand || 'Card'} •••• {profile.cardLast4}
+                      </span>
+                      <span className="font-bold">Auto-bills R499 after trial</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bank Settlement & Direct Payouts Card */}

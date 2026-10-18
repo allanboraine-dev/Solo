@@ -13,6 +13,15 @@ export interface KycDriverProfile {
   isVerified: boolean;
   subscriptionPlan: 'trial' | 'paid' | 'owner' | 'expired';
   trialStartedAt?: string | null;
+  trialEndsAt?: string | null;
+  cardLast4?: string | null;
+  cardBrand?: string | null;
+  cardExpMonth?: string | null;
+  cardExpYear?: string | null;
+  paystackSubscriptionCode?: string | null;
+  paystackAuthorizationCode?: string | null;
+  nextBillingDate?: string | null;
+  cardCaptured?: boolean;
   createdAt: string;
   verificationNotes?: string | null;
 }
@@ -101,6 +110,15 @@ export function saveKycDriverProfile(profile: Partial<KycDriverProfile> & { id: 
     isVerified: isOwner || (profile.isVerified !== undefined ? profile.isVerified : existing?.isVerified ?? false),
     subscriptionPlan: isOwner ? 'owner' : (profile.subscriptionPlan || existing?.subscriptionPlan || 'trial'),
     trialStartedAt: profile.trialStartedAt !== undefined ? profile.trialStartedAt : (existing?.trialStartedAt || new Date().toISOString()),
+    trialEndsAt: profile.trialEndsAt !== undefined ? profile.trialEndsAt : (existing?.trialEndsAt || null),
+    cardLast4: profile.cardLast4 !== undefined ? profile.cardLast4 : (existing?.cardLast4 || null),
+    cardBrand: profile.cardBrand !== undefined ? profile.cardBrand : (existing?.cardBrand || null),
+    cardExpMonth: profile.cardExpMonth !== undefined ? profile.cardExpMonth : (existing?.cardExpMonth || null),
+    cardExpYear: profile.cardExpYear !== undefined ? profile.cardExpYear : (existing?.cardExpYear || null),
+    paystackSubscriptionCode: profile.paystackSubscriptionCode !== undefined ? profile.paystackSubscriptionCode : (existing?.paystackSubscriptionCode || null),
+    paystackAuthorizationCode: profile.paystackAuthorizationCode !== undefined ? profile.paystackAuthorizationCode : (existing?.paystackAuthorizationCode || null),
+    nextBillingDate: profile.nextBillingDate !== undefined ? profile.nextBillingDate : (existing?.nextBillingDate || null),
+    cardCaptured: isOwner ? true : (profile.cardCaptured !== undefined ? profile.cardCaptured : (existing?.cardCaptured ?? false)),
     createdAt: existing?.createdAt || profile.createdAt || new Date().toISOString(),
     verificationNotes: profile.verificationNotes !== undefined ? profile.verificationNotes : (existing?.verificationNotes || null),
   };

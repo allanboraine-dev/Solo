@@ -50,6 +50,15 @@ export type MockDriverProfile = {
   subscriptionActive: boolean;
   subscriptionPlan?: 'trial' | 'paid' | 'owner';
   trialStartedAt?: number;
+  trialEndsAt?: number;
+  cardLast4?: string;
+  cardBrand?: string;
+  cardExpMonth?: string;
+  cardExpYear?: string;
+  paystackSubscriptionCode?: string;
+  paystackAuthorizationCode?: string;
+  nextBillingDate?: string;
+  cardCaptured?: boolean;
 };
 
 // ----------------------------------------
@@ -83,6 +92,15 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
           subscriptionActive: data.subscription_active ?? (data.subscription_status === 'active' || data.subscription_status === 'trial'),
           subscriptionPlan: data.subscription_plan,
           trialStartedAt: data.trial_started_at ? new Date(data.trial_started_at).getTime() : undefined,
+          trialEndsAt: data.trial_ends_at ? new Date(data.trial_ends_at).getTime() : undefined,
+          cardLast4: data.card_last4 || undefined,
+          cardBrand: data.card_brand || undefined,
+          cardExpMonth: data.card_exp_month || undefined,
+          cardExpYear: data.card_exp_year || undefined,
+          paystackSubscriptionCode: data.paystack_subscription_code || undefined,
+          paystackAuthorizationCode: data.paystack_authorization_code || undefined,
+          nextBillingDate: data.next_billing_date || undefined,
+          cardCaptured: data.card_captured ?? false,
         };
         return applyOwnerPrivileges(mappedProfile);
       }
@@ -199,6 +217,15 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
       subscription_active: profile.subscriptionActive,
       subscription_plan: profile.subscriptionPlan,
       trial_started_at: profile.trialStartedAt ? new Date(profile.trialStartedAt).toISOString() : undefined,
+      trial_ends_at: profile.trialEndsAt ? new Date(profile.trialEndsAt).toISOString() : undefined,
+      card_last4: profile.cardLast4,
+      card_brand: profile.cardBrand,
+      card_exp_month: profile.cardExpMonth,
+      card_exp_year: profile.cardExpYear,
+      paystack_subscription_code: profile.paystackSubscriptionCode,
+      paystack_authorization_code: profile.paystackAuthorizationCode,
+      next_billing_date: profile.nextBillingDate,
+      card_captured: profile.cardCaptured,
     };
 
     // Upsert into Supabase
