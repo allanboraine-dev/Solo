@@ -33,6 +33,7 @@ import {
 } from "@/utils/safetyDispatch";
 import { encodeGeohash } from "@/lib/solo_realtime_and_ride_service";
 import { broadcastEvent } from "@/lib/mockBackend";
+import { audioAlert } from "@/utils/audioAlert";
 
 interface SafetyShieldModalProps {
   isOpen: boolean;
@@ -171,13 +172,11 @@ export default function SafetyShieldModal({
 
       setActiveIncident(incident);
 
-      // If not in silent duress mode and armed response or hijack is selected, vibrate device
-      if (!silentDuress && typeof navigator !== "undefined" && "vibrate" in navigator) {
-        try {
-          navigator.vibrate([400, 150, 400, 150, 600]);
-        } catch {
-          // Ignore
-        }
+      // If not in silent duress mode, trigger loud deterrent siren & vibration on mobile
+      if (!silentDuress) {
+        audioAlert.unlockMobileAudio(false);
+        const started = emergencySiren.start();
+        setSirenActive(started);
       }
     } finally {
       setIsDispatching(false);
@@ -185,6 +184,7 @@ export default function SafetyShieldModal({
   };
 
   const handleToggleSiren = () => {
+    audioAlert.unlockMobileAudio(false);
     if (sirenActive || emergencySiren.isRunning()) {
       emergencySiren.stop();
       setSirenActive(false);
@@ -433,7 +433,10 @@ export default function SafetyShieldModal({
                   <button
                     type="button"
                     disabled={isDispatching}
-                    onClick={() => setCountdown(3)}
+                    onClick={() => {
+                      audioAlert.unlockMobileAudio(!silentDuress);
+                      setCountdown(3);
+                    }}
                     className="w-full py-5 px-6 rounded-3xl bg-gradient-to-r from-red-600 via-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-black text-base sm:text-lg tracking-tight shadow-2xl shadow-red-600/40 border border-red-400/40 flex flex-col items-center justify-center gap-1 transition"
                   >
                     <div className="flex items-center gap-2">

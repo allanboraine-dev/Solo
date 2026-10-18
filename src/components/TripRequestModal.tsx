@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect } from 'react'
 import type { MockTrip } from '@/lib/mockBackend'
+import { audioAlert } from '@/utils/audioAlert'
 
 interface TripRequestModalProps {
   request: MockTrip | null
@@ -9,16 +11,41 @@ interface TripRequestModalProps {
 }
 
 export default function TripRequestModal({ request, onAccept, onDecline }: TripRequestModalProps) {
+  useEffect(() => {
+    if (!request) {
+      audioAlert.stopTripRingtoneLoop()
+      return
+    }
+    audioAlert.startTripRingtoneLoop()
+    return () => {
+      audioAlert.stopTripRingtoneLoop()
+    }
+  }, [request?.id])
+
   if (!request) return null
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto">
       <div className="bg-white dark:bg-zinc-950 p-5 sm:p-6 rounded-3xl max-w-sm w-full shadow-2xl border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar flex flex-col justify-between">
         <div>
-          <div className="flex justify-center mb-3 sm:mb-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60 animate-pulse">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              Ringing
+            </span>
             <div className="bg-gradient-to-br from-green-400 to-green-600 text-white rounded-full p-3.5 sm:p-4 animate-bounce shadow-lg shadow-green-500/30">
               <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 20v-6h4v6a1 1 0 0 0 1 1h3a2 2 0 0 0 2-2v-7.5l-9-5.25L2 9.5V19a2 2 0 0 0 2 2h3a1 1 0 0 0 1-1z"/></svg>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                audioAlert.unlockMobileAudio(false)
+                audioAlert.playAlertSequence()
+              }}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-zinc-700 active:scale-95 transition touch-manipulation"
+            >
+              🔊 Sound
+            </button>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-center mb-2 tracking-tight">New Trip Request!</h2>
           
@@ -52,13 +79,20 @@ export default function TripRequestModal({ request, onAccept, onDecline }: TripR
 
         <div className="flex gap-3 pt-1">
           <button 
-            onClick={onDecline}
+            onClick={() => {
+              audioAlert.stopTripRingtoneLoop()
+              onDecline()
+            }}
             className="flex-1 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 py-3.5 sm:py-4 min-h-[48px] rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-zinc-700 transition active:scale-95 touch-manipulation flex items-center justify-center text-sm sm:text-base"
           >
             Decline
           </button>
           <button 
-            onClick={onAccept}
+            onClick={() => {
+              audioAlert.stopTripRingtoneLoop()
+              audioAlert.playStatusChime()
+              onAccept()
+            }}
             className="flex-1 bg-black dark:bg-white text-white dark:text-black py-3.5 sm:py-4 min-h-[48px] rounded-2xl font-black hover:scale-[1.02] active:scale-95 transition shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
           >
             Accept

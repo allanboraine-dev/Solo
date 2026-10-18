@@ -16,6 +16,7 @@ import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { audioAlert } from '@/utils/audioAlert'
 
 // Dynamically import Map component to disable SSR
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
@@ -241,6 +242,7 @@ export default function RiderPage() {
         const matched = trips.find(t => t.id === currentActive.id);
         if (matched) {
           if (matched.status === 'cancelled') {
+            audioAlert.alertRiderOfTripStatus('cancelled', matched);
             updateActiveTripState(null);
             setDriverCoords(null);
             setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
@@ -248,6 +250,7 @@ export default function RiderPage() {
           }
           if (matched.status === 'completed') {
             markTripCompleted(matched.id);
+            audioAlert.alertRiderOfTripStatus('completed', matched);
             setRatingTrip(matched);
             setShowRatingModal(true);
             updateActiveTripState(null);
@@ -262,6 +265,11 @@ export default function RiderPage() {
             matchedPrio > activePrio ||
             (matched.driver_id && matched.driver_id !== currentActive.driver_id)
           ) {
+            if (matched.status !== currentActive.status) {
+              if (matched.status === 'accepted' || matched.status === 'arrived' || matched.status === 'in_progress') {
+                audioAlert.alertRiderOfTripStatus(matched.status, matched);
+              }
+            }
             updateActiveTripState(matched);
           }
           return;
@@ -377,30 +385,18 @@ export default function RiderPage() {
           const completedSnapshot: MockTrip = currentActive
             ? { ...currentActive, ...trip, status: 'completed' }
             : trip;
+          audioAlert.alertRiderOfTripStatus('completed', completedSnapshot);
           setRatingTrip(completedSnapshot);
           setShowRatingModal(true);
           updateActiveTripState(null);
           setDriverCoords(null);
           setIsProcessingPayment(false);
           setPaymentError(null);
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('Trip Completed! 🎉', {
-              body: `Your trip has ended. Thank you for riding with SOLO!`,
-              icon: '/rider-icon-192.png',
-              tag: `rider-trip-${trip.id}`,
-            });
-          }
         } else if (trip.status === 'cancelled') {
+          audioAlert.alertRiderOfTripStatus('cancelled', trip);
           updateActiveTripState(null);
           setDriverCoords(null);
           setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-            new Notification('Ride Request Cancelled', {
-              body: 'The ride request was cancelled. Please request another ride.',
-              icon: '/rider-icon-192.png',
-              tag: `rider-trip-${trip.id}`,
-            });
-          }
         } else if (!isTripCompleted(trip.id) && !isStaleRequestedTrip(trip)) {
           if (!currentActive) {
             setDeclineNotice(null);
@@ -411,21 +407,11 @@ export default function RiderPage() {
             if (incomingPrio > activePrio || (trip.driver_id && trip.driver_id !== currentActive.driver_id)) {
               setDeclineNotice(null);
               if (trip.status === 'accepted' && currentActive.status === 'requested') {
-                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-                  new Notification('Driver Accepted Your Ride! 🚗', {
-                    body: `Your driver is on the way! Trip PIN: ${trip.verification_pin || 'Check app'}`,
-                    icon: '/rider-icon-192.png',
-                    tag: `rider-trip-${trip.id}`,
-                  });
-                }
+                audioAlert.alertRiderOfTripStatus('accepted', trip);
               } else if (trip.status === 'arrived' && currentActive.status !== 'arrived') {
-                if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted' && document.hidden) {
-                  new Notification('Your Driver Has Arrived! 📍', {
-                    body: `Your driver has arrived at pickup. Share PIN ${trip.verification_pin || ''} to board.`,
-                    icon: '/rider-icon-192.png',
-                    tag: `rider-trip-arrived-${trip.id}`,
-                  });
-                }
+                audioAlert.alertRiderOfTripStatus('arrived', trip);
+              } else if (trip.status === 'in_progress' && currentActive.status !== 'in_progress') {
+                audioAlert.alertRiderOfTripStatus('in_progress', trip);
               }
               updateActiveTripState(trip);
             }
@@ -825,6 +811,7 @@ export default function RiderPage() {
                       currentUser={currentUser}
                       onRequireAuth={() => setShowAuthModal(true)}
                       onTripCreated={(trip) => {
+                        audioAlert.unlockMobileAudio(true);
                         updateActiveTripState(trip);
                         setDeclineNotice(null);
                       }}

@@ -7,6 +7,7 @@ import {
   registerForPushNotifications,
   PushPermissionStatus,
 } from "@/utils/pushClient";
+import { audioAlert } from "@/utils/audioAlert";
 
 interface NotificationPermissionBannerProps {
   role: "driver" | "rider";
@@ -29,12 +30,14 @@ export function NotificationPermissionBanner({
   }, []);
 
   const handleEnablePush = async () => {
+    audioAlert.unlockMobileAudio(true);
     setLoading(true);
     setErrorMsg(null);
     try {
       const result = await registerForPushNotifications(role, userId);
       if (result.success) {
         setStatus("granted");
+        audioAlert.playAlertSequence();
       } else {
         setErrorMsg(result.error || "Failed to enable notifications");
         setStatus(getPushPermissionStatus());
@@ -48,6 +51,8 @@ export function NotificationPermissionBanner({
   };
 
   const handleSendTestPush = async () => {
+    audioAlert.unlockMobileAudio(false);
+    audioAlert.playAlertSequence();
     setTestSent(true);
     try {
       if ("serviceWorker" in navigator) {
@@ -86,11 +91,41 @@ export function NotificationPermissionBanner({
     }
   };
 
-  if (status === "unsupported") {
-    return null; // Don't clutter UI on unsupported environments
-  }
-
   const isDriver = role === "driver";
+
+  if (status === "unsupported") {
+    return (
+      <div
+        className={`p-3 sm:p-4 rounded-2xl border bg-zinc-900/75 border-zinc-800 text-zinc-200 flex items-center justify-between gap-2.5 ${className}`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+            <BellRing size={16} />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-xs sm:text-sm font-bold truncate">
+              {isDriver ? "In-App Dispatch Sound & Haptics" : "In-App Ride Sound & Haptics"}
+            </h4>
+            <p className="text-[11px] text-zinc-400 truncate">
+              Tap Test Sound to unlock loud mobile speaker alerts.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            audioAlert.unlockMobileAudio(false);
+            audioAlert.playAlertSequence();
+            setTestSent(true);
+            setTimeout(() => setTestSent(false), 2000);
+          }}
+          className="shrink-0 text-[11px] sm:text-xs font-bold py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition active:scale-95 touch-manipulation"
+        >
+          {testSent ? "🔊 Playing!" : "🔊 Test Sound"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div

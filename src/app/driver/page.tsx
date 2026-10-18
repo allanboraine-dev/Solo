@@ -48,6 +48,7 @@ export default function DriverPage() {
   const [preemptedNotice, setPreemptedNotice] = useState<string | null>(null)
 
   const handleGoOnlineOnThisDevice = async () => {
+    audioAlert.unlockMobileAudio(true)
     setPreemptedNotice(null)
     const resolvedDriverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null)
     if (resolvedDriverId) {
@@ -773,10 +774,13 @@ export default function DriverPage() {
               onClick={async () => {
                 const nextOnline = !isOnline;
                 if (nextOnline) {
+                  audioAlert.unlockMobileAudio(true);
                   setPreemptedNotice(null);
                   if (profile?.id) {
                     setDriverActiveSession(profile.id, deviceIdRef.current);
                   }
+                } else {
+                  audioAlert.stopTripRingtoneLoop();
                 }
                 setIsOnline(nextOnline);
                 if (nextOnline && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
@@ -1185,9 +1189,21 @@ export default function DriverPage() {
 
                   {isOnline && (
                     <div className="space-y-2.5">
-                      <div className="bg-blue-50/80 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 p-4 rounded-2xl flex items-center justify-center gap-3 animate-pulse border border-blue-100/50 dark:border-blue-800/30">
-                        <Navigation size={20} />
-                        <span className="text-sm font-bold tracking-wide">SEARCHING FOR RIDERS</span>
+                      <div className="bg-blue-50/80 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 p-3.5 rounded-2xl flex items-center justify-between gap-2 animate-pulse border border-blue-100/50 dark:border-blue-800/30">
+                        <div className="flex items-center gap-2.5">
+                          <Navigation size={18} className="shrink-0" />
+                          <span className="text-xs sm:text-sm font-bold tracking-wide">SEARCHING FOR RIDERS</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            audioAlert.unlockMobileAudio(false);
+                            audioAlert.playAlertSequence();
+                          }}
+                          className="shrink-0 px-2.5 py-1 rounded-xl bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/60 text-[11px] font-bold shadow-2xs active:scale-95 transition touch-manipulation"
+                        >
+                          🔊 Test Sound
+                        </button>
                       </div>
 
                       {/* Adaptive Battery-Aware & WebSocket Telemetry HUD */}

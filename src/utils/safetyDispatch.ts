@@ -356,17 +356,34 @@ export async function triggerRapidResponseSos(
 }
 
 // ----------------------------------------------------------------------------
-// Web Audio API + Native PCM WAV High-Decibel Emergency Deterrent Siren
+// Web Audio API + Base64 16-Bit PCM WAV High-Decibel Emergency Deterrent Siren
 // ----------------------------------------------------------------------------
 
+function encodeSirenBufferToBase64Wav(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(slice));
+  }
+  if (typeof btoa === 'function') {
+    return `data:audio/wav;base64,${btoa(binary)}`;
+  }
+  if (typeof Buffer !== 'undefined') {
+    return `data:audio/wav;base64,${Buffer.from(bytes).toString('base64')}`;
+  }
+  return '';
+}
+
 /**
- * Generates an in-memory 16-bit PCM WAV data URL containing a 1.4-second
- * high-output dual-tone police/emergency siren cycle (700Hz <-> 1460Hz).
- * Playing this via HTMLAudioElement forces mobile browsers (iOS Safari / Android)
- * onto the hardware 'playback' media speaker channel even when the ringer is on silent.
+ * Generates an in-memory 16-bit PCM WAV Base64 `data:audio/wav;base64,...` URI
+ * containing a 1.4-second high-output dual-tone police/emergency siren cycle (680Hz <-> 1460Hz).
+ * Using a Base64 data URI instead of a `blob:` URL prevents mobile WebView / CSP blocking
+ * and forces mobile browsers (iOS Safari / Android Chrome) onto the hardware 'playback' speaker channel.
  */
 function buildEmergencySirenWavUrl(): string | null {
-  if (typeof window === 'undefined' || typeof URL === 'undefined') return null;
+  if (typeof window === 'undefined') return null;
   try {
     const sampleRate = 22050;
     const durationSec = 1.4;
@@ -402,22 +419,28 @@ function buildEmergencySirenWavUrl(): string | null {
       // Triangle sweep from 0 -> 1 -> 0 over durationSec
       const half = durationSec / 2;
       const sweep = t < half ? t / half : 1 - (t - half) / half;
-      const f1 = 680 + sweep * 760; // 680Hz -> 1440Hz
-      const f2 = 715 + sweep * 790; // Detuned harmonic for piercing urgency
+      const f1 = 680 + sweep * 780; // 680Hz -> 1460Hz
+      const f2 = 720 + sweep * 810; // Detuned harmonic for piercing urgency
 
       phase1 += (2 * Math.PI * f1) / sampleRate;
       phase2 += (2 * Math.PI * f2) / sampleRate;
 
-      // Rich square/saw-like harmonic blend for maximum mobile speaker projection
-      const raw1 = Math.sin(phase1) + 0.45 * Math.sin(3 * phase1);
-      const raw2 = Math.sin(phase2) >= 0 ? 0.6 : -0.6;
-      const combined = Math.max(-1, Math.min(1, (raw1 + raw2) * 0.65));
+      // Rich square/saw-like harmonic blend at maximum non-clipping mobile speaker amplitude
+      const raw1 = Math.sin(phase1) + 0.5 * Math.sin(3 * phase1) + 0.25 * Math.sin(5 * phase1);
+      const raw2 = Math.sin(phase2) >= 0 ? 0.65 : -0.65;
+      const combined = Math.max(-1, Math.min(1, (raw1 + raw2) * 0.72));
 
       view.setInt16(44 + i * 2, Math.floor(combined * 32767), true);
     }
 
-    const blob = new Blob([buffer], { type: 'audio/wav' });
-    return URL.createObjectURL(blob);
+    const base64Uri = encodeSirenBufferToBase64Wav(buffer);
+    if (base64Uri) return base64Uri;
+
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      return URL.createObjectURL(blob);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -445,7 +468,7 @@ class DeterrentSirenController {
 
     // 1. Force mobile OS audio session to 'playback' so hardware mute switch does not silence SOS
     try {
-      const nav = navigator as any;
+      const nav = typeof navigator !== 'undefined' ? (navigator as any) : null;
       if (nav?.audioSession) {
         nav.audioSession.type = 'playback';
       }
@@ -453,15 +476,20 @@ class DeterrentSirenController {
       // Ignore if unsupported
     }
 
-    // 2. Start HTMLAudioElement PCM WAV loop (unlocks iOS/Android media speaker channel)
+    // 2. Start HTMLAudioElement Base64 PCM WAV loop (forces iOS/Android media speaker channel)
     try {
       if (!this.wavUrl) {
         this.wavUrl = buildEmergencySirenWavUrl();
       }
       if (this.wavUrl && typeof Audio !== 'undefined') {
-        this.audioEl = new Audio(this.wavUrl);
+        if (!this.audioEl) {
+          this.audioEl = new Audio(this.wavUrl);
+        } else if (this.audioEl.src !== this.wavUrl) {
+          this.audioEl.src = this.wavUrl;
+        }
         this.audioEl.loop = true;
         this.audioEl.volume = 1.0;
+        this.audioEl.muted = false;
         (this.audioEl as any).playsInline = true;
         const playPromise = this.audioEl.play();
         if (playPromise && typeof playPromise.catch === 'function') {
@@ -477,15 +505,17 @@ class DeterrentSirenController {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
-        this.ctx = new AudioCtx();
-        if (this.ctx.state === 'suspended') {
+        if (!this.ctx || (this.ctx.state as string) === 'closed') {
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended' || (this.ctx.state as string) === 'interrupted') {
           this.ctx.resume().catch(() => {});
         }
 
-        const now = this.ctx.currentTime;
+        const now = this.ctx.currentTime || 0;
         const compressor = this.ctx.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-12, now);
-        compressor.knee.setValueAtTime(10, now);
+        compressor.threshold.setValueAtTime(-10, now);
+        compressor.knee.setValueAtTime(8, now);
         compressor.ratio.setValueAtTime(12, now);
         compressor.attack.setValueAtTime(0.002, now);
         compressor.release.setValueAtTime(0.15, now);
@@ -502,7 +532,7 @@ class DeterrentSirenController {
         this.oscPrimary.frequency.setValueAtTime(680, now);
         this.oscSecondary.frequency.setValueAtTime(715, now);
 
-        // Immediately schedule first upward wail sweep
+        // Schedule initial upward wail sweep
         this.oscPrimary.frequency.linearRampToValueAtTime(1440, now + 0.35);
         this.oscSecondary.frequency.linearRampToValueAtTime(1495, now + 0.35);
 
@@ -514,25 +544,35 @@ class DeterrentSirenController {
         this.oscPrimary.start(now);
         this.oscSecondary.start(now);
 
+        // Deterministic alternating sweep (avoids mobile WebKit osc.frequency.value readback freeze)
         let high = false;
         this.sweepInterval = setInterval(() => {
           if (!this.ctx || !this.oscPrimary || !this.oscSecondary) return;
-          if (this.ctx.state === 'suspended') {
+          if (this.ctx.state === 'suspended' || (this.ctx.state as string) === 'interrupted') {
             this.ctx.resume().catch(() => {});
           }
-          const t = this.ctx.currentTime;
+          const t = this.ctx.currentTime || 0;
+          const startPrimary = high ? 680 : 1440;
           const targetPrimary = high ? 1440 : 680;
+          const startSecondary = high ? 715 : 1495;
           const targetSecondary = high ? 1495 : 715;
 
           this.oscPrimary.frequency.cancelScheduledValues(t);
-          this.oscPrimary.frequency.setValueAtTime(this.oscPrimary.frequency.value || 680, t);
+          this.oscPrimary.frequency.setValueAtTime(startPrimary, t);
           this.oscPrimary.frequency.linearRampToValueAtTime(targetPrimary, t + 0.34);
 
           this.oscSecondary.frequency.cancelScheduledValues(t);
-          this.oscSecondary.frequency.setValueAtTime(this.oscSecondary.frequency.value || 715, t);
+          this.oscSecondary.frequency.setValueAtTime(startSecondary, t);
           this.oscSecondary.frequency.linearRampToValueAtTime(targetSecondary, t + 0.34);
 
           high = !high;
+
+          // Keep vibrating on mobile during active deterrent siren
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try {
+              navigator.vibrate(250);
+            } catch {}
+          }
         }, 360);
 
         startedAny = true;
@@ -570,11 +610,9 @@ class DeterrentSirenController {
       try {
         this.audioEl.pause();
         this.audioEl.currentTime = 0;
-        this.audioEl.src = '';
       } catch {
         // Ignore
       }
-      this.audioEl = null;
     }
     if (this.oscPrimary) {
       try {
