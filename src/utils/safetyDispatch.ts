@@ -356,12 +356,80 @@ export async function triggerRapidResponseSos(
 }
 
 // ----------------------------------------------------------------------------
-// Web Audio API High-Decibel Emergency Deterrent Siren (Zero external MP3 needed)
+// Web Audio API + Native PCM WAV High-Decibel Emergency Deterrent Siren
 // ----------------------------------------------------------------------------
+
+/**
+ * Generates an in-memory 16-bit PCM WAV data URL containing a 1.4-second
+ * high-output dual-tone police/emergency siren cycle (700Hz <-> 1460Hz).
+ * Playing this via HTMLAudioElement forces mobile browsers (iOS Safari / Android)
+ * onto the hardware 'playback' media speaker channel even when the ringer is on silent.
+ */
+function buildEmergencySirenWavUrl(): string | null {
+  if (typeof window === 'undefined' || typeof URL === 'undefined') return null;
+  try {
+    const sampleRate = 22050;
+    const durationSec = 1.4;
+    const numSamples = Math.floor(sampleRate * durationSec);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    // RIFF WAV header
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // PCM chunk size
+    view.setUint16(20, 1, true);  // Linear PCM
+    view.setUint16(22, 1, true);  // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true); // Byte rate
+    view.setUint16(32, 2, true);  // Block align
+    view.setUint16(34, 16, true); // 16-bit samples
+    writeString(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    let phase1 = 0;
+    let phase2 = 0;
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      // Triangle sweep from 0 -> 1 -> 0 over durationSec
+      const half = durationSec / 2;
+      const sweep = t < half ? t / half : 1 - (t - half) / half;
+      const f1 = 680 + sweep * 760; // 680Hz -> 1440Hz
+      const f2 = 715 + sweep * 790; // Detuned harmonic for piercing urgency
+
+      phase1 += (2 * Math.PI * f1) / sampleRate;
+      phase2 += (2 * Math.PI * f2) / sampleRate;
+
+      // Rich square/saw-like harmonic blend for maximum mobile speaker projection
+      const raw1 = Math.sin(phase1) + 0.45 * Math.sin(3 * phase1);
+      const raw2 = Math.sin(phase2) >= 0 ? 0.6 : -0.6;
+      const combined = Math.max(-1, Math.min(1, (raw1 + raw2) * 0.65));
+
+      view.setInt16(44 + i * 2, Math.floor(combined * 32767), true);
+    }
+
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
 class DeterrentSirenController {
   private ctx: AudioContext | null = null;
-  private osc: OscillatorNode | null = null;
+  private oscPrimary: OscillatorNode | null = null;
+  private oscSecondary: OscillatorNode | null = null;
   private gain: GainNode | null = null;
+  private audioEl: HTMLAudioElement | null = null;
+  private wavUrl: string | null = null;
   private sweepInterval: ReturnType<typeof setInterval> | null = null;
   private active = false;
 
@@ -373,45 +441,123 @@ class DeterrentSirenController {
     if (typeof window === 'undefined') return false;
     if (this.active) return true;
 
+    let startedAny = false;
+
+    // 1. Force mobile OS audio session to 'playback' so hardware mute switch does not silence SOS
+    try {
+      const nav = navigator as any;
+      if (nav?.audioSession) {
+        nav.audioSession.type = 'playback';
+      }
+    } catch {
+      // Ignore if unsupported
+    }
+
+    // 2. Start HTMLAudioElement PCM WAV loop (unlocks iOS/Android media speaker channel)
+    try {
+      if (!this.wavUrl) {
+        this.wavUrl = buildEmergencySirenWavUrl();
+      }
+      if (this.wavUrl && typeof Audio !== 'undefined') {
+        this.audioEl = new Audio(this.wavUrl);
+        this.audioEl.loop = true;
+        this.audioEl.volume = 1.0;
+        (this.audioEl as any).playsInline = true;
+        const playPromise = this.audioEl.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => {});
+        }
+        startedAny = true;
+      }
+    } catch {
+      // Fall through to Web Audio API
+    }
+
+    // 3. Start High-Decibel Dual-Oscillator Web Audio API Graph with explicit .resume()
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return false;
-
-      this.ctx = new AudioCtx();
-      this.osc = this.ctx.createOscillator();
-      this.gain = this.ctx.createGain();
-
-      this.osc.type = 'sawtooth';
-      this.osc.frequency.setValueAtTime(680, this.ctx.currentTime);
-      this.gain.gain.setValueAtTime(0.85, this.ctx.currentTime);
-
-      this.osc.connect(this.gain);
-      this.gain.connect(this.ctx.destination);
-      this.osc.start();
-      this.active = true;
-
-      let high = true;
-      this.sweepInterval = setInterval(() => {
-        if (!this.ctx || !this.osc) return;
-        const now = this.ctx.currentTime;
-        this.osc.frequency.exponentialRampToValueAtTime(high ? 1320 : 640, now + 0.35);
-        high = !high;
-      }, 380);
-
-      // Vibrate phone in SOS Morse pattern if supported
-      if ('vibrate' in navigator) {
-        try {
-          navigator.vibrate([300, 150, 300, 150, 300, 400, 700, 200, 700, 200, 700]);
-        } catch {
-          // Ignore vibration restriction
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
         }
-      }
 
-      return true;
+        const now = this.ctx.currentTime;
+        const compressor = this.ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-12, now);
+        compressor.knee.setValueAtTime(10, now);
+        compressor.ratio.setValueAtTime(12, now);
+        compressor.attack.setValueAtTime(0.002, now);
+        compressor.release.setValueAtTime(0.15, now);
+
+        this.gain = this.ctx.createGain();
+        this.gain.gain.setValueAtTime(1.0, now);
+
+        this.oscPrimary = this.ctx.createOscillator();
+        this.oscSecondary = this.ctx.createOscillator();
+
+        this.oscPrimary.type = 'sawtooth';
+        this.oscSecondary.type = 'square';
+
+        this.oscPrimary.frequency.setValueAtTime(680, now);
+        this.oscSecondary.frequency.setValueAtTime(715, now);
+
+        // Immediately schedule first upward wail sweep
+        this.oscPrimary.frequency.linearRampToValueAtTime(1440, now + 0.35);
+        this.oscSecondary.frequency.linearRampToValueAtTime(1495, now + 0.35);
+
+        this.oscPrimary.connect(this.gain);
+        this.oscSecondary.connect(this.gain);
+        this.gain.connect(compressor);
+        compressor.connect(this.ctx.destination);
+
+        this.oscPrimary.start(now);
+        this.oscSecondary.start(now);
+
+        let high = false;
+        this.sweepInterval = setInterval(() => {
+          if (!this.ctx || !this.oscPrimary || !this.oscSecondary) return;
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          const t = this.ctx.currentTime;
+          const targetPrimary = high ? 1440 : 680;
+          const targetSecondary = high ? 1495 : 715;
+
+          this.oscPrimary.frequency.cancelScheduledValues(t);
+          this.oscPrimary.frequency.setValueAtTime(this.oscPrimary.frequency.value || 680, t);
+          this.oscPrimary.frequency.linearRampToValueAtTime(targetPrimary, t + 0.34);
+
+          this.oscSecondary.frequency.cancelScheduledValues(t);
+          this.oscSecondary.frequency.setValueAtTime(this.oscSecondary.frequency.value || 715, t);
+          this.oscSecondary.frequency.linearRampToValueAtTime(targetSecondary, t + 0.34);
+
+          high = !high;
+        }, 360);
+
+        startedAny = true;
+      }
     } catch {
+      // If Web Audio fails, HTMLAudioElement WAV loop may still be active
+    }
+
+    if (!startedAny) {
       this.stop();
       return false;
     }
+
+    this.active = true;
+
+    // Vibrate phone in SOS Morse pattern if supported
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([300, 150, 300, 150, 300, 400, 700, 200, 700, 200, 700]);
+      } catch {
+        // Ignore vibration restriction
+      }
+    }
+
+    return true;
   }
 
   public stop(): void {
@@ -420,14 +566,33 @@ class DeterrentSirenController {
       clearInterval(this.sweepInterval);
       this.sweepInterval = null;
     }
-    if (this.osc) {
+    if (this.audioEl) {
       try {
-        this.osc.stop();
-        this.osc.disconnect();
+        this.audioEl.pause();
+        this.audioEl.currentTime = 0;
+        this.audioEl.src = '';
       } catch {
         // Ignore
       }
-      this.osc = null;
+      this.audioEl = null;
+    }
+    if (this.oscPrimary) {
+      try {
+        this.oscPrimary.stop();
+        this.oscPrimary.disconnect();
+      } catch {
+        // Ignore
+      }
+      this.oscPrimary = null;
+    }
+    if (this.oscSecondary) {
+      try {
+        this.oscSecondary.stop();
+        this.oscSecondary.disconnect();
+      } catch {
+        // Ignore
+      }
+      this.oscSecondary = null;
     }
     if (this.gain) {
       try {

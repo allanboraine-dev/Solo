@@ -185,7 +185,7 @@ export default function SafetyShieldModal({
   };
 
   const handleToggleSiren = () => {
-    if (sirenActive) {
+    if (sirenActive || emergencySiren.isRunning()) {
       emergencySiren.stop();
       setSirenActive(false);
     } else {
@@ -261,6 +261,10 @@ export default function SafetyShieldModal({
             type="button"
             onClick={() => {
               setCountdown(null);
+              if (emergencySiren.isRunning()) {
+                emergencySiren.stop();
+                setSirenActive(false);
+              }
               onClose();
             }}
             className="p-2 rounded-xl bg-black/20 hover:bg-black/40 text-white transition shrink-0"
