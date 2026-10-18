@@ -41,20 +41,34 @@ export function parseHouseNumberFromQuery(query: string): {
   remainder: string;
 } {
   const trimmed = query.trim();
-  // Check leading house number: "14 Niobe Street", "No. 22 Barkley Rd", "#14 Memorial"
-  const leadingMatch = trimmed.match(/^(?:no\.?\s*|house\s*|erf\s*|stand\s*|#\s*)?(\d+[a-zA-Z]?)\s+(.{2,})$/i);
+  // Check leading house number: "14 Niobe Street", "No. 22 Barkley Rd", "#14 Memorial", "12, Carrington Road", "Unit 4 10 Oliver Rd"
+  const leadingMatch = trimmed.match(
+    /^(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)\s*[,]?\s+(.{2,})$/i
+  );
   if (leadingMatch) {
     return {
       houseNumber: leadingMatch[1],
       remainder: leadingMatch[2].trim(),
     };
   }
-  // Check trailing house number: "Niobe Street 14", "Memorial Road No 22"
-  const trailingMatch = trimmed.match(/^(.{2,})\s+(?:no\.?\s*|house\s*|erf\s*|stand\s*|#\s*)?(\d+[a-zA-Z]?)$/i);
+  // Check trailing house number: "Niobe Street 14", "Memorial Road No 22", "Carrington Road, 12"
+  const trailingMatch = trimmed.match(
+    /^(.{2,})\s*[,]?\s+(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)$/i
+  );
   if (trailingMatch) {
     return {
       houseNumber: trailingMatch[2],
       remainder: trailingMatch[1].trim(),
+    };
+  }
+  // Standalone house number (e.g. "14", "22B", "#108")
+  const standaloneMatch = trimmed.match(
+    /^(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)$/i
+  );
+  if (standaloneMatch) {
+    return {
+      houseNumber: standaloneMatch[1],
+      remainder: '',
     };
   }
   return { remainder: trimmed };
@@ -906,6 +920,457 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'address',
   },
+  {
+    id: 'street-carrington',
+    name: 'Carrington Road',
+    display_name: 'Carrington Road, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7512,
+    lon: 24.7725,
+    street: 'Carrington Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-lennox',
+    name: 'Lennox Street',
+    display_name: 'Lennox Street, Central / Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7460,
+    lon: 24.7690,
+    street: 'Lennox Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-dalham',
+    name: 'Dalham Road',
+    display_name: 'Dalham Road, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7540,
+    lon: 24.7710,
+    street: 'Dalham Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-aristotle',
+    name: 'Aristotle Avenue',
+    display_name: 'Aristotle Avenue, Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7590,
+    lon: 24.7660,
+    street: 'Aristotle Avenue',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-plato',
+    name: 'Plato Avenue',
+    display_name: 'Plato Avenue, Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7605,
+    lon: 24.7670,
+    street: 'Plato Avenue',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-socrates',
+    name: 'Socrates Avenue',
+    display_name: 'Socrates Avenue, Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7595,
+    lon: 24.7680,
+    street: 'Socrates Avenue',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-homer',
+    name: 'Homer Avenue',
+    display_name: 'Homer Avenue, Monument Heights, Kimberley, Northern Cape, 8301',
+    lat: -28.7620,
+    lon: 24.7690,
+    street: 'Homer Avenue',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-reservoir',
+    name: 'Reservoir Road',
+    display_name: 'Reservoir Road, Rhodesdene / Carters Glen, Kimberley, Northern Cape, 8301',
+    lat: -28.7550,
+    lon: 24.7450,
+    street: 'Reservoir Road',
+    suburb: 'Rhodesdene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-hull',
+    name: 'Hull Street',
+    display_name: 'Hull Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7380,
+    lon: 24.7740,
+    street: 'Hull Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-george',
+    name: 'George Street',
+    display_name: 'George Street, Kimberley Central / Civic Centre, Northern Cape, 8301',
+    lat: -28.7390,
+    lon: 24.7670,
+    street: 'George Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-bean',
+    name: 'Bean Street',
+    display_name: 'Bean Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7420,
+    lon: 24.7640,
+    street: 'Bean Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-roper',
+    name: 'Roper Street',
+    display_name: 'Roper Street, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7470,
+    lon: 24.7680,
+    street: 'Roper Street',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-park',
+    name: 'Park Road',
+    display_name: 'Park Road, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7485,
+    lon: 24.7700,
+    street: 'Park Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-egerton',
+    name: 'Egerton Road',
+    display_name: 'Egerton Road, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7530,
+    lon: 24.7740,
+    street: 'Egerton Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-milner',
+    name: 'Milner Street',
+    display_name: 'Milner Street, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7525,
+    lon: 24.7750,
+    street: 'Milner Street',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-scanlan',
+    name: 'Scanlan Street',
+    display_name: 'Scanlan Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7385,
+    lon: 24.7620,
+    street: 'Scanlan Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-stockdale',
+    name: 'Stockdale Street',
+    display_name: 'Stockdale Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7370,
+    lon: 24.7645,
+    street: 'Stockdale Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-crossman',
+    name: 'Crossman Road',
+    display_name: 'Crossman Road, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7395,
+    lon: 24.7610,
+    street: 'Crossman Road',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-pniel',
+    name: 'Pniel Road',
+    display_name: 'Pniel Road, West End / Central, Kimberley, Northern Cape, 8301',
+    lat: -28.7330,
+    lon: 24.7600,
+    street: 'Pniel Road',
+    suburb: 'West End',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-woodley',
+    name: 'Woodley Street',
+    display_name: 'Woodley Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7440,
+    lon: 24.7660,
+    street: 'Woodley Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-sydney',
+    name: 'Sydney Street',
+    display_name: 'Sydney Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7410,
+    lon: 24.7630,
+    street: 'Sydney Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-villiers',
+    name: 'Villiers Street',
+    display_name: 'Villiers Street, Belgravia, Kimberley, Northern Cape, 8301',
+    lat: -28.7450,
+    lon: 24.7685,
+    street: 'Villiers Street',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-halkett',
+    name: 'Halkett Road',
+    display_name: 'Halkett Road, Rhodesdene, Kimberley, Northern Cape, 8301',
+    lat: -28.7540,
+    lon: 24.7550,
+    street: 'Halkett Road',
+    suburb: 'Rhodesdene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-diamant',
+    name: 'Diamant Street',
+    display_name: 'Diamant Street, Rhodesdene, Kimberley, Northern Cape, 8301',
+    lat: -28.7510,
+    lon: 24.7500,
+    street: 'Diamant Street',
+    suburb: 'Rhodesdene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-lawson',
+    name: 'Lawson Street',
+    display_name: 'Lawson Street, Rhodesdene, Kimberley, Northern Cape, 8301',
+    lat: -28.7505,
+    lon: 24.7530,
+    street: 'Lawson Street',
+    suburb: 'Rhodesdene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-central-rd',
+    name: 'Central Road',
+    display_name: 'Central Road, Beaconsfield, Kimberley, Northern Cape, 8301',
+    lat: -28.7650,
+    lon: 24.7680,
+    street: 'Central Road',
+    suburb: 'Beaconsfield',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-green',
+    name: 'Green Street',
+    display_name: 'Green Street, Beaconsfield, Kimberley, Northern Cape, 8301',
+    lat: -28.7680,
+    lon: 24.7720,
+    street: 'Green Street',
+    suburb: 'Beaconsfield',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-main-rd',
+    name: 'Main Road',
+    display_name: 'Main Road, Beaconsfield, Kimberley, Northern Cape, 8301',
+    lat: -28.7630,
+    lon: 24.7690,
+    street: 'Main Road',
+    suburb: 'Beaconsfield',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-market',
+    name: 'Market Street',
+    display_name: 'Market Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7400,
+    lon: 24.7650,
+    street: 'Market Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-steve-biko',
+    name: 'Steve Biko Road',
+    display_name: 'Steve Biko Road, Galeshewe, Kimberley, Northern Cape, 8345',
+    lat: -28.7150,
+    lon: 24.7230,
+    street: 'Steve Biko Road',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-moshweshwe',
+    name: 'Moshweshwe Street',
+    display_name: 'Moshweshwe Street, Galeshewe, Kimberley, Northern Cape, 8345',
+    lat: -28.7220,
+    lon: 24.7250,
+    street: 'Moshweshwe Street',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-tshelanyane',
+    name: 'Tshelanyane Street',
+    display_name: 'Tshelanyane Street, Galeshewe, Kimberley, Northern Cape, 8345',
+    lat: -28.7180,
+    lon: 24.7310,
+    street: 'Tshelanyane Street',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-mapoch',
+    name: 'Mapoch Street',
+    display_name: 'Mapoch Street, Galeshewe, Kimberley, Northern Cape, 8345',
+    lat: -28.7160,
+    lon: 24.7290,
+    street: 'Mapoch Street',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-diskobolos',
+    name: 'Diskobolos Road',
+    display_name: 'Diskobolos Road, Diskobolos / Airport, Kimberley, 8301',
+    lat: -28.7950,
+    lon: 24.7660,
+    street: 'Diskobolos Road',
+    suburb: 'Diskobolos',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-long',
+    name: 'Long Street',
+    display_name: 'Long Street, Kimberley Central, Northern Cape, 8301',
+    lat: -28.7445,
+    lon: 24.7580,
+    street: 'Long Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-waterworks',
+    name: 'Waterworks Road',
+    display_name: 'Waterworks Road, Royldene, Kimberley, Northern Cape, 8301',
+    lat: -28.7620,
+    lon: 24.7580,
+    street: 'Waterworks Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-rendlesham',
+    name: 'Rendlesham Road',
+    display_name: 'Rendlesham Road, Rhodesdene, Kimberley, Northern Cape, 8301',
+    lat: -28.7560,
+    lon: 24.7510,
+    street: 'Rendlesham Road',
+    suburb: 'Rhodesdene',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-jacobus-smit',
+    name: 'Jacobus Smit Avenue',
+    display_name: 'Jacobus Smit Avenue, Hadison Park, Kimberley, Northern Cape, 8301',
+    lat: -28.7570,
+    lon: 24.7420,
+    street: 'Jacobus Smit Avenue',
+    suburb: 'Hadison Park',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-silson',
+    name: 'Silson Road',
+    display_name: 'Silson Road, Hadison Park, Kimberley, Northern Cape, 8301',
+    lat: -28.7590,
+    lon: 24.7410,
+    street: 'Silson Road',
+    suburb: 'Hadison Park',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-roodepan-main',
+    name: 'Roodepan Main Road',
+    display_name: 'Roodepan Main Road, Roodepan, Kimberley, Northern Cape, 8301',
+    lat: -28.6920,
+    lon: 24.7310,
+    street: 'Roodepan Main Road',
+    suburb: 'Roodepan',
+    city: 'Kimberley',
+    category: 'address',
+  },
+  {
+    id: 'street-eagle',
+    name: 'Eagle Street',
+    display_name: 'Eagle Street, Roodepan, Kimberley, Northern Cape, 8301',
+    lat: -28.6900,
+    lon: 24.7340,
+    street: 'Eagle Street',
+    suburb: 'Roodepan',
+    city: 'Kimberley',
+    category: 'address',
+  },
 
   // Major South African Metros (for users travelling or cross-testing)
   {
@@ -1052,6 +1517,23 @@ export async function searchPlaces(
   const remainderNoSpace = cleanRemainder.replace(/[\s\-_]+/g, '');
   const normRemainderNoSpace = normalizedRemainder.replace(/[\s\-_]+/g, '');
 
+  // 1.1 If user typed a standalone house number (e.g. "14"), suggest top Kimberley streets for that house number
+  if (parsedHouseNo && (!streetOrPlaceQuery || streetOrPlaceQuery.trim().length === 0)) {
+    const popularKimberleyStreets = KIMBERLEY_POPULAR_PLACES.filter((p) => p.category === 'address').slice(0, 8);
+    for (const streetPlace of popularKimberleyStreets) {
+      addUniqueResult({
+        ...streetPlace,
+        id: `${streetPlace.id}-${parsedHouseNo}`,
+        name: `${parsedHouseNo} ${streetPlace.name}`,
+        display_name: `${parsedHouseNo} ${streetPlace.display_name}`,
+        houseNumber: parsedHouseNo,
+        street: streetPlace.street || streetPlace.name,
+        category: 'address',
+      });
+    }
+  }
+
+  // 1.2 Match against all Kimberley places, giving exact street addresses priority
   for (const popular of KIMBERLEY_POPULAR_PLACES) {
     const popularNameLower = popular.name.toLowerCase();
     const popularStreetLower = (popular.street || '').toLowerCase();
@@ -1071,13 +1553,17 @@ export async function searchPlaces(
       popularNameLower.includes(lowerNormalized) ||
       popularStreetLower.includes(lowerNormalized) ||
       popularDisplayLower.includes(lowerNormalized) ||
-      popularNameLower.includes(cleanRemainder) ||
-      popularStreetLower.includes(cleanRemainder) ||
-      popularBuildingLower.includes(cleanRemainder) ||
-      popularDisplayLower.includes(cleanRemainder) ||
-      popularNameLower.includes(normalizedRemainder) ||
-      popularStreetLower.includes(normalizedRemainder) ||
-      popularDisplayLower.includes(normalizedRemainder) ||
+      (cleanRemainder.length >= 2 && (
+        popularNameLower.includes(cleanRemainder) ||
+        popularStreetLower.includes(cleanRemainder) ||
+        popularBuildingLower.includes(cleanRemainder) ||
+        popularDisplayLower.includes(cleanRemainder)
+      )) ||
+      (normalizedRemainder.length >= 2 && (
+        popularNameLower.includes(normalizedRemainder) ||
+        popularStreetLower.includes(normalizedRemainder) ||
+        popularDisplayLower.includes(normalizedRemainder)
+      )) ||
       (cleanNoSpace.length >= 3 && (
         popularNameNoSpace.includes(cleanNoSpace) ||
         popularStreetNoSpace.includes(cleanNoSpace) ||
@@ -1102,23 +1588,41 @@ export async function searchPlaces(
       ));
 
     if (isMatch) {
-      const matchWithHouse = parsedHouseNo
-        ? {
-            ...popular,
-            id: `${popular.id}-${parsedHouseNo}`,
-            name: `${parsedHouseNo} ${popular.name}`,
-            display_name: `${parsedHouseNo} ${popular.display_name}`,
-            houseNumber: parsedHouseNo,
-          }
-        : popular;
-      addUniqueResult(matchWithHouse);
+      if (popular.category === 'address') {
+        const matchWithHouse = parsedHouseNo
+          ? {
+              ...popular,
+              id: `${popular.id}-${parsedHouseNo}`,
+              name: `${parsedHouseNo} ${popular.name}`,
+              display_name: `${parsedHouseNo} ${popular.display_name}`,
+              houseNumber: parsedHouseNo,
+              street: popular.street || popular.name,
+              category: 'address' as const,
+            }
+          : popular;
+        addUniqueResult(matchWithHouse);
+      } else {
+        // Building / POI match: only attach house number if query explicitly targeted it
+        const matchWithHouse = parsedHouseNo && (popularNameLower.includes(cleanRemainder) || cleanRemainder.length === 0)
+          ? {
+              ...popular,
+              id: `${popular.id}-${parsedHouseNo}`,
+              name: `${parsedHouseNo} ${popular.name}`,
+              display_name: `${parsedHouseNo} ${popular.display_name}`,
+              houseNumber: parsedHouseNo,
+            }
+          : popular;
+        addUniqueResult(matchWithHouse);
+      }
     }
   }
 
-  // 2. Client-side: Query our internal API route /api/geocode (which handles multi-provider cascaded search)
+  // 2. Client-side: Query our internal API route /api/geocode (which handles multi-provider cascaded search with house numbers)
   if (typeof window !== 'undefined') {
     try {
-      const apiEndpoint = `/api/geocode?q=${encodeURIComponent(cleanQuery)}&lat=${prox.lat}&lng=${prox.lng}`;
+      const houseNoParam = parsedHouseNo ? `&houseNumber=${encodeURIComponent(parsedHouseNo)}` : '';
+      const streetParam = streetOrPlaceQuery ? `&street=${encodeURIComponent(streetOrPlaceQuery)}` : '';
+      const apiEndpoint = `/api/geocode?q=${encodeURIComponent(cleanQuery)}${houseNoParam}${streetParam}&lat=${prox.lat}&lng=${prox.lng}`;
       const res = await fetch(apiEndpoint);
       if (res.ok) {
         const data = await res.json();
@@ -1134,14 +1638,16 @@ export async function searchPlaces(
   }
 
   // 3. Query Mapbox Geocoding directly if needed
-  if (MAPBOX_TOKEN && combinedResults.length < 6) {
-    const queryVariants = Array.from(new Set([normalizedQuery, cleanQuery])).filter(Boolean);
+  if (MAPBOX_TOKEN && combinedResults.length < 8) {
+    const queryVariants = Array.from(
+      new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
+    ).filter((q): q is string => Boolean(q && q.length >= 2));
 
     for (const qVar of queryVariants) {
       try {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           qVar
-        )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
+        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
         const res = await fetch(endpoint);
         if (res.ok) {
           const data = await res.json();
@@ -1154,14 +1660,17 @@ export async function searchPlaces(
       } catch (err) {
         console.warn('Mapbox geocoding error:', err);
       }
-      if (combinedResults.length >= 6) break;
+      if (combinedResults.length >= 8) break;
     }
   }
 
   // 4. Query Photon API (OpenStreetMap-based, high accuracy for South African addresses, CORS-friendly)
-  if (combinedResults.length < 6) {
+  if (combinedResults.length < 8) {
     try {
-      const photonQueries = Array.from(new Set([cleanQuery, normalizedQuery])).filter(Boolean);
+      const photonQueries = Array.from(
+        new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
+      ).filter((q): q is string => Boolean(q && q.length >= 2));
+
       for (const pQuery of photonQueries) {
         const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
           pQuery
@@ -1178,14 +1687,14 @@ export async function searchPlaces(
             });
           }
         }
-        if (combinedResults.length >= 6) break;
+        if (combinedResults.length >= 8) break;
       }
     } catch (err) {
       console.warn('Photon geocoding error:', err);
     }
   }
 
-  // 5. Prioritize by relevance match first, then proximity to user / Kimberley
+  // 5. Prioritize by relevance match first, exact house number matches, then proximity
   const lowerQ = cleanQuery.toLowerCase();
   const lowerTokens = lowerQ.split(/\s+/).filter(Boolean);
 
@@ -1195,18 +1704,28 @@ export async function searchPlaces(
 
     const getRelevanceScore = (place: SearchResultPlace, name: string) => {
       let score = 0;
+      const hasMatchingHouse =
+        parsedHouseNo && place.houseNumber && place.houseNumber.toLowerCase() === parsedHouseNo.toLowerCase();
+
+      if (hasMatchingHouse) {
+        score += 150; // Priority to exact house number match
+      }
+
       if (name === lowerQ) score += 100;
       else if (name.startsWith(lowerQ)) score += 60;
       else if (name.includes(lowerQ)) score += 40;
 
+      // If query had a street and this place matches it
+      if (streetOrPlaceQuery && (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))) {
+        score += 50;
+      }
+
       const allTokensInName = lowerTokens.length > 1 && lowerTokens.every((t) => name.includes(t));
       if (allTokensInName) score += 30;
 
-      if (String(place.id).startsWith('poi-') || String(place.id).startsWith('street-')) {
-        score += 25;
-      }
-
-      if (place.category === 'building' || place.category === 'address' || place.category === 'poi') {
+      if (place.category === 'address') {
+        score += 35;
+      } else if (place.category === 'building' || place.category === 'poi') {
         score += 15;
       } else if (place.category === 'area' && lowerTokens.length > 1) {
         score -= 20;

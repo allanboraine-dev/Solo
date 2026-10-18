@@ -88,6 +88,36 @@ describe('Commercial Map & Fare Pricing Suite', () => {
     assert.ok(addressResults.length > 0);
     assert.strictEqual(addressResults[0].houseNumber, '14');
   });
+
+  it('accurately resolves house numbers entered with street names and prioritizes exact address pins', async () => {
+    // 1. Search house number + street name (e.g. "14 Carrington Road")
+    const carringtonResults = await searchPlaces('14 Carrington Road');
+    assert.ok(carringtonResults.length > 0, 'Expected results for "14 Carrington Road"');
+    const firstCarrington = carringtonResults[0];
+    assert.strictEqual(firstCarrington.houseNumber, '14');
+    assert.ok(firstCarrington.name.includes('14 Carrington Road'));
+    assert.strictEqual(firstCarrington.category, 'address');
+
+    // 2. Search house number + partial street (e.g. "25 Dalham")
+    const dalhamResults = await searchPlaces('25 Dalham');
+    assert.ok(dalhamResults.length > 0, 'Expected results for "25 Dalham"');
+    const firstDalham = dalhamResults[0];
+    assert.strictEqual(firstDalham.houseNumber, '25');
+    assert.ok(firstDalham.name.includes('25 Dalham Road'));
+
+    // 3. Search trailing house number (e.g. "Aristotle Avenue 7")
+    const aristotleResults = await searchPlaces('Aristotle Avenue 7');
+    assert.ok(aristotleResults.length > 0);
+    const firstAristotle = aristotleResults[0];
+    assert.strictEqual(firstAristotle.houseNumber, '7');
+    assert.ok(firstAristotle.name.includes('7 Aristotle Avenue'));
+
+    // 4. Standalone house number suggests top Kimberley thoroughfares
+    const standaloneNumberResults = await searchPlaces('14');
+    assert.ok(standaloneNumberResults.length > 0);
+    assert.ok(standaloneNumberResults.every(r => r.houseNumber === '14'));
+    assert.ok(standaloneNumberResults.some(r => r.name.includes('Memorial Road')));
+  });
 });
 
 

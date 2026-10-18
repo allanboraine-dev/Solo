@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { searchPlaces, SearchResultPlace, KIMBERLEY_POPULAR_PLACES } from '@/utils/mapService'
+import {
+  searchPlaces,
+  SearchResultPlace,
+  KIMBERLEY_POPULAR_PLACES,
+  parseHouseNumberFromQuery,
+} from '@/utils/mapService'
 import {
   MapPin,
   Building2,
@@ -42,6 +47,9 @@ export default function CustomSearchInput({
   const itemRefs = useRef<(HTMLDivElement | null)[]>([])
   const suppressNextSearchRef = useRef(false)
   const isUserTypingRef = useRef(false)
+
+  // Parse house number & street remainder from currently typed input
+  const { houseNumber: currentHouseNo, remainder: currentRemainder } = parseHouseNumberFromQuery(value || '')
 
   // When value is short/empty, show top Kimberley destinations as quick-picks
   const isQueryShort = !value || value.trim().length < 2
@@ -227,7 +235,11 @@ export default function CustomSearchInput({
           <div className="px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 bg-gray-50/90 dark:bg-zinc-800/60 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between sticky top-0 z-10">
             <span className="flex items-center gap-1.5">
               <Sparkles size={12} className="text-amber-500" />
-              {isQueryShort ? 'Popular Destinations' : 'Matching Locations'}
+              {isQueryShort
+                ? 'Popular Destinations'
+                : currentHouseNo
+                ? `Suggested Addresses for #${currentHouseNo}`
+                : 'Matching Locations'}
             </span>
             <button
               type="button"
@@ -277,6 +289,11 @@ export default function CustomSearchInput({
                           #{place.houseNumber}
                         </span>
                       )}
+                      {place.category === 'address' && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50">
+                          Street Address
+                        </span>
+                      )}
                       {place.buildingName && !place.houseNumber && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50">
                           POI
@@ -291,14 +308,50 @@ export default function CustomSearchInput({
               )
             })
           ) : hasSearched && !isLoading ? (
-            <div className="p-5 text-center flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-gray-400">
-              <MapPin size={22} className="text-gray-300 dark:text-gray-600 mb-1" />
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                No matching location found
-              </p>
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 max-w-xs">
-                Try searching by street name (e.g. &ldquo;dutoitspan&rdquo; or &ldquo;memorial&rdquo;) or a Kimberley landmark.
-              </p>
+            <div className="p-4 text-center flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+              {currentHouseNo && currentRemainder && currentRemainder.trim().length >= 2 ? (
+                <div
+                  className="w-full text-left p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-900/60 hover:bg-blue-100/70 transition cursor-pointer flex items-center justify-between"
+                  onClick={() =>
+                    handleSelect({
+                      id: `custom-house-${Date.now()}`,
+                      name: `${currentHouseNo} ${currentRemainder.trim()}`,
+                      display_name: `${currentHouseNo} ${currentRemainder.trim()}, Kimberley, Northern Cape, South Africa`,
+                      lat: proximityCoords?.lat || -28.7282,
+                      lon: proximityCoords?.lng || 24.7623,
+                      houseNumber: currentHouseNo,
+                      street: currentRemainder.trim(),
+                      city: 'Kimberley',
+                      category: 'address',
+                    })
+                  }
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-blue-500 text-white shrink-0">
+                      <Home size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-blue-900 dark:text-blue-100">
+                        Use &ldquo;{currentHouseNo} {currentRemainder.trim()}&rdquo;
+                      </p>
+                      <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                        Direct custom pin for House #{currentHouseNo}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Select →</span>
+                </div>
+              ) : (
+                <>
+                  <MapPin size={22} className="text-gray-300 dark:text-gray-600 mb-1" />
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    No matching location found
+                  </p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 max-w-xs">
+                    Try searching with a house number and street (e.g. &ldquo;14 Memorial Road&rdquo; or &ldquo;12 Carrington Road&rdquo;).
+                  </p>
+                </>
+              )}
             </div>
           ) : null}
         </div>

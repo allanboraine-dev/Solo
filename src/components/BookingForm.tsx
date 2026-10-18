@@ -225,6 +225,9 @@ export default function BookingForm({
                   const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                   setRealPickupCoords(coords);
                   setPickup(formatSelectedPlaceLabel(feature));
+                  if (feature.houseNumber && !pickupDetail) {
+                    setPickupDetail(`House #${feature.houseNumber}`);
+                  }
                   onLocationSelect('pickup', coords.lat, coords.lng);
                 }}
               />
@@ -265,6 +268,9 @@ export default function BookingForm({
                   const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                   setRealDropoffCoords(coords);
                   setDropoff(formatSelectedPlaceLabel(feature));
+                  if (feature.houseNumber && !dropoffDetail) {
+                    setDropoffDetail(`House #${feature.houseNumber}`);
+                  }
                   onLocationSelect('dropoff', coords.lat, coords.lng);
                 }}
               />
