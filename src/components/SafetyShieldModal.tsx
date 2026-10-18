@@ -67,7 +67,10 @@ export function SafetyFloatingButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        audioAlert.unlockMobileAudio(false);
+        onClick();
+      }}
       aria-label="Open SOLO South Africa Rapid-Response Safety & Panic Shield"
       className={`group flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider shadow-2xl border transition-all active:scale-95 pointer-events-auto touch-manipulation ${
         hasActiveAlert
@@ -126,43 +129,24 @@ export default function SafetyShieldModal({
     if (isOpen) {
       setContacts(getTrustedContacts(role));
       setSirenActive(audioAlert.isDeterrentSirenRunning() || emergencySiren.isRunning());
+      try {
+        if (sirenAudioRef.current && sirenAudioRef.current.paused) {
+          sirenAudioRef.current.load();
+        }
+      } catch {
+        // Ignore
+      }
     }
   }, [isOpen, role]);
 
   const startSirenPlayback = () => {
-    // 1. Play preloaded DOM <audio src="/siren.wav"> directly inside user tap gesture
-    try {
-      const el = sirenAudioRef.current;
-      if (el) {
-        el.volume = 1.0;
-        el.muted = false;
-        el.loop = true;
-        el.currentTime = 0;
-        const p = el.play();
-        if (p && typeof p.catch === "function") {
-          p.catch(() => {});
-        }
-      }
-    } catch {
-      // Ignore
-    }
-
-    // 2. Start shared unlocked Web Audio 16-step siren wail + Base64 WAV loop in audioAlert
-    audioAlert.startDeterrentSiren();
+    // Play preloaded DOM <audio src="/siren.wav"> + shared Web Audio 16-step discrete siren wail
+    audioAlert.startDeterrentSiren(sirenAudioRef.current);
     setSirenActive(true);
   };
 
   const stopSirenPlayback = () => {
-    try {
-      const el = sirenAudioRef.current;
-      if (el) {
-        el.pause();
-        el.currentTime = 0;
-      }
-    } catch {
-      // Ignore
-    }
-    audioAlert.stopDeterrentSiren();
+    audioAlert.stopDeterrentSiren(sirenAudioRef.current);
     emergencySiren.stop();
     setSirenActive(false);
   };
@@ -211,7 +195,7 @@ export default function SafetyShieldModal({
 
       setActiveIncident(incident);
 
-      // If not in silent duress mode, trigger loud deterrent siren & vibration on mobile
+      // Ensure siren remains active if not in silent duress mode
       if (!silentDuress) {
         startSirenPlayback();
       }
@@ -265,31 +249,20 @@ export default function SafetyShieldModal({
     setContacts(updated);
   };
 
-  if (!isOpen) {
-    return (
-      <audio
-        ref={sirenAudioRef}
-        src="/siren.wav"
-        loop
-        preload="auto"
-        playsInline
-        className="hidden"
-      />
-    );
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      {/* Preloaded native DOM audio element for instant mobile speaker playback on tap */}
+    <>
+      {/* Persistent native DOM audio element (never unmounted when isOpen toggles) */}
       <audio
         ref={sirenAudioRef}
         src="/siren.wav"
         loop
         preload="auto"
         playsInline
-        className="hidden"
+        className="w-0 h-0 opacity-0 pointer-events-none absolute"
       />
-      <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-lg shadow-2xl border border-red-500/30 dark:border-red-500/40 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] max-h-[92dvh] flex flex-col">
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-lg shadow-2xl border border-red-500/30 dark:border-red-500/40 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] max-h-[92dvh] flex flex-col">
         {/* Top Security Header */}
         <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-700 text-white p-4 sm:p-5 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -464,6 +437,9 @@ export default function SafetyShieldModal({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!silentDuress) {
+                            startSirenPlayback();
+                          }
                           setCountdown(null);
                           executePanicDispatch();
                         }}
@@ -473,7 +449,10 @@ export default function SafetyShieldModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setCountdown(null)}
+                        onClick={() => {
+                          setCountdown(null);
+                          stopSirenPlayback();
+                        }}
                         className="px-4 py-3 bg-black/30 hover:bg-black/50 text-white font-bold rounded-xl text-xs"
                       >
                         Cancel
@@ -485,7 +464,11 @@ export default function SafetyShieldModal({
                     type="button"
                     disabled={isDispatching}
                     onClick={() => {
-                      audioAlert.unlockMobileAudio(!silentDuress);
+                      if (!silentDuress) {
+                        startSirenPlayback();
+                      } else {
+                        audioAlert.unlockMobileAudio(false);
+                      }
                       setCountdown(3);
                     }}
                     className="w-full py-5 px-6 rounded-3xl bg-gradient-to-r from-red-600 via-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.99] text-white font-black text-base sm:text-lg tracking-tight shadow-2xl shadow-red-600/40 border border-red-400/40 flex flex-col items-center justify-center gap-1 transition"
@@ -731,8 +714,10 @@ export default function SafetyShieldModal({
               )}
             </div>
           )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
