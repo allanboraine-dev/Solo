@@ -141,12 +141,15 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="pt-8 border-t border-gray-200/60 dark:border-white/10 text-center">
+        <footer className="pt-8 border-t border-gray-200/60 dark:border-white/10 text-center space-y-1">
           <p className="text-xs md:text-sm font-semibold tracking-wider uppercase text-gray-500 dark:text-gray-400">
-            Designed and Developed by{" "}
+            Designed, Built & Maintained by{" "}
             <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
-              BORAINE TECH
+              Boraine Tech (Pty) Ltd
             </span>
+          </p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">
+            &copy; {new Date().getFullYear()} Boraine Tech (Pty) Ltd • All Rights Reserved
           </p>
         </footer>
       </main>

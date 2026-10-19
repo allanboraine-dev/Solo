@@ -337,8 +337,8 @@ export default function AdminLoginPage() {
 
       {/* Footer Info */}
       <div className="mt-8 text-center text-[11px] text-zinc-500 space-y-1">
-        <p>SOLO Commercial Ride-Hailing Platform &copy; {new Date().getFullYear()}</p>
-        <p>Strictly for authorized operations managers and compliance reviewers.</p>
+        <p>SOLO Commercial Ride-Hailing Platform &copy; {new Date().getFullYear()} Boraine Tech (Pty) Ltd</p>
+        <p>Built and engineered by Boraine Tech (Pty) Ltd for authorized operations managers.</p>
       </div>
     </div>
   );

@@ -138,8 +138,8 @@ export default function TripReceiptPage() {
                 Zero Commission Platform
               </span>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">SOLO Technologies South Africa (Pty) Ltd</p>
-            <p className="text-xs text-zinc-500">Reg No: 2024/782910/07 • Cape Town, South Africa</p>
+            <p className="text-xs text-zinc-500 mt-1">Platform Built & Operated by Boraine Tech (Pty) Ltd</p>
+            <p className="text-xs text-zinc-500">Cape Town, South Africa</p>
           </div>
 
           <div className="text-left sm:text-right">
@@ -251,7 +251,7 @@ export default function TripReceiptPage() {
 
         {/* Footer */}
         <div className="text-center text-[10px] text-zinc-400 pt-4 border-t border-zinc-200">
-          Thank you for riding with SOLO • Zero Commission E-Hailing • www.solo-app.co.za
+          Thank you for riding with SOLO • Zero Commission E-Hailing • Built by Boraine Tech (Pty) Ltd • www.solo-app.co.za
         </div>
       </div>
     </div>

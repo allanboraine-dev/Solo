@@ -9,7 +9,7 @@
 
 ## Executive Summary & Core Philosophy
 
-**SOLO** is an enterprise-grade, peer-to-peer digital e-hailing platform engineered specifically for the South African transport ecosystem. Unlike traditional legacy aggregator platforms that deduct between 20% and 30% commission from driver earnings and lock earnings in platform escrow, SOLO operates on a **Pure Zero-Commission Model (0.0% Take-Rate)** with **Direct In-Vehicle Trip Settlement**.
+**SOLO** is an enterprise-grade, peer-to-peer digital e-hailing platform engineered and built by **Boraine Tech (Pty) Ltd** specifically for the South African transport ecosystem. Unlike traditional legacy aggregator platforms that deduct between 20% and 30% commission from driver earnings and lock earnings in platform escrow, SOLO operates on a **Pure Zero-Commission Model (0.0% Take-Rate)** with **Direct In-Vehicle Trip Settlement**.
 
 ```
 +-------------------------------------------------------------+
@@ -452,4 +452,4 @@ Discovery Bank     679000        10 digits        Paystack NUBAN / EFT
 - **Information Regulator South Africa (POPIA Compliance):** `complaints.IR@justice.gov.za`
 
 ---
-*SOLO Platform Operating Manual — Copyright © 2026 SOLO Mobility Technologies (Pty) Ltd. All Rights Reserved.*
+*SOLO Platform Operating Manual — Copyright © 2026 Boraine Tech (Pty) Ltd. All Rights Reserved. Built and engineered by Boraine Tech (Pty) Ltd.*

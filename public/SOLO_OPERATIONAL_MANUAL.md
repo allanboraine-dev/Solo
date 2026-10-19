@@ -1,15 +1,15 @@
 # SOLO PLATFORM OPERATIONAL MANUAL
 ### Standard Operating Procedures (SOP) & Platform Guidelines
 **Jurisdiction:** Republic of South Africa  
-**Applicable Statutes:** National Land Transport Act (Act No. 5 of 2009), Protection of Personal Information Act (POPIA Act No. 4 of 2013), Value-Added Tax Act (Act No. 89 of 1991), Consumer Protection Act (Act No. 68 of 2008)  
-**Document Version:** 2.0 (High-Concurrency & Operational Master Release)  
+**Applicable Statutes:** National Land Transport Act (Act No. 5 of 2009), Protection of Personal Information Act (POPIA Act No. 4 of 2013), Value-Added Tax Act (Act No. 89 of 1991), Consumer Protection Act (Act No. 68 of 2008), South African Reserve Bank (SARB) National Payment System Directives  
+**Document Version:** 2.1 (Direct In-Vehicle Fare Settlement & Security-Hardened Master Release)  
 **Classification:** Operational Policy & User Manual  
 
 ---
 
 ## Executive Summary & Core Philosophy
 
-**SOLO** is an enterprise-grade, peer-to-peer digital e-hailing platform engineered specifically for the South African transport ecosystem. Unlike traditional legacy aggregator platforms that deduct between 20% and 30% commission from driver earnings, SOLO operates on a **Pure Zero-Commission Model (0.0% Take-Rate)**.
+**SOLO** is an enterprise-grade, peer-to-peer digital e-hailing platform engineered and built by **Boraine Tech (Pty) Ltd** specifically for the South African transport ecosystem. Unlike traditional legacy aggregator platforms that deduct between 20% and 30% commission from driver earnings and lock earnings in platform escrow, SOLO operates on a **Pure Zero-Commission Model (0.0% Take-Rate)** with **Direct In-Vehicle Trip Settlement**.
 
 ```
 +-------------------------------------------------------------+
@@ -17,24 +17,28 @@
 +-------------------------------------------------------------+
 |  Legacy Platforms:   R100 Fare --> Platform takes R25 - R30 |
 |                      Driver receives only R70 - R75         |
+|                      Platform holds funds; weekly payouts   |
 +-------------------------------------------------------------+
 |  SOLO Platform:      R100 Fare --> Driver receives R100.00  |
 |                      Platform takes: R0.00 (0.0%)           |
+|                      Paid DIRECTLY to Driver (Cash or POS)  |
 |                      Driver pays flat: R499.00 / month      |
 +-------------------------------------------------------------+
 ```
 
 ### Key Architectural Pillars
-1. **100% Fare Retention for Drivers:** Drivers retain 100% of the metered gross fare calculated per trip (R20 base fare + R10/km, subject to an R30 minimum fare threshold).
-2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly access fee of **R499.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking. Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access.
-3. **Single-Device Active Concurrency Policy:** Drivers must and can only be active online on ONE device at a time, enforcing physical driver authentication, preventing account credential sharing, and protecting passenger safety.
-4. **Multi-Driver Ride Availability on Decline:** When a driver declines a ride request, the trip remains in the active dispatch pool for all other nearby registered online drivers, ensuring riders are never stranded.
-5. **Native Device Notification Alerts & Dispatch Acoustic Chime:** Integrates with native mobile device notification settings allowing drivers to set their own alert tones directly on their smartphone, accompanied by synthesized acoustic chimes and tactile haptic vibration.
-6. **South African Banking Integration:** Direct bank payout recipient creation using standard 6-digit South African universal clearing branch codes (FNB, Standard Bank, Capitec, Nedbank, ABSA, Investec, TymeBank, African Bank, Discovery).
-7. **Mandatory 4-Digit Anti-Impersonation PIN:** Every trip requires real-time physical confirmation of a cryptographic 4-digit PIN between rider and driver before the trip state transitions to `in_progress`.
-8. **SARS Tax & NLTA Regulatory Transparency:** Built-in automated tax invoicing complying with SARS Section 11(2) statutory disclosures, and strict document verification matching South African National Land Transport regulations (PrDP and Roadworthy certification).
-9. **Zero-Cost WhatsApp Click-to-Verify Authentication:** Seamless rider onboarding via deep-linked WhatsApp verification (`wa.me`) with zero reliance on paid SMS gateways.
-10. **Network Dead-Zone & Mobile Browser Optimization:** Progressive Web Application (PWA) optimized for Android Chrome, Samsung Internet browser, and iOS Safari, with Mapbox tile caching, offline incident protocols, and emergency telephonic speed-dials (`10111`, `10177`, `112`).
+1. **100% Direct Fare Retention for Drivers:** Drivers retain 100% of the metered gross fare calculated per trip (R20 base fare + R10/km, subject to an R30 minimum fare threshold). Fares are collected **directly by the driver from the passenger in the vehicle** via **Cash** or **In-Vehicle Mobile Card Machine / Speedpoint** (or optional in-app card settlement).
+2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly platform access fee of **R499.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking. Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access.
+3. **Hardware Payment Freedom:** Drivers are free to use any portable South African point-of-sale card machine (Yoco, iKhokha, Nedbank PocketPOS, Capitec, ABSA/FNB speedpoint) or accept physical cash (ZAR banknotes and coins). SOLO never withholds driver funds in platform escrow.
+4. **Single-Device Active Concurrency Policy:** Drivers must and can only be active online on ONE device at a time, enforcing physical driver authentication, preventing account credential sharing, and protecting passenger safety.
+5. **Multi-Driver Ride Availability on Decline:** When a driver declines a ride request, the trip remains in the active dispatch pool for all other nearby registered online drivers, ensuring riders are never stranded.
+6. **Native Device Notification Alerts & Dispatch Acoustic Chime:** Integrates with native mobile device notification settings allowing drivers to set their own alert tones directly on their smartphone, accompanied by synthesized acoustic chimes and tactile haptic vibration.
+7. **South African Banking Integration:** Direct bank payout recipient creation using standard 6-digit South African universal clearing branch codes (FNB, Standard Bank, Capitec, Nedbank, ABSA, Investec, TymeBank, African Bank, Discovery) for driver speedpoint settlements and subscription management.
+8. **Mandatory 4-Digit Anti-Impersonation PIN:** Every trip requires real-time physical confirmation of a cryptographic 4-digit PIN between rider and driver before the trip state transitions to `in_progress`.
+9. **SARS Tax & NLTA Regulatory Transparency:** Built-in automated tax invoicing complying with SARS Section 11(2) statutory disclosures (logging cash, card machine, or digital payment methods), and strict document verification matching South African National Land Transport regulations (PrDP and Roadworthy certification).
+10. **Zero-Cost WhatsApp Click-to-Verify Authentication:** Seamless rider onboarding via deep-linked WhatsApp verification (`wa.me`) with zero reliance on paid SMS gateways.
+11. **POPIA Compliance & Cryptographic Security Architecture:** Cryptographically signed administrative session cookies (`s:<payload>.<sig>`), strict Row Level Security (RLS) over driver KYC documentation, telephone number masking on real-time geohash broadcasts, and authenticated SOS distress logging.
+12. **Network Dead-Zone & Mobile Browser Optimization:** Progressive Web Application (PWA) optimized for Android Chrome, Samsung Internet browser, and iOS Safari, with Mapbox tile caching, offline incident protocols, and emergency telephonic speed-dials (`10111`, `10177`, `112`).
 
 ---
 
@@ -46,28 +50,28 @@
    - 1.4 Driver Matching, 15km PostGIS Radius & Multi-Driver Decline Availability
    - 1.5 Boarding Safety & The 4-Digit Security PIN
    - 1.6 In-Trip Experience & Live Chat
-   - 1.7 Payment Settlement & Card Security
+   - 1.7 In-Vehicle Direct Payment Settlement (Cash, Card Machine & In-App Card)
    - 1.8 Tax Invoices & Downloadable PDF Receipts
    - 1.9 Emergency Protocol & Cellular Dead-Zone Safety
 2. [Section B: Driver Operations & Partner Guide](#section-b-driver-operations--partner-guide)
    - 2.1 Driver Onboarding & Statutory Requirements (NLTA)
    - 2.2 KYC Document Submission Protocol & System Resilience
    - 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
-   - 2.4 South African Banking Setup & Universal Clearing Codes
+   - 2.4 South African Banking Setup & Mobile Card Machine Integration
    - 2.5 Single-Device Active Concurrency Enforcement
    - 2.6 Daily Operating Routine & Trip Rejection Handling
    - 2.7 Driver Notification Alerts & Native Mobile Device Sound Customization
    - 2.8 Mobile Ergonomics & Samsung Internet Optimization
-   - 2.9 Arrival, Rider Identification & PIN Validation
-   - 2.10 Fare Structure & Zero Commission Economics
+   - 2.9 Arrival, Rider Identification, PIN Validation & Direct Payment Collection
+   - 2.10 Fare Structure, Zero Commission Economics & Direct Cash/Card Liquidity
    - 2.11 Vehicle Standards & Regulatory Inspections
    - 2.12 Driver Tax Guidance (SARS Independent Contractor)
 3. [Section C: Administrator Operations & Governance](#section-c-administrator-operations--governance)
-   - 3.1 Administrative Access & Security Architecture
+   - 3.1 Administrative Access, Cryptographic Sessions & Security Architecture
    - 3.2 Driver Compliance & Document Review Engine (`/admin/compliance`)
    - 3.3 Verification Decision Matrix & Statutory Rejection Codes
    - 3.4 Interactive Dual-Window Simulator (`/admin/simulator`)
-   - 3.5 Paystack Webhook Telemetry & Financial Audits
+   - 3.5 Paystack SaaS Billing Telemetry & Webhook Security
    - 3.6 PostGIS Geospatial Engine, Concurrency & Proximity Matching
    - 3.7 Web Push Notification Infrastructure
    - 3.8 Dispute Resolution, Fraud Prevention & Incident Escalation
@@ -131,8 +135,26 @@ SOLO integrates Mapbox Commercial Geocoding and Matrix Routing, designed specifi
 - **Live Telematics:** Track your vehicle along the optimal route with turn-by-turn progression.
 - **In-App Encrypted Chat:** Coordinate pickup details (e.g. *"Waiting at gate 2 opposite the pharmacy"*) with real-time delivery and message deduplication.
 
-### 1.7 Payment Settlement & Card Security
-Payments are processed via Paystack's bank-grade 256-bit SSL encrypted gateway supporting 3D-Secure Visa, Mastercard, and Instant EFT. Fare charges are authorized on booking and settled upon physical trip completion.
+### 1.7 In-Vehicle Direct Payment Settlement (Cash, Card Machine & In-App Card)
+In accordance with SOLO's pure 0% commission philosophy, **riders pay the driver directly** upon arrival at the destination. SOLO does not intercept or hold trip funds in platform escrow, eliminating middleman platform markups:
+
+1. **Option 1: Cash (ZAR Banknotes & Coins):**
+   - Riders can settle the exact metered fare in South African Rand banknotes and coins.
+   - Drivers carry standard float change for round-figure denominations (e.g. tendering change for R100 or R200 banknotes).
+   - Once cash is handed to the driver, the driver confirms receipt on their terminal and marks the trip completed.
+
+2. **Option 2: In-Vehicle Mobile Card Machine / Speedpoint (Tap to Pay / Chip & PIN):**
+   - Drivers operate portable mobile card machines (speedpoints) such as **Yoco Go / Neo**, **iKhokha Mover / Pro**, **Nedbank PocketPOS**, **Capitec**, **ABSA**, or **FNB speedpoints**.
+   - Riders can settle using any South African or international debit or credit card (Visa, Mastercard, American Express).
+   - **Contactless & Mobile Wallets Supported:** Drivers' mobile terminals support NFC Tap to Pay, Apple Pay, Google Wallet, Samsung Pay, and Garmin Pay directly from your smartphone or smartwatch.
+   - Once the card machine prints or displays "Approved", the driver confirms payment on the SOLO driver app.
+
+3. **Option 3: In-App Digital Card Settlement (Paystack Fallback):**
+   - For riders preferring completely in-app digital settlement, payments are processed via Paystack's bank-grade 256-bit SSL encrypted gateway supporting 3D-Secure authentication and Instant EFT.
+   - In-app payment amounts are verified server-side against the exact database trip fare before the ride status is finalized.
+
+> [!NOTE]
+> Regardless of whether you pay by Cash, Mobile Card Machine, or In-App Card, you receive the exact same non-surge metered trip price with zero platform markup and an immediate SARS Section 11(2) compliant tax invoice at `/receipt/[tripId]`.
 
 ### 1.8 Tax Invoices & Downloadable PDF Receipts
 Upon trip completion, riders immediately receive access to a SARS Section 11(2) compliant tax invoice at `/receipt/[tripId]`. Features include:
@@ -179,20 +201,30 @@ SOLO replaces predatory percentage commissions with a transparent, predictable f
 - **Monthly Subscription:** After 7 days, platform access is maintained for **R499.00 per month** billed automatically via Paystack.
 - **Platform Founder & Lifetime Exemption Policy:** Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access to SOLO Driver Pro with zero subscription charges and permanent 0% commission.
 
-### 2.4 South African Banking Setup & Universal Clearing Codes
-SOLO automatically validates and populates the official 6-digit universal clearing branch codes for all major South African banking institutions:
-- **Standard Bank:** `051001` (9-11 digit account)
-- **First National Bank (FNB):** `250655` (10-11 digit account)
-- **Capitec Bank:** `470010` (10 digit account)
-- **Nedbank:** `198765` (10 digit account)
-- **ABSA Bank:** `632005` (10 digit account)
-- **Investec Bank:** `580105` (11 digit account)
-- **TymeBank:** `678910` (10 digit account)
-- **African Bank:** `430000` (10-11 digit account)
-- **Discovery Bank:** `679000` (10 digit account)
+### 2.4 South African Banking Setup & Mobile Card Machine Integration
+SOLO drivers are independent transport entrepreneurs who maintain full sovereignty over their earnings. The platform facilitates direct banking integration and recommends standard portable mobile card machines (speedpoints) for in-vehicle card payments:
+
+1. **South African Universal Clearing Codes:**
+   SOLO automatically validates and populates the official 6-digit universal clearing branch codes for all major South African banking institutions:
+   - **Standard Bank:** `051001` (9-11 digit account)
+   - **First National Bank (FNB):** `250655` (10-11 digit account)
+   - **Capitec Bank:** `470010` (10 digit account)
+   - **Nedbank:** `198765` (10 digit account)
+   - **ABSA Bank:** `632005` (10 digit account)
+   - **Investec Bank:** `580105` (11 digit account)
+   - **TymeBank:** `678910` (10 digit account)
+   - **African Bank:** `430000` (10-11 digit account)
+   - **Discovery Bank:** `679000` (10 digit account)
+
+2. **Recommended Mobile Card Machines (In-Vehicle Speedpoints):**
+   Drivers can acquire any accredited, portable South African card machine to receive card payments directly from passengers in the vehicle:
+   - **Yoco (Yoco Go, Neo, or Khumo):** Instant setup, Bluetooth/standalone SIM, deposits directly into your South African bank account within 1-2 business days.
+   - **iKhokha (Mover Pro, Flyer):** Standalone 4G/Wi-Fi speedpoint with built-in thermal receipt printer or digital SMS slips.
+   - **Nedbank PocketPOS / Capitec POS / ABSA / FNB Speedpoint:** Bank-issued mobile terminals linking directly to your business account.
+   - All terminals support EMV Chip & PIN, Visa, Mastercard, American Express, and contactless Tap to Pay (Apple Pay, Google Pay, Samsung Pay).
 
 > [!NOTE]
-> Bank accounts are masked in all views (`••••••4829`) to preserve POPIA privacy. Account holder name must match the driver's registered legal identity.
+> Bank accounts are masked across all views (`••••••4829`) to preserve POPIA privacy. Account holder name must match the driver's registered legal identity. Platform SaaS subscription fees (R499/mo) are managed via Paystack debit against this profile.
 
 ### 2.5 Single-Device Active Concurrency Enforcement
 To prevent fraudulent account sharing, phantom driver tracking, and multi-phone confusion, SOLO strictly enforces a **Single-Device Active Duty Rule**:
@@ -239,23 +271,44 @@ The SOLO Driver interface is optimized for in-vehicle mounting on modern smartph
 - **Samsung Internet & Dynamic Viewport Units (`dvh`):** Layouts use dynamic viewport calculations so browser address bars and Samsung One UI navigation pills never occlude dispatch cards or action buttons.
 - **Collapsible Radar Sheet:** Swipe down to view the full-screen GPS dispatch radar, or swipe up to inspect earnings and trip history.
 
-### 2.9 Arrival, Rider Identification & PIN Validation
+### 2.9 Arrival, Rider Identification, PIN Validation & Direct Payment Collection
 1. **Navigate to Pickup:** Follow live routing to the passenger's pickup pin.
-2. **Tap "I Have Arrived":** When within 50 meters, tap **"I Have Arrived"** to trigger a passenger push alert.
-3. **Verify Passenger & Request PIN:** Greet the passenger and ask: *"Please provide your 4-digit SOLO safety PIN."*
-4. **Enter PIN:** Type the 4 digits into your terminal.
-   - If verified: The meter starts and navigation to destination begins.
-   - If incorrect: Re-confirm with the passenger.
-5. **Complete Trip:** Upon reaching the destination, tap **"Complete Trip"**. Paystack automatically charges the passenger, crediting 100% of the fare to you.
+2. **Tap "I Have Arrived":** When within 50 meters, tap **"I Have Arrived"** to trigger an automatic passenger push alert.
+3. **Verify Passenger & Request PIN:** Greet the passenger and request: *"Please provide your 4-digit SOLO safety PIN."*
+4. **Enter PIN:** Type the 4 digits into your driver terminal:
+   - If verified: The meter starts and turn-by-turn navigation to the destination begins.
+   - If incorrect: Re-confirm with the passenger. The meter will not start without cryptographic PIN validation.
+5. **Destination Arrival & Direct Fare Collection Protocol:**
+   - Upon bringing the vehicle to a safe halt at the destination, tap **"Arrived at Destination"**.
+   - The driver terminal displays the exact gross metered fare (e.g. **R82.00**) and prompts for payment confirmation.
+   - **Step-by-Step Payment Collection by Method:**
+     - **If Passenger Pays by Cash:**
+       1. Request the metered amount from the passenger.
+       2. Receive cash banknotes and tender change from your cash float if required.
+       3. Tap **"Cash Payment Received"** on your screen.
+     - **If Passenger Pays by In-Vehicle Card Machine / Speedpoint:**
+       1. Key the trip fare (e.g. R82.00) into your portable card machine (Yoco, iKhokha, Nedbank PocketPOS, etc.).
+       2. Present the speedpoint to the passenger to tap or insert their bank card, or tap their smartphone (Apple Pay / Google Wallet / Samsung Pay).
+       3. Once your card machine displays **"Approved"** or prints the merchant slip, tap **"Card Machine Payment Received"** on your screen.
+     - **If Passenger Uses In-App Card Settlement:**
+       1. For trips pre-selected for digital in-app payment, the transaction is processed via Paystack and verified against the database fare.
+   - **Tap "Complete Trip":** The trip state transitions to `completed`, releasing your vehicle back to `available` status for the next dispatch. The passenger immediately receives their digital SARS tax invoice at `/receipt/[tripId]`.
 
-### 2.10 Fare Structure & Zero Commission Economics
-SOLO uses a standardized, non-surge fare structure designed to maintain steady rider demand while maximizing driver profit:
+### 2.10 Fare Structure, Zero Commission Economics & Direct Cash/Card Liquidity
+SOLO operates on a standardized, non-surge fare structure designed to maintain strong passenger demand while maximizing driver net take-home earnings:
 - **Base Flag-Fall Fare:** R20.00
 - **Rate per Kilometer:** R10.00 / km
 - **Minimum Trip Fare:** R30.00
 - **Platform Take-Rate:** **R0.00 (0.0% Commission)**
 
-$$\text{Driver Payout per Trip} = \text{Total Fare Charged to Rider}$$
+$$\text{Driver Earnings per Trip} = 100\% \times \text{Metered Fare Charged to Passenger}$$
+
+#### Immediate Liquidity Advantage:
+- **Zero Commission Deductions:** Unlike legacy e-hailing apps that deduct 25% or more from every trip, you keep every single Rand of the fare.
+- **Immediate Cash in Hand:** Cash payments stay 100% in your wallet immediately with zero delays, zero platform processing fees, and zero banking transfer charges.
+- **Direct Card Machine Deposits:** Payments collected through your mobile card machine (Yoco, iKhokha, or bank POS) deposit directly into your designated South African bank account under your card provider's schedule (e.g., next business day), completely bypassing platform escrow.
+- **No Escrow Withholding or Payout Delays:** SOLO does not hold your trip money in platform escrow, eliminating payout disputes, weekly payout delays, or arbitrary payment freezes.
+- **Predictable Fixed Cost:** Your only platform cost is the flat **R499.00 / month** SaaS subscription fee (free for the first 7 days, and permanently free for platform founder Allan Boraine).
 
 ### 2.11 Vehicle Standards & Regulatory Inspections
 Partner vehicles must comply with South African passenger transport standards:
@@ -281,12 +334,24 @@ SOLO driver partners operate as independent micro-entrepreneurs under South Afri
 
 # Section C: Administrator Operations & Governance
 
-### 3.1 Administrative Access & Security Architecture
-The SOLO Administration suite provides central oversight of fleet compliance, geospatial dispatch parameters, financial reconciliation, and dispute resolution.
+### 3.1 Administrative Access, Cryptographic Sessions & Security Architecture
+The SOLO Administration suite provides central oversight of fleet compliance, geospatial dispatch parameters, financial reconciliation, and dispute resolution, fortified by enterprise-grade cryptographic security:
 - **Primary Routes:**
   - Compliance Engine: `/admin/compliance`
   - Dual-Window Simulator: `/admin/simulator`
-- **Access Control:** Restricted via Supabase Row-Level Security (RLS) and JWT claims (`app_metadata.role === 'admin'`).
+- **HMAC-SHA256 Signed Session Cookies:**
+  - Admin authentication does not rely on easily forged client state. Administrative cookies are formatted as cryptographically signed tokens `s:<payload>.<sig>` using a secret HMAC-SHA256 signing key (`adminAuth.ts`).
+  - Tampered, expired, or unsigned cookies are rejected immediately with HTTP 401 Unauthorized.
+- **Administrative Email Allowlist Domain Enforcement:**
+  - Administrative session creation is restricted to authorized email identities (`isAuthorizedAdminEmail`), strictly preventing unauthorized privilege elevation even if authentication credentials are leaked. Platform founder Allan Boraine (`allanboraine@gmail.com`) is permanently authorized.
+- **POPIA-Compliant Row-Level Security (RLS):**
+  - Supabase database tables and the `driver-documents` storage bucket enforce strict Row-Level Security under the Protection of Personal Information Act (POPIA Act No. 4 of 2013). Drivers can only access their own documents, while only authenticated administrators can view applicant records via ephemeral 1-hour signed URLs (`createSignedUrl(path, 3600)`).
+- **Public WebSocket Telemetry & Telematics Privacy:**
+  - Live driver location broadcasts over WebSocket channels mask driver mobile numbers (`082***4567`), eliminating eavesdropping or telematics surveillance risks.
+- **SOS & Safety Distress Access Control:**
+  - Emergency SOS monitoring endpoints (`/api/safety/sos`) require valid administrative authentication (`validateAdminRequest`), safeguarding passenger and driver distress telemetry against unauthorized scraping.
+- **Trip Completion & Driver Authorization Guards:**
+  - Endpoints concluding rides (`/api/trips/complete`) strictly verify driver session authorization (`validateDriverAuthorization`), block replay attempts on already completed trips, and ensure ride states transition predictably.
 
 ### 3.2 Driver Compliance & Document Review Engine (`/admin/compliance`)
 The compliance dashboard displays real-time applicant telemetry:
@@ -318,14 +383,17 @@ The built-in diagnostic simulator enables developers and compliance staff to tes
 3. **Speed Multipliers:** Run tests at **1x (Real-Time)**, **2x (Accelerated)**, or **5x (Rapid Validation)**.
 4. **5-Minute Telematics Expiration (TTL):** Only drivers with fresh telemetry within the last 5 minutes appear on the rider radar, preventing phantom vehicles.
 
-### 3.5 Paystack Webhook Telemetry & Financial Audits
+### 3.5 Paystack SaaS Billing Telemetry & Webhook Security
+While individual trip fares are paid directly to drivers via cash or mobile card machines in the vehicle, the platform utilizes Paystack exclusively for the driver flat **R499.00/month** SaaS subscription and optional digital in-app card settlements.
+
 Billing operations are verified cryptographically at `/api/paystack-webhook` using HMAC SHA512 signatures:
 $$\text{Signature} = \text{HMAC-SHA512}\left(\text{Payload Body}, \text{PAYSTACK\_SECRET\_KEY}\right)$$
+
 Monitored events:
-- `charge.success`: Trip fare captured.
 - `subscription.create`: R499/mo SaaS plan initiated following 7-day trial.
 - `subscription.disable`: Subscription paused or cancelled; driver set to `inactive`.
 - `invoice.payment_failed`: Billing error; 48-hour grace period initiated before suspension.
+- `charge.success`: Trip fare captured for optional in-app digital settlements, verified against database fare amounts via `/api/verify-trip-payment`.
 
 ### 3.6 PostGIS Geospatial Engine, Concurrency & Proximity Matching
 Matching runs on PostgreSQL PostGIS using spatial indexes and geodesic calculations:
@@ -384,4 +452,4 @@ Discovery Bank     679000        10 digits        Paystack NUBAN / EFT
 - **Information Regulator South Africa (POPIA Compliance):** `complaints.IR@justice.gov.za`
 
 ---
-*SOLO Platform Operating Manual — Copyright © 2026 SOLO Mobility Technologies (Pty) Ltd. All Rights Reserved.*
+*SOLO Platform Operating Manual — Copyright © 2026 Boraine Tech (Pty) Ltd. All Rights Reserved. Built and engineered by Boraine Tech (Pty) Ltd.*

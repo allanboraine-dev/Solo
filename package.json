@@ -1,6 +1,8 @@
 {
   "name": "solo-app",
   "version": "0.1.0",
+  "description": "SOLO — South Africa's Zero-Commission E-Hailing Platform, engineered and built by Boraine Tech (Pty) Ltd",
+  "author": "Boraine Tech (Pty) Ltd",
   "private": true,
   "scripts": {
     "dev": "next dev",
