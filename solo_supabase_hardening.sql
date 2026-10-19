@@ -262,9 +262,9 @@ CREATE POLICY "driver_profiles_select_policy" ON public.driver_profiles
 
 DROP POLICY IF EXISTS "driver_profiles_update_policy" ON public.driver_profiles;
 CREATE POLICY "driver_profiles_update_policy" ON public.driver_profiles
-    FOR UPDATE TO authenticated, anon
-    USING (id = (select auth.uid()) OR (select auth.uid()) IS NULL)
-    WITH CHECK (id = (select auth.uid()) OR (select auth.uid()) IS NULL);
+    FOR UPDATE TO authenticated
+    USING (id = (select auth.uid()))
+    WITH CHECK (id = (select auth.uid()));
 
 DROP POLICY IF EXISTS "trips_select_policy" ON public.trips;
 CREATE POLICY "trips_select_policy" ON public.trips

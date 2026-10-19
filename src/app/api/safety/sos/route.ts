@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { sendWebPushNotification } from '@/utils/webPush';
 import { getMemorySubscriptions } from '@/utils/pushStore';
 import { checkSosRateLimit } from '@/utils/rateLimit';
+import { validateAdminRequest } from '@/utils/adminAuth';
 
 // In-memory incident ring buffer for instant serverless fallback & control-room queries
 const recentSafetyIncidents: any[] = [];
@@ -197,7 +198,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = validateAdminRequest(req);
+  if (!auth.authorized) {
+    return NextResponse.json(
+      { error: 'Unauthorized: Administrative credentials required to view emergency dispatch logs', reason: auth.reason },
+      { status: 401 }
+    );
+  }
+
   return NextResponse.json({
     success: true,
     incidents: recentSafetyIncidents.slice(0, 30),

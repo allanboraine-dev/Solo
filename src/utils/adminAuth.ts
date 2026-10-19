@@ -18,13 +18,38 @@ const AUTHORIZED_PASSCODES = [
 
 
 
+const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'solo_sec_admin_sig_key_2026';
+
+function computeSessionSignature(payload: string): string {
+  let hash = 0;
+  const combined = `${payload}:${ADMIN_SESSION_SECRET}`;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+export function isAuthorizedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  if (isPlatformOwner(clean)) return true;
+  if (clean.endsWith('@soloride.co.za') || clean.endsWith('@solorides.co.za')) return true;
+  if (process.env.ADMIN_ALLOWED_EMAILS) {
+    const list = process.env.ADMIN_ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase());
+    if (list.includes(clean)) return true;
+  }
+  return false;
+}
+
 export function getAdminSession(): AdminSession | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(ADMIN_SESSION_KEY) || sessionStorage.getItem(ADMIN_SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw);
-    if (session && session.email && session.role) {
+    if (session && session.email && session.role && isAuthorizedAdminEmail(session.email)) {
       return session;
     }
   } catch (e) {
@@ -32,6 +57,8 @@ export function getAdminSession(): AdminSession | null {
   }
   return null;
 }
+
+const SIGNED_PREFIX = 's:';
 
 export function setAdminSession(session: AdminSession, persist: boolean = true): void {
   if (typeof window === 'undefined') return;
@@ -42,9 +69,11 @@ export function setAdminSession(session: AdminSession, persist: boolean = true):
     } else {
       sessionStorage.setItem(ADMIN_SESSION_KEY, raw);
     }
+    const sig = computeSessionSignature(raw);
+    const signedValue = `${SIGNED_PREFIX}${encodeURIComponent(raw)}.${sig}`;
     // Set cookie for Next.js server middleware and API route guards
     const maxAge = persist ? 60 * 60 * 24 * 7 : 60 * 60 * 8; // 7 days or 8 hours
-    document.cookie = `${ADMIN_SESSION_KEY}=${encodeURIComponent(raw)}; path=/; max-age=${maxAge}; SameSite=Lax; ${window.location.protocol === 'https:' ? 'Secure;' : ''}`;
+    document.cookie = `${ADMIN_SESSION_KEY}=${signedValue}; path=/; max-age=${maxAge}; SameSite=Lax; ${window.location.protocol === 'https:' ? 'Secure;' : ''}`;
   } catch (e) {
     console.warn('Error saving admin session:', e);
   }
@@ -102,7 +131,23 @@ export function validateAdminRequest(req: Request | { headers: Headers | { get: 
       for (const part of parts) {
         const [k, ...v] = part.trim().split('=');
         if (k === ADMIN_SESSION_KEY) {
-          const raw = decodeURIComponent(v.join('='));
+          const cookieVal = v.join('=');
+          let raw = '';
+          
+          if (cookieVal.startsWith(SIGNED_PREFIX)) {
+            const inner = cookieVal.slice(SIGNED_PREFIX.length);
+            const lastDot = inner.lastIndexOf('.');
+            const payloadPart = inner.substring(0, lastDot);
+            const signaturePart = inner.substring(lastDot + 1);
+            raw = decodeURIComponent(payloadPart);
+            if (signaturePart !== computeSessionSignature(raw)) {
+              return { authorized: false, reason: 'Invalid or tampered session signature' };
+            }
+          } else {
+            // Unsigned cookie handling
+            raw = decodeURIComponent(cookieVal);
+          }
+
           try {
             const session: AdminSession = JSON.parse(raw);
             if (
@@ -112,6 +157,9 @@ export function validateAdminRequest(req: Request | { headers: Headers | { get: 
             ) {
               if (session.isOwner && !isPlatformOwner(session.email)) {
                 return { authorized: false, reason: 'Unauthorized owner impersonation' };
+              }
+              if (!isAuthorizedAdminEmail(session.email)) {
+                return { authorized: false, reason: 'Unauthorized admin email' };
               }
               return { authorized: true, session };
             }

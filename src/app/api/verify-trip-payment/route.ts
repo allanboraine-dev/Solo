@@ -45,11 +45,33 @@ async function verifyTransaction(reference: string, clientTripId?: string) {
   const resolvedTripId = txData.metadata?.trip_id || clientTripId
 
   if (resolvedTripId) {
+    // Fare amount validation: Ensure paid amount matches or exceeds trip fare in cents
+    try {
+      const { data: trip } = await supabase
+        .from('trips')
+        .select('fare_amount')
+        .eq('id', resolvedTripId)
+        .maybeSingle();
+
+      if (trip?.fare_amount) {
+        const expectedCents = Math.round(Number(trip.fare_amount) * 100);
+        if (txData.amount < expectedCents) {
+          return {
+            success: false,
+            error: `Insufficient payment: Amount paid (${txData.amount / 100} ZAR) is less than trip fare (${trip.fare_amount} ZAR)`,
+            status: 400,
+          };
+        }
+      }
+    } catch (fareCheckErr) {
+      console.warn('Fare check warning during payment verification:', fareCheckErr);
+    }
+
     // Mark trip completed in Supabase database (both SECURITY DEFINER RPC + direct update)
     try {
       await supabase.rpc('complete_trip', {
         p_trip_id: resolvedTripId,
-        p_payment_method: 'cash',
+        p_payment_method: 'in_app',
       })
 
       const { error: dbError } = await supabase

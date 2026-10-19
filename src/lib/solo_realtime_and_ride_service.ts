@@ -227,7 +227,7 @@ export class SoloLocationEngine {
           isAvailable,
           isOnline,
           fullName,
-          phone,
+          phone: tripId && phone ? (phone.length > 4 ? `••••••${phone.slice(-4)}` : phone) : undefined,
           vehicleMake,
           vehicleModel,
           vehicleYear,

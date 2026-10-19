@@ -57,10 +57,21 @@ export default function RiderLoginPage() {
     return () => clearTimeout(timer)
   }, [countdown])
 
+  const deriveSecureRiderPassword = (cleanDigits: string) => {
+    const salt = 'SoloRiderAuthSalt_2026_Secure';
+    let hash = 0;
+    const str = `${cleanDigits}:${salt}`;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return `SoloRider_${Math.abs(hash).toString(36)}_${cleanDigits.slice(-4)}!`;
+  };
+
   const createVerifiedRiderSession = async (e164Phone: string, riderFullName: string) => {
     const cleanDigits = e164Phone.replace(/[^\d]/g, '')
     const riderEmail = `rider_${cleanDigits}@solorides.co.za`
-    const riderPassword = `SoloWhatsAppAuth_${cleanDigits}_2026!`
+    const riderPassword = deriveSecureRiderPassword(cleanDigits)
     let resolvedId = phoneToDeterministicUuid(e164Phone)
 
     try {

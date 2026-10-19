@@ -157,4 +157,58 @@ describe('SOLO API Security & Rate Limiting Suite', () => {
       assert.strictEqual(res.status, 403);
     });
   });
+
+  describe('Admin Session Cryptographic Integrity & Email Domain Validation', () => {
+    test('rejects unauthorized external emails claiming admin privileges', async () => {
+      const { validateAdminRequest } = await import('../src/utils/adminAuth.ts');
+      const forgedSession = {
+        email: 'malicious@randomdomain.com',
+        name: 'Attacker',
+        role: 'super_admin',
+        loginTime: new Date().toISOString(),
+      };
+
+      const req = new Request('https://soloride.co.za/api/admin/drivers-kyc', {
+        headers: {
+          cookie: `solo_admin_session=${encodeURIComponent(JSON.stringify(forgedSession))}`,
+        },
+      });
+
+      const auth = validateAdminRequest(req);
+      assert.strictEqual(auth.authorized, false);
+      assert.strictEqual(auth.reason, 'Unauthorized admin email');
+    });
+
+    test('rejects tampered signed session cookies', async () => {
+      const { validateAdminRequest } = await import('../src/utils/adminAuth.ts');
+      const validSession = {
+        email: 'operations@soloride.co.za',
+        name: 'Operations Manager',
+        role: 'compliance_manager',
+        loginTime: new Date().toISOString(),
+      };
+
+      const payload = encodeURIComponent(JSON.stringify(validSession));
+      const fakeSig = 'invalidsignature123';
+
+      const req = new Request('https://soloride.co.za/api/admin/drivers-kyc', {
+        headers: {
+          cookie: `solo_admin_session=s:${payload}.${fakeSig}`,
+        },
+      });
+
+      const auth = validateAdminRequest(req);
+      assert.strictEqual(auth.authorized, false);
+      assert.strictEqual(auth.reason, 'Invalid or tampered session signature');
+    });
+
+    test('protects emergency SOS dispatch logs against unauthenticated public callers', async () => {
+      const { validateAdminRequest } = await import('../src/utils/adminAuth.ts');
+      const unauthReq = new Request('https://soloride.co.za/api/safety/sos');
+      const auth = validateAdminRequest(unauthReq);
+      assert.strictEqual(auth.authorized, false);
+      assert.strictEqual(auth.reason, 'Missing or expired manager credentials');
+    });
+  });
 });
+

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { validateDriverAuthorization } from '@/utils/apiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,32 @@ export async function POST(req: Request) {
     if (!supabase) {
       // In offline/dev environment without Supabase creds, return success so mock backend continues
       return NextResponse.json({ success: true, tripId, status: 'completed', offline: true });
+    }
+
+    // Authorization & State Verification
+    const { data: trip } = await supabase
+      .from('trips')
+      .select('id, driver_id, status, rider_id')
+      .eq('id', tripId)
+      .maybeSingle();
+
+    if (trip) {
+      if (trip.status === 'completed') {
+        return NextResponse.json({ success: true, tripId, status: 'completed', alreadyCompleted: true });
+      }
+      if (trip.status === 'cancelled') {
+        return NextResponse.json({ success: false, error: 'Cannot complete a cancelled trip' }, { status: 400 });
+      }
+      if (trip.driver_id) {
+        // Enforce that caller is the assigned driver or platform admin
+        const auth = await validateDriverAuthorization(req, trip.driver_id);
+        if (!auth.authorized) {
+          return NextResponse.json(
+            { success: false, error: 'Unauthorized: Only the assigned driver or platform admin can complete this trip' },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     // 1. Attempt complete_trip RPC

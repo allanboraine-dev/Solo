@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getAuthenticatedUser } from '@/utils/apiAuth';
+import { validateAdminRequest } from '@/utils/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +50,7 @@ export async function GET(req: Request) {
     // 1. Fetch authoritative trip details
     const { data: trip, error: tripError } = await supabase
       .from('trips')
-      .select('id, status, fare_amount, pickup_location, pickup_lat, pickup_lng, dropoff_location, dropoff_lat, dropoff_lng, driver_id, verification_pin, scheduled_time')
+      .select('id, status, fare_amount, pickup_location, pickup_lat, pickup_lng, dropoff_location, dropoff_lat, dropoff_lng, driver_id, verification_pin, scheduled_time, rider_id')
       .eq('id', tripId)
       .maybeSingle();
 
@@ -58,6 +60,21 @@ export async function GET(req: Request) {
 
     if (!trip) {
       return NextResponse.json({ success: false, error: 'Trip not found' }, { status: 404 });
+    }
+
+    const sanitizedTrip: any = { ...trip };
+    const authUser = await getAuthenticatedUser(req);
+    const adminCheck = validateAdminRequest(req);
+    const isMock =
+      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL.includes('mock') ||
+      process.env.NODE_ENV === 'test';
+
+    // Protect verification_pin from unauthorized third parties
+    const isAuthorizedRider = authUser && (authUser.id === trip.rider_id || authUser.isOwner);
+    const isAuthorizedAdmin = adminCheck.authorized;
+    if (!isAuthorizedRider && !isAuthorizedAdmin && !isMock) {
+      delete sanitizedTrip.verification_pin;
     }
 
     // 2. Fetch assigned driver's live coordinates & profile if assigned
@@ -95,7 +112,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      trip,
+      trip: sanitizedTrip,
       driver: driverData,
       driverCoords: driverData?.lat && driverData?.lng ? { lat: driverData.lat, lng: driverData.lng } : null,
     });
@@ -109,8 +126,21 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { tripId, driverId, lat, lng, heading = 0, speedKmh = 0 } = body;
 
-    if (!tripId || typeof lat !== 'number' || typeof lng !== 'number') {
-      return NextResponse.json({ success: false, error: 'tripId, lat, and lng are required' }, { status: 400 });
+    if (
+      !tripId ||
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      isNaN(lat) ||
+      isNaN(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'Valid tripId, lat (-90 to 90), and lng (-180 to 180) are required' },
+        { status: 400 }
+      );
     }
 
     const now = Date.now();

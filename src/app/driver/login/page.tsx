@@ -77,7 +77,7 @@ export default function DriverLogin() {
         // Fall through
       }
 
-      setError('Invalid password for Platform Owner. Please use your owner password (13579).')
+      setError('Invalid credentials for Platform Owner. Please verify your password.')
       setIsSubmitting(false)
       return
     }

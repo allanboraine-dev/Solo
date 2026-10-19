@@ -259,11 +259,41 @@ export const clearDriverActiveSession = (
 export const isDriverSessionPreempted = (
   driverId: string,
   myDeviceId: string,
-  customStorage?: { getItem: (k: string) => string | null }
+  customStorage?: { getItem: (k: string) => string | null },
+  remoteDeviceId?: string | null
 ): boolean => {
   if (!driverId || !myDeviceId) return false;
+  if (remoteDeviceId && remoteDeviceId !== myDeviceId) {
+    return true;
+  }
   const active = getDriverActiveSession(driverId, customStorage);
   if (!active) return false;
   return active.deviceId !== myDeviceId;
+};
+
+/**
+ * Synchronizes the driver's active device identifier with central telemetry to preempt other physical devices.
+ */
+export const syncDriverDeviceOnline = async (
+  driverId: string,
+  deviceId: string,
+  supabaseClient?: any
+): Promise<void> => {
+  if (!driverId || !deviceId) return;
+  setDriverActiveSession(driverId, deviceId);
+  if (supabaseClient) {
+    try {
+      await supabaseClient
+        .from('driver_profiles')
+        .update({
+          active_device_id: deviceId,
+          is_online: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', driverId);
+    } catch (e) {
+      console.warn('Driver device online sync notice:', e);
+    }
+  }
 };
 
