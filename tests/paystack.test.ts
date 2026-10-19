@@ -83,15 +83,31 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
       'utf8'
     );
 
+    const driverRegisterSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'app', 'driver', 'register', 'page.tsx'),
+      'utf8'
+    );
+
     assert.strictEqual(
-      /callback:\s*async\s+function/.test(riderPageSource),
+      /callback:\s*(async\s+function|async\s*\()/.test(riderPageSource),
       false,
-      'PaystackPop.setup callback must not be an async function (Paystack v1 rejects [object AsyncFunction])'
+      'Rider PaystackPop.setup callback must not be an async function'
     );
     assert.strictEqual(
       /callback:\s*function\s*\(/.test(riderPageSource),
       true,
-      'PaystackPop.setup callback must be a standard synchronous function'
+      'Rider PaystackPop.setup callback must be a standard synchronous function'
+    );
+
+    assert.strictEqual(
+      /callback:\s*(async\s+function|async\s*\()/.test(driverRegisterSource),
+      false,
+      'Driver register PaystackPop.setup callback must not be an async function'
+    );
+    assert.strictEqual(
+      /callback:\s*function\s*\(/.test(driverRegisterSource),
+      true,
+      'Driver register PaystackPop.setup callback must be a standard synchronous function'
     );
   });
 });

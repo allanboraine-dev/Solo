@@ -316,6 +316,42 @@ export default function DriverRegistration() {
 
       if (paystackPop && publicKey) {
         setUploadProgressText('Waiting for card details entry...')
+
+        const completeTrialSetup = (reference: string) => {
+          setUploadProgressText('Authorizing card & scheduling 7-day trial renewal...')
+          fetch('/api/driver/setup-trial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              driverId,
+              email,
+              reference,
+            }),
+          })
+            .then((res) => res.json())
+            .then((setupData) => {
+              if (setupData.success) {
+                const billingDate = setupData.nextBillingDate
+                  ? new Date(setupData.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : '7 days from now'
+                alert(`🎉 Card verified and securely linked! Your 7-day free trial is active. Your first R499.00 monthly subscription will be debited on ${billingDate}. You keep 100% of all fares. Welcome to SOLO!`)
+                router.push(hasSession ? '/driver' : '/driver/login')
+              } else {
+                setSubmitError(setupData.error || 'Failed to complete trial subscription schedule.')
+                setIsSubmitting(false)
+                setUploadProgressText('')
+              }
+            })
+            .catch((err: unknown) => {
+              setSubmitError((err as Error).message || 'Error completing trial setup.')
+              setIsSubmitting(false)
+              setUploadProgressText('')
+            })
+        }
+
+        // NOTE: Paystack Inline v1 strictly checks `Object.prototype.toString.call(callback) === '[object Function]'`.
+        // Passing an `async function` produces `'[object AsyncFunction]'` and throws "Attribute callback must be a valid function".
+        // We MUST pass a standard synchronous function here.
         const handler = paystackPop.setup({
           key: publicKey,
           email,
@@ -327,37 +363,10 @@ export default function DriverRegistration() {
             email,
             purpose: 'driver_trial_card_capture',
           },
-          callback: async (response: { reference: string }) => {
-            setUploadProgressText('Authorizing card & scheduling 7-day trial renewal...')
-            try {
-              const setupRes = await fetch('/api/driver/setup-trial', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  driverId,
-                  email,
-                  reference: response.reference,
-                }),
-              })
-
-              const setupData = await setupRes.json()
-
-              if (setupData.success) {
-                const billingDate = setupData.nextBillingDate
-                  ? new Date(setupData.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '7 days from now'
-                alert(`🎉 Card verified and securely linked! Your 7-day free trial is active. Your first R499.00 monthly subscription will be debited on ${billingDate}. You keep 100% of all fares. Welcome to SOLO!`)
-                router.push(hasSession ? '/driver' : '/driver/login')
-              } else {
-                setSubmitError(setupData.error || 'Failed to complete trial subscription schedule.')
-                setIsSubmitting(false)
-              }
-            } catch (err: unknown) {
-              setSubmitError((err as Error).message || 'Error completing trial setup.')
-              setIsSubmitting(false)
-            }
+          callback: function (response: { reference: string }) {
+            completeTrialSetup(response.reference)
           },
-          onClose: () => {
+          onClose: function () {
             setIsSubmitting(false)
             setUploadProgressText('')
           },
