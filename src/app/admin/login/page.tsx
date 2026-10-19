@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, CheckCircle2, ShieldAlert, Clock } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { isPlatformOwner, isOwnerPassword } from "@/utils/owner";
-import { setAdminSession, verifyManagerPasscode, isOwnerPasscode, createOwnerAdminSession } from "@/utils/adminAuth";
+import { setAdminSession, clearAdminSession, verifyManagerPasscode, isOwnerPasscode, createOwnerAdminSession } from "@/utils/adminAuth";
 
 const LOCKOUT_TIMESTAMP_KEY = "solo_admin_lockout_until";
 const FAILED_ATTEMPTS_KEY = "solo_admin_failed_attempts";
