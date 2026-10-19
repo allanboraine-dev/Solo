@@ -9,14 +9,15 @@ import { isOwnerPassword } from '../src/utils/owner.ts';
 
 describe('System Admin & Manager Portal Authorization Suite', () => {
   it('validates authorized manager passcodes and rejects unauthorized keys', () => {
-    // Valid passcodes
+    // Strictly authorized passcodes (only 13579)
     assert.strictEqual(verifyManagerPasscode('13579'), true);
-    assert.strictEqual(verifyManagerPasscode('9021'), true);
-    assert.strictEqual(verifyManagerPasscode('SOLO-ADMIN-2026'), true);
-    assert.strictEqual(verifyManagerPasscode('SOLO-COMPLIANCE-KEY'), true);
-    assert.strictEqual(verifyManagerPasscode('BORAINETECH'), true);
+    assert.strictEqual(verifyManagerPasscode('  13579  '), true);
 
-    // Invalid passcodes
+    // Purged weak/guessable passcodes are now strictly rejected
+    assert.strictEqual(verifyManagerPasscode('9021'), false);
+    assert.strictEqual(verifyManagerPasscode('SOLO-ADMIN-2026'), false);
+    assert.strictEqual(verifyManagerPasscode('SOLO-COMPLIANCE-KEY'), false);
+    assert.strictEqual(verifyManagerPasscode('BORAINETECH'), false);
     assert.strictEqual(verifyManagerPasscode('1234'), false);
     assert.strictEqual(verifyManagerPasscode('password'), false);
     assert.strictEqual(verifyManagerPasscode(''), false);
@@ -25,8 +26,8 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
   it('validates platform owner master passcode (13579) and password', () => {
     assert.strictEqual(isOwnerPasscode('13579'), true);
     assert.strictEqual(isOwnerPasscode('  13579  '), true);
-    assert.strictEqual(isOwnerPasscode('BORAINETECH'), true);
     assert.strictEqual(isOwnerPasscode('9021'), false);
+    assert.strictEqual(isOwnerPasscode('BORAINETECH'), false);
     assert.strictEqual(isOwnerPasscode('random'), false);
 
     assert.strictEqual(isOwnerPassword('13579'), true);
@@ -69,13 +70,11 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
     assert.strictEqual(auth1.session?.role, 'super_admin');
     assert.strictEqual(auth1.session?.isOwner, true);
 
-    // 3. Manager passcode header (Operations 9021)
-    const managerHeaderReq = {
+    // 3. Purged passcode header (Operations 9021 is now rejected)
+    const purgedHeaderReq = {
       headers: new Map([['x-admin-passcode', '9021']]),
     } as any;
-    const auth2 = validateAdminRequest(managerHeaderReq);
-    assert.strictEqual(auth2.authorized, true);
-    assert.strictEqual(auth2.session?.role, 'compliance_manager');
+    assert.strictEqual(validateAdminRequest(purgedHeaderReq).authorized, false);
 
     // 4. Invalid passcode header
     const badPasscodeReq = {
@@ -151,6 +150,35 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
       loginSource.includes('isLockedOut'),
       true,
       'Login page must implement lockout state after failed attempts'
+    );
+    assert.strictEqual(
+      loginSource.includes('MAX_ATTEMPTS = 3'),
+      true,
+      'Login page must strictly enforce max 3 attempts'
+    );
+    assert.strictEqual(
+      loginSource.includes('LOCKOUT_TIMESTAMP_KEY'),
+      true,
+      'Login page must persist lockout timestamp in storage'
+    );
+
+    // No simplistic single-input passkey tab
+    assert.strictEqual(
+      loginSource.includes('setActiveTab("passkey")'),
+      false,
+      'Login page must not offer a simplistic single-input passkey tab'
+    );
+
+    // Requires all 3 executive credentials simultaneously
+    assert.strictEqual(
+      loginSource.includes('securityPin'),
+      true,
+      'Login page must require master security PIN'
+    );
+    assert.strictEqual(
+      loginSource.includes('handleExecutiveLogin'),
+      true,
+      'Login page must use handleExecutiveLogin'
     );
   });
 
