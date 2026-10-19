@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { isPlatformOwner } from '@/utils/owner';
 import { getAllKycDriverProfiles, getAllKycDocuments, getRecentDriverSignupAlerts } from '@/utils/kycStore';
+import { validateAdminRequest } from '@/utils/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,15 @@ export interface DriverKycSummary {
 
 export async function GET(req: NextRequest) {
   try {
+    // Enforce administrative authorization
+    const auth = validateAdminRequest(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const filterStatus = searchParams.get('status') || 'all';
     const searchQuery = searchParams.get('search')?.toLowerCase().trim() || '';

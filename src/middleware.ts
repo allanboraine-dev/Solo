@@ -1,7 +1,31 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
+import { validateAdminRequest } from '@/utils/adminAuth'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // 1. Guard /api/admin/* endpoints: Reject unauthorized callers with 401
+  if (pathname.startsWith('/api/admin/')) {
+    const auth = validateAdminRequest(request)
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      )
+    }
+  }
+
+  // 2. Guard /admin/* pages: Redirect unauthenticated public visitors to /admin/login
+  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+    const auth = validateAdminRequest(request)
+    if (!auth.authorized) {
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   return await updateSession(request)
 }
 

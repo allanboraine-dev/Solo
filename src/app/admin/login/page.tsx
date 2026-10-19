@@ -16,15 +16,21 @@ export default function AdminLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
 
-  // Quick Manager / Owner Passkey Login
+  // Manager / Owner Passkey Login
   const handlePasskeyLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLockedOut) {
+      setError("Maximum login attempts exceeded. Access locked for security.");
+      return;
+    }
     setError(null);
     setIsSubmitting(true);
 
     if (isOwnerPasscode(passcode)) {
-      setSuccessMsg("Founder clearance verified with master PIN (13579). Welcome Allan Boraine.");
+      setSuccessMsg("Master founder credentials verified. Access granted.");
       setAdminSession(createOwnerAdminSession("allanboraine@gmail.com"));
       setTimeout(() => {
         router.push("/admin/compliance");
@@ -44,14 +50,25 @@ export default function AdminLoginPage() {
         router.push("/admin/compliance");
       }, 500);
     } else {
-      setError("Invalid Security Passkey. Please verify and try again.");
+      const nextCount = failedAttempts + 1;
+      setFailedAttempts(nextCount);
+      if (nextCount >= 5) {
+        setIsLockedOut(true);
+        setError("Maximum login attempts exceeded. Portal temporarily locked for security.");
+      } else {
+        setError(`Invalid Security Passkey. ${5 - nextCount} attempt(s) remaining.`);
+      }
       setIsSubmitting(false);
     }
   };
 
-  // Full Admin Email & Password Login
+  // Admin Email & Password Login
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLockedOut) {
+      setError("Maximum login attempts exceeded. Access locked for security.");
+      return;
+    }
     setError(null);
     setIsSubmitting(true);
 
@@ -61,7 +78,7 @@ export default function AdminLoginPage() {
     // Check if platform owner is logging in
     if (isPlatformOwner(cleanEmail)) {
       if (isOwnerPassword(password)) {
-        setSuccessMsg("Welcome Founder Allan Boraine. Full administrative clearance active.");
+        setSuccessMsg("Platform founder clearance verified. Access granted.");
         setAdminSession(createOwnerAdminSession(cleanEmail));
         setTimeout(() => {
           router.push("/admin/compliance");
@@ -77,7 +94,7 @@ export default function AdminLoginPage() {
         });
 
         if (!authError && data?.user) {
-          setSuccessMsg("Welcome Founder Allan Boraine. Full administrative clearance active.");
+          setSuccessMsg("Platform founder clearance verified. Access granted.");
           setAdminSession(createOwnerAdminSession(cleanEmail));
           setTimeout(() => {
             router.push("/admin/compliance");
@@ -85,10 +102,17 @@ export default function AdminLoginPage() {
           return;
         }
       } catch (err) {
-        console.warn("Auth check error:", err);
+        console.warn("Auth check notice:", err);
       }
 
-      setError("Invalid password for Platform Owner. Please use your owner password (13579).");
+      const nextCount = failedAttempts + 1;
+      setFailedAttempts(nextCount);
+      if (nextCount >= 5) {
+        setIsLockedOut(true);
+        setError("Maximum login attempts exceeded. Portal temporarily locked for security.");
+      } else {
+        setError(`Invalid credentials. ${5 - nextCount} attempt(s) remaining.`);
+      }
       setIsSubmitting(false);
       return;
     }
@@ -100,7 +124,14 @@ export default function AdminLoginPage() {
       });
 
       if (authErr) {
-        setError(authErr.message || "Invalid administrator credentials.");
+        const nextCount = failedAttempts + 1;
+        setFailedAttempts(nextCount);
+        if (nextCount >= 5) {
+          setIsLockedOut(true);
+          setError("Maximum login attempts exceeded. Portal temporarily locked for security.");
+        } else {
+          setError(`Invalid credentials. ${5 - nextCount} attempt(s) remaining.`);
+        }
         setIsSubmitting(false);
         return;
       }
@@ -119,17 +150,6 @@ export default function AdminLoginPage() {
       setError((err as Error).message || "An unexpected authentication error occurred.");
       setIsSubmitting(false);
     }
-  };
-
-  // One-click Founder clearance for rapid development & in-field management
-  const handleQuickFounderLogin = () => {
-    setIsSubmitting(true);
-    setError(null);
-    setSuccessMsg("Platform Owner clearance granted.");
-    setAdminSession(createOwnerAdminSession("allanboraine@gmail.com"));
-    setTimeout(() => {
-      router.push("/admin/compliance");
-    }, 400);
   };
 
   return (
@@ -211,30 +231,32 @@ export default function AdminLoginPage() {
           <form onSubmit={handlePasskeyLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                Manager Security Passkey or PIN
+                Manager Security Passkey or Master PIN
               </label>
               <div className="relative">
                 <input
                   type="password"
                   required
-                  placeholder="Enter Passkey or Owner PIN (13579)"
+                  disabled={isLockedOut || isSubmitting}
+                  placeholder="Enter Security Passkey or Master PIN"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                  className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50"
                 />
                 <Key size={16} className="absolute right-3.5 top-3.5 text-zinc-500" />
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1.5">
-                Owner Master PIN: <code className="text-emerald-400 font-mono">13579</code> &bull; Operations PIN: <code className="text-zinc-400 font-mono">9021</code>
+              <p className="text-[11px] text-zinc-500 mt-1.5 flex items-center gap-1.5">
+                <Lock size={12} className="text-emerald-500 shrink-0" />
+                <span>Restricted internal portal. Unauthorized access attempts are monitored and logged.</span>
               </p>
             </div>
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isLockedOut || isSubmitting}
               className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-98"
             >
-              <span>{isSubmitting ? "Authenticating..." : "Unlock Manager Console"}</span>
+              <span>{isSubmitting ? "Authenticating..." : isLockedOut ? "Access Locked" : "Unlock Manager Console"}</span>
               <ArrowRight size={16} />
             </button>
           </form>
@@ -250,10 +272,11 @@ export default function AdminLoginPage() {
               <input
                 type="email"
                 required
-                placeholder="allanboraine@gmail.com"
+                disabled={isLockedOut || isSubmitting}
+                placeholder="admin@soloride.co.za"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50"
               />
             </div>
 
@@ -264,36 +287,24 @@ export default function AdminLoginPage() {
               <input
                 type="password"
                 required
+                disabled={isLockedOut || isSubmitting}
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50"
               />
             </div>
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isLockedOut || isSubmitting}
               className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-98"
             >
-              <span>{isSubmitting ? "Verifying..." : "Sign In to Admin Portal"}</span>
+              <span>{isSubmitting ? "Verifying..." : isLockedOut ? "Access Locked" : "Sign In to Admin Portal"}</span>
               <ArrowRight size={16} />
             </button>
           </form>
         )}
-
-        {/* Quick Founder Shortcut */}
-        <div className="mt-6 pt-5 border-t border-zinc-800 text-center">
-          <button
-            type="button"
-            onClick={handleQuickFounderLogin}
-            disabled={isSubmitting}
-            className="w-full py-2.5 px-3 bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/60 rounded-xl text-xs font-semibold text-zinc-300 hover:text-white flex items-center justify-center gap-2 transition"
-          >
-            <UserCheck size={14} className="text-emerald-400" />
-            <span>Instant Clearance as Platform Founder (Allan Boraine)</span>
-          </button>
-        </div>
       </div>
 
       {/* Footer Info */}

@@ -52,4 +52,131 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
     assert.strictEqual(session.isOwner, false);
     assert.strictEqual(session.name, 'Compliance Manager');
   });
+
+  it('validates validateAdminRequest authorization engine', async () => {
+    const { validateAdminRequest } = await import('../src/utils/adminAuth.ts');
+
+    // 1. Unauthenticated request: No headers, no cookies
+    const emptyReq = { headers: new Map() } as any;
+    assert.strictEqual(validateAdminRequest(emptyReq).authorized, false);
+
+    // 2. Direct passcode header (Owner 13579)
+    const ownerHeaderReq = {
+      headers: new Map([['x-admin-passcode', '13579']]),
+    } as any;
+    const auth1 = validateAdminRequest(ownerHeaderReq);
+    assert.strictEqual(auth1.authorized, true);
+    assert.strictEqual(auth1.session?.role, 'super_admin');
+    assert.strictEqual(auth1.session?.isOwner, true);
+
+    // 3. Manager passcode header (Operations 9021)
+    const managerHeaderReq = {
+      headers: new Map([['x-admin-passcode', '9021']]),
+    } as any;
+    const auth2 = validateAdminRequest(managerHeaderReq);
+    assert.strictEqual(auth2.authorized, true);
+    assert.strictEqual(auth2.session?.role, 'compliance_manager');
+
+    // 4. Invalid passcode header
+    const badPasscodeReq = {
+      headers: new Map([['x-admin-passcode', 'invalid_pin']]),
+    } as any;
+    assert.strictEqual(validateAdminRequest(badPasscodeReq).authorized, false);
+
+    // 5. Valid session cookie
+    const validSession = {
+      email: 'operations@soloride.co.za',
+      name: 'Operations Manager',
+      role: 'compliance_manager',
+      loginTime: new Date().toISOString(),
+    };
+    const validCookieReq = {
+      headers: new Map([
+        ['cookie', `solo_admin_session=${encodeURIComponent(JSON.stringify(validSession))}`],
+      ]),
+    } as any;
+    const auth3 = validateAdminRequest(validCookieReq);
+    assert.strictEqual(auth3.authorized, true);
+
+    // 6. Impersonation protection: Non-owner claiming isOwner in cookie
+    const spoofedSession = {
+      email: 'hacker@example.com',
+      name: 'Allan Impersonator',
+      role: 'super_admin',
+      isOwner: true,
+      loginTime: new Date().toISOString(),
+    };
+    const spoofedCookieReq = {
+      headers: new Map([
+        ['cookie', `solo_admin_session=${encodeURIComponent(JSON.stringify(spoofedSession))}`],
+      ]),
+    } as any;
+    assert.strictEqual(validateAdminRequest(spoofedCookieReq).authorized, false);
+  });
+
+  it('verifies admin login page has no public bypass buttons or exposed PINs', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const loginSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'app', 'admin', 'login', 'page.tsx'),
+      'utf8'
+    );
+
+    // No one-click founder bypass button
+    assert.strictEqual(
+      loginSource.includes('handleQuickFounderLogin'),
+      false,
+      'Login page must not contain handleQuickFounderLogin'
+    );
+    assert.strictEqual(
+      loginSource.includes('Instant Clearance as Platform Founder'),
+      false,
+      'Login page must not render Instant Clearance button'
+    );
+
+    // No plaintext PIN hints printed on the screen
+    assert.strictEqual(
+      loginSource.includes('Owner Master PIN: 13579'),
+      false,
+      'Login page must not display master PIN on the public interface'
+    );
+    assert.strictEqual(
+      loginSource.includes('Operations PIN: 9021'),
+      false,
+      'Login page must not display operations PIN on the public interface'
+    );
+
+    // Brute force lockout protection
+    assert.strictEqual(
+      loginSource.includes('isLockedOut'),
+      true,
+      'Login page must implement lockout state after failed attempts'
+    );
+  });
+
+  it('verifies middleware.ts locks down /admin and /api/admin from unauthorized public callers', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const middlewareSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'middleware.ts'),
+      'utf8'
+    );
+
+    assert.strictEqual(
+      middlewareSource.includes("pathname.startsWith('/api/admin/')"),
+      true,
+      'Middleware must inspect and guard /api/admin/ routes'
+    );
+    assert.strictEqual(
+      middlewareSource.includes("pathname.startsWith('/admin')"),
+      true,
+      'Middleware must inspect and guard /admin pages'
+    );
+    assert.strictEqual(
+      middlewareSource.includes('validateAdminRequest'),
+      true,
+      'Middleware must invoke validateAdminRequest'
+    );
+  });
 });
+

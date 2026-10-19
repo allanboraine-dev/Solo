@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRecentDriverSignupAlerts, markDriverSignupAlertRead, recordDriverSignupAlert } from '@/utils/kycStore';
+import { validateAdminRequest } from '@/utils/adminAuth';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +10,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-key'
 );
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = validateAdminRequest(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      );
+    }
+
     const alerts = getRecentDriverSignupAlerts(30);
     return NextResponse.json({
       success: true,
@@ -26,6 +35,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = validateAdminRequest(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { action, alertId, alert } = body;
 

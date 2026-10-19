@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { sendWebPushNotification, PushPayload } from '@/utils/webPush';
 import { approveAllKycDocuments, updateKycDocumentStatus } from '@/utils/kycStore';
+import { validateAdminRequest } from '@/utils/adminAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,15 @@ const isValidUuid = (val?: unknown): boolean =>
 
 export async function POST(req: NextRequest) {
   try {
+    // Enforce administrative authorization
+    const auth = validateAdminRequest(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { documentId, driverId, docType, status, rejectionReason, adminNotes } = body;
 
