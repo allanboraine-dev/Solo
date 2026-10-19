@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendWebPushNotification } from '@/utils/webPush';
 import { getMemorySubscriptions } from '@/utils/pushStore';
+import { checkSosRateLimit } from '@/utils/rateLimit';
 
 // In-memory incident ring buffer for instant serverless fallback & control-room queries
 const recentSafetyIncidents: any[] = [];
@@ -18,6 +19,12 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(req: NextRequest) {
+  // Enforce SOS rate limit (10 dispatches per min per IP)
+  const rateLimit = checkSosRateLimit(req);
+  if (!rateLimit.allowed && rateLimit.response) {
+    return rateLimit.response;
+  }
+
   try {
     const body = await req.json();
     const {

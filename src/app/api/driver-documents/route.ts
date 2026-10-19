@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getKycDocumentsForDriver, getKycDriverProfile } from '@/utils/kycStore'
 import { DriverDocument, KycDocType } from '@/types/kyc'
+import { validateDriverAuthorization, createUnauthorizedResponse } from '@/utils/apiAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,12 @@ export async function GET(req: Request) {
 
     if (!driverId) {
       return NextResponse.json({ error: 'Driver ID is required' }, { status: 400 })
+    }
+
+    // BOLA Protection: Verify caller is this driver or authorized platform admin
+    const auth = await validateDriverAuthorization(req, driverId)
+    if (!auth.authorized) {
+      return createUnauthorizedResponse(auth.reason || "Unauthorized to view this driver's documents", 403)
     }
 
     // 1. Fetch documents from database (gracefully handling missing tables/RLS)

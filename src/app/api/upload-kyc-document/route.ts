@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { KycDocType } from '@/types/kyc'
 import { saveKycDocument, saveKycDriverProfile } from '@/utils/kycStore'
+import { checkUploadRateLimit } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,12 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'applicatio
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
 export async function POST(req: Request) {
+  // Enforce upload rate limit (15 files per 10 min per IP)
+  const rateLimit = checkUploadRateLimit(req)
+  if (!rateLimit.allowed && rateLimit.response) {
+    return rateLimit.response
+  }
+
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null

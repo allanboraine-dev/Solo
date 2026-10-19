@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseHouseNumberFromQuery } from '@/utils/mapService';
+import { checkGeocodeRateLimit } from '@/utils/rateLimit';
 
 interface GeocodePlace {
   id: string | number;
@@ -24,6 +25,12 @@ const MAPBOX_TOKEN =
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 
 export async function GET(req: NextRequest) {
+  // Enforce geocoding rate limits (45 req/min per IP)
+  const rateLimit = checkGeocodeRateLimit(req);
+  if (!rateLimit.allowed && rateLimit.response) {
+    return rateLimit.response;
+  }
+
   const { searchParams } = new URL(req.url);
   const action = searchParams.get('action');
   const q = searchParams.get('q')?.trim() || '';

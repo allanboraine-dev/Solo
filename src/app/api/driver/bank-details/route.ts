@@ -6,6 +6,7 @@ import {
   maskAccountNumber,
   SaAccountType,
 } from "@/utils/bankDetails";
+import { validateDriverAuthorization, createUnauthorizedResponse } from "@/utils/apiAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,12 @@ export async function GET(req: NextRequest) {
 
     if (!driverId) {
       return NextResponse.json({ error: "Driver ID is required" }, { status: 400 });
+    }
+
+    // BOLA Protection: Verify caller is this driver or authorized platform admin
+    const auth = await validateDriverAuthorization(req, driverId);
+    if (!auth.authorized) {
+      return createUnauthorizedResponse(auth.reason || "Unauthorized to access this driver's banking profile", 403);
     }
 
     const { data: profile, error } = await supabase
@@ -71,6 +78,12 @@ export async function POST(req: NextRequest) {
         { error: "driverId, bankId, accountNumber, and accountType are required" },
         { status: 400 }
       );
+    }
+
+    // BOLA Protection: Verify caller has permission to modify this driver's bank details
+    const auth = await validateDriverAuthorization(req, driverId);
+    if (!auth.authorized) {
+      return createUnauthorizedResponse(auth.reason || "Unauthorized to update this driver's banking profile", 403);
     }
 
     const bank = SA_BANKS[bankId];

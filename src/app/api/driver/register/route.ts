@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { saveKycDriverProfile, recordDriverSignupAlert } from '@/utils/kycStore';
 import { isPlatformOwner } from '@/utils/owner';
+import { checkRegistrationRateLimit } from '@/utils/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,12 @@ const supabase = createClient(
 );
 
 export async function POST(req: NextRequest) {
+  // Enforce driver registration rate limit (5 signups per 15 min per IP)
+  const rateLimit = checkRegistrationRateLimit(req);
+  if (!rateLimit.allowed && rateLimit.response) {
+    return rateLimit.response;
+  }
+
   try {
     const body = await req.json();
     const {
