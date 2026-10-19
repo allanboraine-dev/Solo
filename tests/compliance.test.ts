@@ -15,6 +15,8 @@ import {
   recordDriverSignupAlert,
   getRecentDriverSignupAlerts,
   markDriverSignupAlertRead,
+  deleteKycDriverProfile,
+  isDriverPurged,
 } from '../src/utils/kycStore.ts';
 
 // Helper simulating compliance determination logic
@@ -409,6 +411,53 @@ describe('Admin Driver Compliance & KYC Verification Suite', () => {
       assert.doesNotThrow(() => {
         audioAlert.playAdminNewDriverChime();
       });
+    });
+
+    it('allows Operations Manager to delete and purge a bogus driver registration', () => {
+      // 1. Create a bogus driver registration
+      const bogusId = 'driver-bogus-999';
+      saveKycDriverProfile({
+        id: bogusId,
+        fullName: 'Test Bogus Driver',
+        email: 'bogus@spammer.com',
+        phone: '+27800000000',
+        licensePlate: 'FAKE 123',
+      });
+
+      saveKycDocument({
+        id: 'doc-bogus-1',
+        driver_id: bogusId,
+        doc_type: 'license_front',
+        file_path: `${bogusId}/fake.jpg`,
+        status: 'pending',
+      });
+
+      recordDriverSignupAlert({
+        driverId: bogusId,
+        fullName: 'Test Bogus Driver',
+      });
+
+      // Confirm bogus driver exists
+      assert.ok(getKycDriverProfile(bogusId));
+      assert.strictEqual(getKycDocumentsForDriver(bogusId).length, 1);
+      assert.strictEqual(isDriverPurged(bogusId), false);
+
+      // 2. Operations Manager deletes the bogus driver
+      const deleted = deleteKycDriverProfile(bogusId);
+      assert.strictEqual(deleted, true);
+
+      // 3. Confirm completely purged from store and marked as purged
+      assert.strictEqual(getKycDriverProfile(bogusId), undefined);
+      assert.strictEqual(getKycDocumentsForDriver(bogusId).length, 0);
+      assert.strictEqual(isDriverPurged(bogusId), true);
+      assert.strictEqual(
+        getRecentDriverSignupAlerts().some((a) => a.driverId === bogusId),
+        false
+      );
+      assert.strictEqual(
+        getAllKycDriverProfiles().some((d) => d.id === bogusId),
+        false
+      );
     });
   });
 });

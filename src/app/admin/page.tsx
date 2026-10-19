@@ -16,8 +16,10 @@ import {
   ChevronRight,
   ExternalLink,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
+import { isPlatformOwner } from "@/utils/owner";
 
 export default function AdminOverviewDashboard() {
   const [drivers, setDrivers] = useState<DriverKycSummary[]>([]);
@@ -111,6 +113,57 @@ export default function AdminOverviewDashboard() {
       console.error("Error loading overview data:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driver: DriverKycSummary) => {
+    const isOwner = driver.subscriptionPlan === "owner" || isPlatformOwner(driver.email);
+    if (isOwner) {
+      alert("Platform Founder (Allan Boraine) cannot be deleted.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Permanently remove bogus driver registration for "${driver.fullName}" (${driver.email || driver.phone || driver.licensePlate || "No plate"})?\n\nThis will purge all submitted KYC documents, audits, and profile records from the compliance portal.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/admin/drivers-kyc?driverId=${encodeURIComponent(driver.id)}`, {
+        method: "DELETE",
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+
+        if (typeof window !== "undefined") {
+          try {
+            const localProfStr = localStorage.getItem("mock_driver_profile");
+            if (localProfStr) {
+              const parsed = JSON.parse(localProfStr);
+              if (parsed.id === driver.id) localStorage.removeItem("mock_driver_profile");
+            }
+            const allRegStr = localStorage.getItem("all_registered_drivers");
+            if (allRegStr) {
+              const all = JSON.parse(allRegStr);
+              if (Array.isArray(all)) {
+                localStorage.setItem(
+                  "all_registered_drivers",
+                  JSON.stringify(all.filter((x: any) => x.id !== driver.id))
+                );
+              }
+            }
+            localStorage.removeItem(`driver_kyc_documents_${driver.id}`);
+          } catch {}
+        }
+
+        await loadData();
+      } else {
+        alert(result.error || "Failed to delete driver registration");
+      }
+    } catch (err: unknown) {
+      alert(`Error deleting registration: ${(err as Error).message}`);
     }
   };
 
@@ -364,13 +417,25 @@ export default function AdminOverviewDashboard() {
                     </td>
 
                     <td className="py-4 px-6 text-right">
-                      <Link
-                        href={`/admin/compliance?search=${encodeURIComponent(driver.fullName)}`}
-                        className="py-1.5 px-3 bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-200 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500 transition"
-                      >
-                        <span>Inspect & Approve</span>
-                        <ChevronRight size={13} />
-                      </Link>
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/admin/compliance?search=${encodeURIComponent(driver.fullName)}`}
+                          className="py-1.5 px-3 bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-200 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500 transition"
+                        >
+                          <span>Inspect & Approve</span>
+                          <ChevronRight size={13} />
+                        </Link>
+                        {!(driver.subscriptionPlan === "owner" || isPlatformOwner(driver.email)) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDriver(driver)}
+                            className="p-1.5 bg-rose-950/40 hover:bg-rose-900 border border-rose-800/60 hover:border-rose-600 text-rose-300 rounded-xl transition"
+                            title="Delete Bogus Registration"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

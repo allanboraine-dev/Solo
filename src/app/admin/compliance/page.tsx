@@ -29,6 +29,7 @@ import {
   Volume2,
   VolumeX,
   Radio,
+  Trash2,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
@@ -562,6 +563,72 @@ export default function AdminComplianceDashboard() {
     }
   };
 
+  const handleDeleteDriver = async (driver: DriverKycSummary) => {
+    const isOwner = driver.subscriptionPlan === "owner" || isPlatformOwner(driver.email);
+    if (isOwner) {
+      alert("Platform Founder (Allan Boraine) cannot be deleted.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Permanently remove bogus driver registration for "${driver.fullName}" (${driver.email || driver.phone || driver.licensePlate || "No plate"})?\n\nThis will purge all submitted KYC documents, audits, and profile records from the compliance portal.`
+    );
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/admin/drivers-kyc?driverId=${encodeURIComponent(driver.id)}`, {
+        method: "DELETE",
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast(`✓ Removed bogus registration: ${driver.fullName}`);
+
+        // Immediately purge from local state
+        setDrivers((prev) => prev.filter((d) => d.id !== driver.id));
+
+        // Close modal if open on this driver
+        if (selectedDriver?.id === driver.id) {
+          setSelectedDriver(null);
+        }
+
+        // Clean up client-side test localStorage records
+        if (typeof window !== "undefined") {
+          try {
+            const localProfStr = localStorage.getItem("mock_driver_profile");
+            if (localProfStr) {
+              const parsed = JSON.parse(localProfStr);
+              if (parsed.id === driver.id) {
+                localStorage.removeItem("mock_driver_profile");
+              }
+            }
+            const allRegStr = localStorage.getItem("all_registered_drivers");
+            if (allRegStr) {
+              const all = JSON.parse(allRegStr);
+              if (Array.isArray(all)) {
+                localStorage.setItem(
+                  "all_registered_drivers",
+                  JSON.stringify(all.filter((x: any) => x.id !== driver.id))
+                );
+              }
+            }
+            localStorage.removeItem(`driver_kyc_documents_${driver.id}`);
+          } catch {}
+        }
+
+        // Re-fetch live metrics
+        await fetchComplianceData();
+      } else {
+        alert(result.error || "Failed to delete driver registration");
+      }
+    } catch (err: unknown) {
+      alert(`Error deleting registration: ${(err as Error).message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-4 sm:p-8">
       {/* Toast Notification */}
@@ -976,14 +1043,30 @@ export default function AdminComplianceDashboard() {
                     </div>
                   </div>
 
-                  {/* Review Button */}
-                  <button
-                    onClick={() => setSelectedDriver(driver)}
-                    className="mt-4 w-full py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95 border border-zinc-700"
-                  >
-                    <span>Inspect & Review ({driver.totalDocs}/5 Docs)</span>
-                    <ChevronRight size={14} />
-                  </button>
+                  {/* Actions: Review Button & Delete Bogus Driver */}
+                  <div className="mt-4 flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedDriver(driver)}
+                      className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95 border border-zinc-700"
+                    >
+                      <span>Inspect & Review ({driver.totalDocs}/5 Docs)</span>
+                      <ChevronRight size={14} />
+                    </button>
+                    {!isOwnerDriver && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDriver(driver);
+                        }}
+                        disabled={actionLoading}
+                        className="py-2.5 px-3 bg-rose-950/40 hover:bg-rose-900/80 border border-rose-800/60 hover:border-rose-600 text-rose-300 rounded-xl transition active:scale-95 flex items-center justify-center"
+                        title="Delete Bogus Registration"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -1012,6 +1095,18 @@ export default function AdminComplianceDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {!(selectedDriver.subscriptionPlan === "owner" || isPlatformOwner(selectedDriver.email)) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDriver(selectedDriver)}
+                    disabled={actionLoading}
+                    className="py-2 px-3 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 hover:border-rose-600 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-950/40 transition active:scale-95"
+                    title="Delete Bogus Registration"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete Bogus</span>
+                  </button>
+                )}
                 {!selectedDriver.isVerified && (
                   <button
                     onClick={() => handleApproveAll(selectedDriver.id)}

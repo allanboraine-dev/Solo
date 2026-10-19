@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DriverDocument, KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc';
 import { isPlatformOwner } from '@/utils/owner';
-import { getAllKycDriverProfiles, getAllKycDocuments, getRecentDriverSignupAlerts } from '@/utils/kycStore';
+import {
+  getAllKycDriverProfiles,
+  getAllKycDocuments,
+  getRecentDriverSignupAlerts,
+  getKycDriverProfile,
+  deleteKycDriverProfile,
+  isDriverPurged,
+} from '@/utils/kycStore';
 import { validateAdminRequest } from '@/utils/adminAuth';
 
 export const dynamic = 'force-dynamic';
@@ -135,6 +142,9 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    // Filter out any bogus drivers purged by operations managers
+    driverList = driverList.filter((d: any) => !isDriverPurged(d.id));
 
     // 4. Fetch all driver documents from Supabase
     let dbDocs: DriverDocument[] = [];
@@ -287,6 +297,98 @@ export async function GET(req: NextRequest) {
     console.error('[AdminKycAPI] Exception:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch compliance records' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE: Allows Operations Managers to permanently remove a bogus, fraudulent, or test driver registration
+ */
+export async function DELETE(req: NextRequest) {
+  try {
+    // 1. Enforce manager/admin credentials
+    const auth = validateAdminRequest(req);
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
+        { status: 401 }
+      );
+    }
+
+    // 2. Extract driverId from query parameters or JSON body
+    const { searchParams } = new URL(req.url);
+    let driverId = searchParams.get('driverId') || searchParams.get('id');
+
+    if (!driverId) {
+      try {
+        const body = await req.json();
+        driverId = body?.driverId || body?.id;
+      } catch {
+        // Query params primary
+      }
+    }
+
+    if (!driverId || typeof driverId !== 'string') {
+      return NextResponse.json(
+        { error: 'Driver ID is required to remove a registration' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Platform founder protection (Allan Boraine can NEVER be deleted)
+    const memoryProfile = getKycDriverProfile(driverId);
+    if (memoryProfile && isPlatformOwner(memoryProfile.email)) {
+      return NextResponse.json(
+        { error: 'Action Prohibited: Cannot delete Platform Founder (Allan Boraine) account.' },
+        { status: 403 }
+      );
+    }
+
+    // 4. Delete from Supabase persistent database
+    try {
+      // Check database email before deletion
+      const { data: dbDriver } = await supabase
+        .from('driver_profiles')
+        .select('email')
+        .eq('id', driverId)
+        .maybeSingle();
+
+      if (dbDriver && isPlatformOwner(dbDriver.email)) {
+        return NextResponse.json(
+          { error: 'Action Prohibited: Cannot delete Platform Founder (Allan Boraine) account.' },
+          { status: 403 }
+        );
+      }
+
+      // Delete associated statutory documents
+      await supabase.from('driver_documents').delete().eq('driver_id', driverId);
+
+      // Delete verification audits if present
+      await supabase.from('driver_verification_audits').delete().eq('driver_id', driverId);
+
+      // Delete driver profile row
+      await supabase.from('driver_profiles').delete().eq('id', driverId);
+
+      // If registered under profiles table with driver role, delete
+      await supabase.from('profiles').delete().eq('id', driverId).eq('user_type', 'driver');
+    } catch (dbErr: any) {
+      console.warn('[AdminKycAPI] DB deletion notice (continuing in-memory cleanup):', dbErr?.message);
+    }
+
+    // 5. Purge from in-memory kycStore and add to tombstone
+    deleteKycDriverProfile(driverId);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Driver registration permanently deleted.',
+      deletedDriverId: driverId,
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('[AdminKycAPI] DELETE Exception:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete driver registration' },
       { status: 500 }
     );
   }

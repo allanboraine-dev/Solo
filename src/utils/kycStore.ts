@@ -44,6 +44,11 @@ export interface DriverSignupAlert {
 const memoryDrivers = new Map<string, KycDriverProfile>();
 const memoryDocuments = new Map<string, Map<KycDocType, DriverDocument>>();
 const memorySignupAlerts: DriverSignupAlert[] = [];
+const purgedDriverIds = new Set<string>();
+
+export function isDriverPurged(driverId: string): boolean {
+  return purgedDriverIds.has(driverId);
+}
 
 const MANDATORY_DOC_TYPES: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
 
@@ -95,6 +100,7 @@ export function markDriverSignupAlertRead(alertId: string): void {
  * Register or update driver profile in the in-memory store
  */
 export function saveKycDriverProfile(profile: Partial<KycDriverProfile> & { id: string }): KycDriverProfile {
+  purgedDriverIds.delete(profile.id);
   const existing = memoryDrivers.get(profile.id);
   const isOwner = isPlatformOwner(profile.email || existing?.email || '');
 
@@ -305,10 +311,29 @@ export function approveAllKycDocuments(
 }
 
 /**
+ * Completely purge a bogus or test driver registration, documents, and related signup alerts from the store
+ */
+export function deleteKycDriverProfile(driverId: string): boolean {
+  purgedDriverIds.add(driverId);
+  const hadDriver = memoryDrivers.delete(driverId);
+  memoryDocuments.delete(driverId);
+
+  // Also remove any signup alerts for this driver
+  for (let i = memorySignupAlerts.length - 1; i >= 0; i--) {
+    if (memorySignupAlerts[i].driverId === driverId) {
+      memorySignupAlerts.splice(i, 1);
+    }
+  }
+
+  return hadDriver;
+}
+
+/**
  * Reset store (for unit tests)
  */
 export function resetKycStore(): void {
   memoryDrivers.clear();
   memoryDocuments.clear();
   memorySignupAlerts.length = 0;
+  purgedDriverIds.clear();
 }
