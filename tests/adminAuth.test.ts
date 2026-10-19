@@ -180,7 +180,20 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
       true,
       'Login page must use handleExecutiveLogin'
     );
+
+    // Active purge on mount and manual clear action
+    assert.strictEqual(
+      loginSource.includes('Clear Login Details'),
+      true,
+      'Login page must provide a manual Clear Login Details action'
+    );
+    assert.strictEqual(
+      loginSource.includes('clearAdminSession()'),
+      true,
+      'Login page must purge session on mount'
+    );
   });
+
 
   it('verifies middleware.ts locks down /admin and /api/admin from unauthorized public callers', async () => {
     const fs = await import('node:fs');

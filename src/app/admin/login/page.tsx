@@ -23,6 +23,15 @@ export default function AdminLoginPage() {
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
 
+  // Purge any existing manager session on mount so portal starts 100% clean
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    clearAdminSession();
+    setEmail("");
+    setPassword("");
+    setSecurityPin("");
+  }, []);
+
   // Monitor and enforce persistent lockout across tab closes/refreshes
   useEffect(() => {
     const updateLockoutStatus = () => {
@@ -203,13 +212,24 @@ export default function AdminLoginPage() {
         )}
 
         {/* Single Hardened Executive Sign-In Form */}
-        <form onSubmit={handleExecutiveLogin} className="space-y-4">
+        <form onSubmit={handleExecutiveLogin} autoComplete="off" className="space-y-4">
+          {/* Decoy fields to intercept aggressive browser password auto-injectors */}
+          <input type="text" name="fake_username_guard" style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
+          <input type="password" name="fake_password_guard" style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
+
           <div>
             <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
               Administrator Email
             </label>
             <input
-              type="email"
+              type="text"
+              name="solo_admin_identity_field"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
               required
               disabled={isLockedOut || isSubmitting}
               placeholder="admin@soloride.co.za"
@@ -226,6 +246,13 @@ export default function AdminLoginPage() {
             <div className="relative">
               <input
                 type="password"
+                name="solo_admin_secret_token"
+                autoComplete="new-password"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
                 required
                 disabled={isLockedOut || isSubmitting}
                 placeholder="••••••••••••"
@@ -244,6 +271,13 @@ export default function AdminLoginPage() {
             <div className="relative">
               <input
                 type="password"
+                name="solo_admin_master_pin"
+                autoComplete="new-password"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
                 required
                 disabled={isLockedOut || isSubmitting}
                 placeholder="•••••"
@@ -279,6 +313,25 @@ export default function AdminLoginPage() {
               </>
             )}
           </button>
+
+          {/* Quick Clear Action */}
+          <div className="flex items-center justify-between pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("");
+                setPassword("");
+                setSecurityPin("");
+                setError(null);
+                setSuccessMsg(null);
+                clearAdminSession();
+              }}
+              className="text-[11px] text-zinc-500 hover:text-zinc-300 transition underline underline-offset-4"
+            >
+              Clear Login Details
+            </button>
+            <span className="text-[10px] text-zinc-600 font-mono">Status: Ready</span>
+          </div>
         </form>
       </div>
 
