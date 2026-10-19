@@ -11,6 +11,11 @@ export const OWNER_EMAILS: string[] = [
   ...(process.env.NEXT_PUBLIC_ADMIN_EMAIL ? [process.env.NEXT_PUBLIC_ADMIN_EMAIL.trim().toLowerCase()] : []),
 ];
 
+export const OWNER_PASSWORDS: string[] = [
+  '13579',
+  ...(process.env.OWNER_PASSWORD ? [process.env.OWNER_PASSWORD.trim()] : []),
+];
+
 /**
  * Checks whether an email address belongs to a platform owner or administrator.
  */
@@ -18,6 +23,14 @@ export function isPlatformOwner(email?: string | null): boolean {
   if (!email) return false;
   const cleanEmail = email.trim().toLowerCase();
   return OWNER_EMAILS.some((ownerEmail) => ownerEmail.trim().toLowerCase() === cleanEmail);
+}
+
+/**
+ * Checks whether a password matches the platform owner master password (13579).
+ */
+export function isOwnerPassword(password?: string | null): boolean {
+  if (!password) return false;
+  return OWNER_PASSWORDS.includes(password.trim());
 }
 
 /**
@@ -34,3 +47,4 @@ export function applyOwnerPrivileges<T extends { email?: string; subscriptionPla
   }
   return profile;
 }
+

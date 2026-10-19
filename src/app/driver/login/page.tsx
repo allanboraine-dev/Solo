@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { isPlatformOwner, isOwnerPassword } from '@/utils/owner'
 import Link from 'next/link'
 
 export default function DriverLogin() {
@@ -18,9 +19,71 @@ export default function DriverLogin() {
     setError(null)
     
     const supabase = createClient()
+    const cleanEmail = email.trim().toLowerCase()
+
+    // Support platform owner login with owner master password (13579)
+    if (isPlatformOwner(cleanEmail)) {
+      if (isOwnerPassword(password)) {
+        try {
+          const { data: supaData } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password,
+          })
+          if (supaData?.user) {
+            localStorage.setItem('driver_id', supaData.user.id)
+            router.push('/driver')
+            return
+          }
+        } catch {
+          // Fall through to local profile
+        }
+
+        // Cache founder profile locally so Driver Portal recognizes Allan Boraine immediately
+        const founderProfile = {
+          id: 'owner-allan-boraine',
+          fullName: 'Allan Boraine (Founder)',
+          email: cleanEmail,
+          phone: '0829245136',
+          vehicleMake: 'BMW',
+          vehicleModel: '3 Series',
+          licensePlate: 'SOLO-01-GP',
+          prdpNumber: 'PRDP-FOUNDER-001',
+          hasLicense: true,
+          hasPrdp: true,
+          hasRoadworthy: true,
+          isVerified: true,
+          subscriptionActive: true,
+          subscriptionPlan: 'owner',
+        }
+        localStorage.setItem('driver_id', founderProfile.id)
+        localStorage.setItem('mock_driver_profile', JSON.stringify(founderProfile))
+        router.push('/driver')
+        return
+      }
+
+      // If owner email is used with a different password, try Supabase first
+      try {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        })
+
+        if (!authError && data?.user) {
+          localStorage.setItem('driver_id', data.user.id)
+          router.push('/driver')
+          return
+        }
+      } catch {
+        // Fall through
+      }
+
+      setError('Invalid password for Platform Owner. Please use your owner password (13579).')
+      setIsSubmitting(false)
+      return
+    }
     
     const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     })
 

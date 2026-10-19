@@ -2,12 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   verifyManagerPasscode,
+  isOwnerPasscode,
   createOwnerAdminSession,
 } from '../src/utils/adminAuth.ts';
+import { isOwnerPassword } from '../src/utils/owner.ts';
 
 describe('System Admin & Manager Portal Authorization Suite', () => {
   it('validates authorized manager passcodes and rejects unauthorized keys', () => {
     // Valid passcodes
+    assert.strictEqual(verifyManagerPasscode('13579'), true);
     assert.strictEqual(verifyManagerPasscode('9021'), true);
     assert.strictEqual(verifyManagerPasscode('SOLO-ADMIN-2026'), true);
     assert.strictEqual(verifyManagerPasscode('SOLO-COMPLIANCE-KEY'), true);
@@ -18,6 +21,21 @@ describe('System Admin & Manager Portal Authorization Suite', () => {
     assert.strictEqual(verifyManagerPasscode('password'), false);
     assert.strictEqual(verifyManagerPasscode(''), false);
   });
+
+  it('validates platform owner master passcode (13579) and password', () => {
+    assert.strictEqual(isOwnerPasscode('13579'), true);
+    assert.strictEqual(isOwnerPasscode('  13579  '), true);
+    assert.strictEqual(isOwnerPasscode('BORAINETECH'), true);
+    assert.strictEqual(isOwnerPasscode('9021'), false);
+    assert.strictEqual(isOwnerPasscode('random'), false);
+
+    assert.strictEqual(isOwnerPassword('13579'), true);
+    assert.strictEqual(isOwnerPassword('  13579  '), true);
+    assert.strictEqual(isOwnerPassword('wrongpassword'), false);
+    assert.strictEqual(isOwnerPassword(null), false);
+    assert.strictEqual(isOwnerPassword(''), false);
+  });
+
 
   it('creates super_admin session with platform owner privileges for Allan Boraine', () => {
     const session = createOwnerAdminSession('allanboraine@gmail.com');

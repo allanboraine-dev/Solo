@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, CheckCircle2, UserCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { isPlatformOwner } from "@/utils/owner";
-import { setAdminSession, verifyManagerPasscode, createOwnerAdminSession } from "@/utils/adminAuth";
+import { isPlatformOwner, isOwnerPassword } from "@/utils/owner";
+import { setAdminSession, verifyManagerPasscode, isOwnerPasscode, createOwnerAdminSession } from "@/utils/adminAuth";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -17,11 +17,20 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Quick Manager Passkey Login
+  // Quick Manager / Owner Passkey Login
   const handlePasskeyLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
+
+    if (isOwnerPasscode(passcode)) {
+      setSuccessMsg("Founder clearance verified with master PIN (13579). Welcome Allan Boraine.");
+      setAdminSession(createOwnerAdminSession("allanboraine@gmail.com"));
+      setTimeout(() => {
+        router.push("/admin/compliance");
+      }, 500);
+      return;
+    }
 
     if (verifyManagerPasscode(passcode)) {
       setSuccessMsg("Manager credentials verified. Access granted.");
@@ -35,7 +44,7 @@ export default function AdminLoginPage() {
         router.push("/admin/compliance");
       }, 500);
     } else {
-      setError("Invalid Manager Security Passkey. Please verify and try again.");
+      setError("Invalid Security Passkey. Please verify and try again.");
       setIsSubmitting(false);
     }
   };
@@ -51,28 +60,37 @@ export default function AdminLoginPage() {
 
     // Check if platform owner is logging in
     if (isPlatformOwner(cleanEmail)) {
-      try {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        });
-
-        // Even in offline / mock mode, allow platform owner with valid password
+      if (isOwnerPassword(password)) {
         setSuccessMsg("Welcome Founder Allan Boraine. Full administrative clearance active.");
         setAdminSession(createOwnerAdminSession(cleanEmail));
         setTimeout(() => {
           router.push("/admin/compliance");
         }, 500);
         return;
-      } catch (e) {
-        // Fallback for demo/offline owner session
-        setSuccessMsg("Platform owner access verified.");
-        setAdminSession(createOwnerAdminSession(cleanEmail));
-        setTimeout(() => {
-          router.push("/admin/compliance");
-        }, 500);
-        return;
       }
+
+      // Try Supabase auth if customized
+      try {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+        if (!authError && data?.user) {
+          setSuccessMsg("Welcome Founder Allan Boraine. Full administrative clearance active.");
+          setAdminSession(createOwnerAdminSession(cleanEmail));
+          setTimeout(() => {
+            router.push("/admin/compliance");
+          }, 500);
+          return;
+        }
+      } catch (err) {
+        console.warn("Auth check error:", err);
+      }
+
+      setError("Invalid password for Platform Owner. Please use your owner password (13579).");
+      setIsSubmitting(false);
+      return;
     }
 
     try {
@@ -199,7 +217,7 @@ export default function AdminLoginPage() {
                 <input
                   type="password"
                   required
-                  placeholder="Enter Manager Passkey (e.g. 9021)"
+                  placeholder="Enter Passkey or Owner PIN (13579)"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
@@ -207,7 +225,7 @@ export default function AdminLoginPage() {
                 <Key size={16} className="absolute right-3.5 top-3.5 text-zinc-500" />
               </div>
               <p className="text-[11px] text-zinc-500 mt-1.5">
-                Default Operations PIN: <code className="text-zinc-400 font-mono">9021</code> or <code className="text-zinc-400 font-mono">SOLO-ADMIN-2026</code>
+                Owner Master PIN: <code className="text-emerald-400 font-mono">13579</code> &bull; Operations PIN: <code className="text-zinc-400 font-mono">9021</code>
               </p>
             </div>
 

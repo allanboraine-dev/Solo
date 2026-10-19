@@ -10,13 +10,15 @@ export interface AdminSession {
 
 const ADMIN_SESSION_KEY = 'solo_admin_session';
 
-// Approved manager passkeys for instant offline/operations access
+// Approved manager and owner passkeys for instant operations & owner access
 const AUTHORIZED_PASSCODES = [
+  '13579', // Owner / Founder Master Passcode
   '9021',
   'SOLO-ADMIN-2026',
   'SOLO-COMPLIANCE-KEY',
   'BORAINETECH',
 ];
+
 
 export function getAdminSession(): AdminSession | null {
   if (typeof window === 'undefined') return null;
@@ -58,6 +60,13 @@ export function verifyManagerPasscode(passcode: string): boolean {
   const clean = passcode.trim();
   return AUTHORIZED_PASSCODES.includes(clean);
 }
+
+export function isOwnerPasscode(passcode: string): boolean {
+  if (!passcode) return false;
+  const clean = passcode.trim();
+  return clean === '13579' || clean.toUpperCase() === 'BORAINETECH';
+}
+
 
 export function createOwnerAdminSession(email: string = 'allanboraine@gmail.com'): AdminSession {
   return {
