@@ -15,14 +15,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Driver email is required' }, { status: 400 });
     }
 
-    // Platform Owner exemption: Allan Boraine has lifetime free driver access with no card requirement
-    if (isPlatformOwner(email)) {
-      return NextResponse.json({
-        success: true,
-        isOwner: true,
-        message: 'Platform owner exempt from card capture and subscription charges.',
-      });
-    }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {

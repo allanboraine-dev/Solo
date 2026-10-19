@@ -24,7 +24,6 @@ import {
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
-import { isPlatformOwner } from '@/utils/owner'
 
 export default function DriverRegistration() {
   const router = useRouter()
@@ -57,6 +56,19 @@ export default function DriverRegistration() {
   const [createdDriverId, setCreatedDriverId] = useState<string | null>(null)
   const [hasRegisteredAccount, setHasRegisteredAccount] = useState(false)
   const [isPaystackLoaded, setIsPaystackLoaded] = useState(false)
+
+  // Purge any existing cached owner/driver session on mount so registration is 100% clean
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (!params.get('card_setup')) {
+      localStorage.removeItem('driver_id')
+      localStorage.removeItem('pending_driver_email')
+      localStorage.removeItem('mock_driver_profile')
+      const supabase = createClient()
+      supabase.auth.signOut().catch(() => {})
+    }
+  }, [])
 
   // Dynamically load Paystack Inline JS script
   useEffect(() => {
@@ -124,7 +136,6 @@ export default function DriverRegistration() {
   // Registers the Supabase user, profile, and uploads KYC documents
   const performAccountRegistration = async (): Promise<{ driverId: string; hasSession: boolean }> => {
     const supabase = createClient()
-    const isOwner = isPlatformOwner(email)
     let driverId: string | null = createdDriverId
     let hasSession = false
 
@@ -189,9 +200,9 @@ export default function DriverRegistration() {
       hasLicense: !!(licenseFrontFile || licenseBackFile),
       hasPrdp: !!prdpFile,
       hasRoadworthy: !!roadworthyFile,
-      isVerified: isOwner ? true : false,
+      isVerified: false,
       subscriptionActive: true,
-      subscriptionPlan: isOwner ? 'owner' : 'trial',
+      subscriptionPlan: 'trial',
       trialStartedAt: Date.now(),
       trialEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
     })
@@ -209,8 +220,8 @@ export default function DriverRegistration() {
         vehicleModel,
         licensePlate,
         prdpNumber,
-        isVerified: isOwner,
-        subscriptionPlan: isOwner ? 'owner' : 'trial',
+        isVerified: false,
+        subscriptionPlan: 'trial',
         createdAt: new Date().toISOString(),
       })
       localStorage.setItem('all_registered_drivers', JSON.stringify(filteredDrivers))
@@ -279,19 +290,10 @@ export default function DriverRegistration() {
     setSubmitError(null)
 
     try {
-      const isOwner = isPlatformOwner(email)
-
       // 1. Register account & upload documents if not done yet
       const { driverId, hasSession } = await performAccountRegistration()
 
-      // 2. If Platform Owner, immediately bypass card entry
-      if (isOwner) {
-        alert("👑 Welcome Platform Owner! Your account has been activated with permanent lifetime free driver access. No card capture or monthly fee required.")
-        router.push(hasSession ? '/driver' : '/driver/login')
-        return
-      }
-
-      // 3. Initialize Paystack card tokenization transaction
+      // 2. Initialize Paystack card tokenization transaction
       setUploadProgressText('Connecting to Paystack secure card vault...')
       const initRes = await fetch('/api/driver/init-trial-card', {
         method: 'POST',
@@ -389,7 +391,6 @@ export default function DriverRegistration() {
   }
 
   const hasRequiredDocs = !!(licenseFrontFile && licenseBackFile && prdpFile && roadworthyFile)
-  const isOwner = isPlatformOwner(email)
 
   // 7-day trial date string for UI display
   const trialEndDateString = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', {
@@ -460,25 +461,25 @@ export default function DriverRegistration() {
 
           {/* STEP 1: Personal Info */}
           {step === 1 && (
-            <form onSubmit={handleNext} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <form onSubmit={handleNext} autoComplete="off" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
                 <User className="text-blue-500" /> Personal Details
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input required type="text" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Sipho Khumalo" />
+                <input required type="text" name="driver_reg_fullname" autoComplete="off" autoCorrect="off" spellCheck={false} value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Sipho Khumalo" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email Address</label>
-                <input required type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="sipho@example.co.za" />
+                <input required type="email" name="driver_reg_email" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="sipho@example.co.za" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Create Password</label>
-                <input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="••••••••" minLength={6} />
+                <input required type="password" name="driver_reg_password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="••••••••" minLength={6} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number (South Africa)</label>
-                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="+27 82 123 4567" />
+                <input required type="tel" name="driver_reg_phone" autoComplete="off" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="+27 82 123 4567" />
               </div>
               <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
                 Continue to Vehicle &amp; Payment Setup <ChevronRight size={18} />
@@ -655,38 +656,8 @@ export default function DriverRegistration() {
                 </span>
               </div>
 
-              {isOwner ? (
-                /* Platform Owner Bypass View */
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50/50 dark:from-amber-950/40 dark:to-yellow-950/20 rounded-2xl p-5 border border-amber-200 dark:border-amber-900/50 text-left space-y-3">
-                  <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200 text-sm">
-                    <Sparkles size={16} className="text-amber-500" />
-                    <span>Platform Owner Detected (Allan Boraine)</span>
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                    You have permanent <strong>Lifetime Free Driver Access</strong> with zero subscription deductions and 0% commission on all rides. Card capture is waived.
-                  </p>
-                  <button
-                    onClick={handleCardSetupAndTrialStart}
-                    disabled={isSubmitting}
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-black p-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition"
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
-                        <span>{uploadProgressText || 'Activating owner account...'}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <span>Activate Driver Account (Owner Free)</span>
-                        <ArrowRight size={18} />
-                      </>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                /* Standard Driver: Transparent 7-Day Trial & Card Capture */
-                <>
-                  <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white p-5 rounded-2xl shadow-xl border border-zinc-800 space-y-4">
+              {/* Standard Driver: Transparent 7-Day Trial & Card Capture */}
+              <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white p-5 rounded-2xl shadow-xl border border-zinc-800 space-y-4">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
@@ -786,10 +757,8 @@ export default function DriverRegistration() {
                       )}
                     </button>
                   </div>
-                </>
+                </div>
               )}
-            </div>
-          )}
         </div>
         
         <div className="text-center p-4 text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800">

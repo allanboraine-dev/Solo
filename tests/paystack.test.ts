@@ -110,4 +110,31 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
       'Driver register PaystackPop.setup callback must be a standard synchronous function'
     );
   });
+
+  it('verifies driver registration page has no owner bypass and auto-purges cached sessions', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const driverRegisterSource = fs.readFileSync(
+      path.join(process.cwd(), 'src', 'app', 'driver', 'register', 'page.tsx'),
+      'utf8'
+    );
+
+    assert.strictEqual(
+      /isOwner|isPlatformOwner/.test(driverRegisterSource),
+      false,
+      'Driver register page must not contain owner bypass logic or prefill'
+    );
+    assert.strictEqual(
+      /localStorage\.removeItem\('driver_id'\)/.test(driverRegisterSource),
+      true,
+      'Driver register page must purge cached driver credentials on mount'
+    );
+    assert.strictEqual(
+      /autoComplete="off"/.test(driverRegisterSource),
+      true,
+      'Driver register page must use anti-autofill attributes'
+    );
+  });
 });
+
+

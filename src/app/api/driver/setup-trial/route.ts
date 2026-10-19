@@ -23,25 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Driver email is required' }, { status: 400 });
     }
 
-    const isOwner = isPlatformOwner(email);
 
-    // Platform Owner bypass: lifetime free access with zero card or subscription requirements
-    if (isOwner) {
-      saveKycDriverProfile({
-        id: driverId,
-        email,
-        isVerified: true,
-        subscriptionPlan: 'owner',
-        trialStartedAt: new Date().toISOString(),
-        cardCaptured: true,
-      });
-
-      return NextResponse.json({
-        success: true,
-        isOwner: true,
-        message: 'Platform owner activated with permanent free subscription privileges.',
-      });
-    }
 
     if (!reference) {
       return NextResponse.json({ error: 'Paystack transaction reference is required' }, { status: 400 });
