@@ -10,10 +10,11 @@ import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShieldModal'
+import RiderSupportModal from '@/components/RiderSupportModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -89,7 +90,19 @@ export default function RiderPage() {
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
   const [showDriversModal, setShowDriversModal] = useState(false)
   const [showSafetyModal, setShowSafetyModal] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
+  const [pastRiderTrips, setPastRiderTrips] = useState<MockTrip[]>([])
   const [focusedDriverCoords, setFocusedDriverCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  const handleOpenSupport = async () => {
+    try {
+      const allTrips = await getTrips()
+      const myRiderId = getRiderSessionId(currentUser?.id)
+      const myTrips = allTrips.filter(t => t.rider_id === myRiderId || t.status === 'completed')
+      setPastRiderTrips(myTrips)
+    } catch {}
+    setShowSupportModal(true)
+  }
 
   const handleLocateDriverOnMap = (driver: LiveDriver) => {
     setFocusedDriverCoords({ lat: driver.lat, lng: driver.lng })
@@ -990,6 +1003,15 @@ export default function RiderPage() {
                         {availableDrivers.length}
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenSupport}
+                      className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2.5 py-1.5 rounded-xl border border-amber-200/70 dark:border-amber-800/60 transition active:scale-95 shadow-2xs"
+                      title="Help, Lost & Found, and Trip Support"
+                    >
+                      <HelpCircle size={14} />
+                      <span className="hidden sm:inline">Help</span>
+                    </button>
                     <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-zinc-800" />
                     <button
                       type="button"
@@ -1525,6 +1547,15 @@ export default function RiderPage() {
         vehicleModel={assignedDriverInfo?.vehicleModel}
         licensePlate={assignedDriverInfo?.licensePlate}
         verificationPin={activeTrip?.verification_pin}
+      />
+
+      {/* Rider Help, Disputes & Lost Property Modal */}
+      <RiderSupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        trips={pastRiderTrips}
+        currentUser={currentUser}
+        onOpenSafetyModal={() => setShowSafetyModal(true)}
       />
     </div>
   )

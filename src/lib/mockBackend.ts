@@ -1544,7 +1544,7 @@ export const getDriverRatingSummary = (driverId?: string): { average: number; co
 // ----------------------------------------
 // REAL-TIME BROADCASTS & SUBSCRIPTIONS
 // ----------------------------------------
-export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'sos_emergency_alert' | 'INSERT' | 'UPDATE';
+export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'sos_emergency_alert' | 'lost_item_alert' | 'INSERT' | 'UPDATE';
 
 let globalTripsChannel: any = null;
 let globalMessagesChannel: any = null;
@@ -1757,6 +1757,9 @@ const initGlobalChannels = () => {
     })
     .on('broadcast', { event: 'sos_emergency_alert' }, (payload: any) => {
       listeners.forEach(cb => cb('sos_emergency_alert', payload.payload));
+    })
+    .on('broadcast', { event: 'lost_item_alert' }, (payload: any) => {
+      listeners.forEach(cb => cb('lost_item_alert', payload.payload));
     })
     .subscribe();
 };

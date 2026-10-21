@@ -22,6 +22,7 @@ import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils
 import SafetyShieldModal from '@/components/SafetyShieldModal'
 import { AdaptiveTelemetryGovernor, TELEMETRY_TIER_CONFIGS, type ComputedGpsSample } from '@/utils/telemetryEngine'
 import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
+import { updateSupportTicketStatus, type SupportTicket } from '@/utils/supportStore'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -119,6 +120,7 @@ export default function DriverPage() {
   const [isNotifyingArrival, setIsNotifyingArrival] = useState(false)
   const [showSafetyModal, setShowSafetyModal] = useState(false)
   const [nearbySosAlert, setNearbySosAlert] = useState<SafetyIncidentRecord | null>(null)
+  const [activeLostItemAlert, setActiveLostItemAlert] = useState<SupportTicket | null>(null)
   const [liveNavDetails, setLiveNavDetails] = useState<{ distanceKm: number; durationMinutes: number } | null>(null)
   const [telemetryStatus, setTelemetryStatus] = useState<ComputedGpsSample | null>(null)
   const telemetryGovernorRef = useRef<AdaptiveTelemetryGovernor | null>(null)
@@ -366,6 +368,18 @@ export default function DriverPage() {
         return;
       }
 
+      if (type === 'lost_item_alert') {
+        const ticket = payload as SupportTicket | null;
+        const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
+        if (ticket && (!ticket.driverId || ticket.driverId === driverId)) {
+          setActiveLostItemAlert(ticket);
+          try {
+            audioAlert.playTripAlertChime();
+          } catch {}
+        }
+        return;
+      }
+
       if (type === 'driver_session_preempted') {
         const payloadData = payload as { driverId: string; deviceId: string } | null;
         const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
@@ -449,10 +463,23 @@ export default function DriverPage() {
         }
       }
     });
+
+    const onLocalLostItem = (e: any) => {
+      const ticket = e?.detail?.ticket as SupportTicket | null;
+      const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
+      if (ticket && (!ticket.driverId || ticket.driverId === driverId)) {
+        setActiveLostItemAlert(ticket);
+        try {
+          audioAlert.playTripAlertChime();
+        } catch {}
+      }
+    };
+    window.addEventListener('solo_lost_item_alert', onLocalLostItem);
     
     return () => {
       clearInterval(pollInterval);
       unsubscribe();
+      window.removeEventListener('solo_lost_item_alert', onLocalLostItem);
     }
   }, [isOnline, profile?.id])
 
@@ -1449,6 +1476,90 @@ export default function DriverPage() {
                         <MapPin size={13} />
                         <span>Open Responder GPS Pin</span>
                       </a>
+                    </div>
+                  )}
+
+                  {activeLostItemAlert && (
+                    <div className="mb-4 p-4 rounded-2xl bg-amber-600 text-white text-left text-xs shadow-xl shadow-amber-600/30 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black uppercase tracking-wider flex items-center gap-1.5">
+                          <Smartphone size={16} />
+                          <span>🚨 Passenger Lost Item Alert ({activeLostItemAlert.ticketCode})</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveLostItemAlert(null)}
+                          className="text-white/80 hover:text-white font-bold px-1 text-sm"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-amber-100">
+                        A passenger from a recent trip reported an item left behind in your vehicle.
+                      </p>
+                      <div className="p-3 bg-black/20 rounded-xl text-xs space-y-1 text-amber-50">
+                        <div>
+                          <strong>Item:</strong> {activeLostItemAlert.itemDetails?.brandModel || activeLostItemAlert.subject}{' '}
+                          {activeLostItemAlert.itemDetails?.color ? `(${activeLostItemAlert.itemDetails.color})` : ''}
+                        </div>
+                        {activeLostItemAlert.itemDetails?.caseOrFeatures && (
+                          <div><strong>Features/Case:</strong> {activeLostItemAlert.itemDetails.caseOrFeatures}</div>
+                        )}
+                        {activeLostItemAlert.itemDetails?.lockScreenInfo && (
+                          <div><strong>Lock Screen Hint:</strong> {activeLostItemAlert.itemDetails.lockScreenInfo}</div>
+                        )}
+                        <div><strong>Passenger:</strong> {activeLostItemAlert.riderName || 'SOLO Passenger'}</div>
+                        <div>
+                          <strong>Alternative Contact:</strong> {activeLostItemAlert.alternativeContactName || 'Contact'} ({activeLostItemAlert.alternativeContactPhone})
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {activeLostItemAlert.alternativeContactPhone && (
+                          <>
+                            <a
+                              href={`tel:${activeLostItemAlert.alternativeContactPhone}`}
+                              className="inline-flex items-center gap-1 bg-white text-amber-800 font-bold px-3 py-1.5 rounded-xl text-[11px] hover:bg-amber-50 transition shadow-xs"
+                            >
+                              <Phone size={13} />
+                              <span>Call Passenger</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/${activeLostItemAlert.alternativeContactPhone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+                                `Hi, I am your SOLO driver. I received your lost property alert (${activeLostItemAlert.ticketCode}).`
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] hover:bg-emerald-700 transition shadow-xs"
+                            >
+                              <MessageCircle size={13} />
+                              <span>WhatsApp</span>
+                            </a>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSupportTicketStatus(activeLostItemAlert.id, 'driver_confirmed_found', 'Driver confirmed item secured in vehicle.');
+                            alert('Thank you! Passenger and SOLO Support have been notified that you secured the item.');
+                            setActiveLostItemAlert(null);
+                          }}
+                          className="inline-flex items-center gap-1 bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] hover:bg-emerald-600 transition"
+                        >
+                          <CheckCircle2 size={13} />
+                          <span>I Found It</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSupportTicketStatus(activeLostItemAlert.id, 'driver_checked_not_found', 'Driver checked vehicle but item was not located.');
+                            alert('Status updated: Checked vehicle, item was not located.');
+                            setActiveLostItemAlert(null);
+                          }}
+                          className="inline-flex items-center gap-1 bg-black/30 text-white font-medium px-2.5 py-1.5 rounded-xl text-[11px] hover:bg-black/40 transition"
+                        >
+                          <span>Not Found</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 

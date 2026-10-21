@@ -465,7 +465,14 @@ export default function RiderLoginPage() {
           </form>
         )}
 
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-6 p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 rounded-2xl text-center text-xs text-amber-800 dark:text-amber-300">
+          <span>Left your phone in a SOLO vehicle? </span>
+          <Link href="/lost-phone" className="font-bold underline text-amber-900 dark:text-amber-200 hover:text-amber-700">
+            Report lost phone without logging in &rarr;
+          </Link>
+        </div>
+
+        <div className="mt-6 text-center text-sm text-gray-500">
           Are you a driver? <Link href="/driver/login" className="text-green-600 font-bold hover:underline">Driver Portal</Link>
         </div>
       </div>

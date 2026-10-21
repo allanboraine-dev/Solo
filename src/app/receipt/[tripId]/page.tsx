@@ -249,6 +249,28 @@ export default function TripReceiptPage() {
           </p>
         </div>
 
+        {/* Support & Lost Property Bar */}
+        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs print:hidden">
+          <div>
+            <strong className="text-amber-900 block font-bold">Have an issue or left an item in the car?</strong>
+            <span className="text-amber-700 text-[11px]">Report lost items or dispute this trip with our support team.</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="/lost-phone"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition text-[11px]"
+            >
+              Report Lost Phone
+            </a>
+            <a
+              href="/rider"
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition text-[11px]"
+            >
+              Get Trip Support
+            </a>
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="text-center text-[10px] text-zinc-400 pt-4 border-t border-zinc-200">
           Thank you for riding with SOLO • Zero Commission E-Hailing • Built by Boraine Tech (Pty) Ltd • www.solo-app.co.za

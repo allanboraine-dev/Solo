@@ -424,6 +424,18 @@ Background notifications adhere to the Web Push Protocol (RFC 8291 / RFC 8292) s
 2. **Chargeback Defense:** Physical 4-digit PIN confirmation upon boarding provides conclusive proof of passenger presence, protecting drivers against fraudulent "trip not taken" chargeback claims.
 3. **Emergency Action:** In safety incidents, administrators can freeze accounts (`is_active = false`) and export telemetry for SAPS law enforcement inquiries.
 
+### 3.9 Rider Customer Service, Lost Property & Emergency Lost Phone Recovery
+1. **Zero-Login Lost Phone Recovery (`/lost-phone`):**
+   - In the event a passenger leaves their smartphone inside a driver's vehicle, they cannot access in-app chat or receive SMS OTP login verification codes.
+   - The public `/lost-phone` portal allows riders, hotel concierges, or friends to submit an emergency lost property claim with zero login requirements.
+   - Requires passenger identification, alternative contact number, phone make/model/features, and approximate trip landmarks.
+2. **Instant Driver Priority Alert & Chime:**
+   - Once a lost property ticket is submitted, the system automatically matches the trip in the database and dispatches a high-priority audio chime and visual dispatch banner (`lost_item_alert`) to the driver's active terminal.
+   - Drivers can immediately tap "Call Passenger" or "WhatsApp" to communicate directly with the passenger's alternative contact number without platform intermediary delay.
+3. **In-App Rider Help & Resolution Hub:**
+   - Passengers can open the Rider Help modal directly from the rider interface or from their trip receipt (`/receipt/[tripId]`).
+   - Categorized self-service workflows for fare disputes, driver conduct feedback, SARS-compliant tax receipt downloads, and official WhatsApp Business support escalation (`https://wa.me/27...`).
+
 ---
 
 ## Appendix: South African Banking & Statutory Directory
