@@ -592,7 +592,7 @@ export default function RiderSupportModal({
                   How is my fare calculated?
                 </strong>
                 <p className="text-gray-600 dark:text-zinc-300">
-                  SOLO uses transparent South African distance pricing: <strong>R20 base fare + R10/km</strong>, with a minimum fare of R30. Drivers keep 100% of the fare with zero commission deductions.
+                  SOLO uses transparent South African distance pricing: <strong>R12 base fare + R8/km</strong>, with a minimum fare of R25. Drivers keep 100% of the fare with zero commission deductions.
                 </p>
               </div>
 

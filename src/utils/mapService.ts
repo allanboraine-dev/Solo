@@ -2009,7 +2009,7 @@ export interface FareBreakdown {
 /**
  * Returns South African Time-of-Day Tariff tier based on local time:
  *  - Morning Rush (06:30 - 08:30): +15% (1.15x) - peak commuting & school traffic
- *  - Daytime Standard (08:30 - 16:30): 1.0x (Standard Base: R20 + R10/km, min R30)
+ *  - Daytime Standard (08:30 - 16:30): 1.0x (Standard Base: R12 + R8/km, min R25)
  *  - Evening Commute (16:30 - 18:30): +15% (1.15x) - peak home-bound traffic
  *  - Evening Standard (18:30 - 22:00): 1.0x (Standard)
  *  - Night Owl & Safety Surcharge (22:00 - 05:00): +25% (1.25x) - driver night safety & availability incentive
@@ -2070,7 +2070,7 @@ export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
     name: 'Standard Daytime',
     multiplier: 1.0,
     badge: '☀️ Standard Daytime',
-    description: 'Standard distance tariff (R20 base + R10/km, min R30)',
+    description: 'Standard distance tariff (R12 base + R8/km, min R25)',
   };
 }
 
@@ -2083,12 +2083,12 @@ export function calculateDynamicFare(
 ): FareBreakdown {
   const validDist = Math.max(0, Number(distanceKm) || 0);
   const tariff = getTimeOfDayTariff(atTime);
-  const baseFareZar = 20;
-  const distanceFareZar = Math.round(validDist * 10);
+  const baseFareZar = 12;
+  const distanceFareZar = Math.round(validDist * 8);
   const subtotalZar = baseFareZar + distanceFareZar;
 
-  // Apply time-of-day multiplier with minimum fare floor (R30 * multiplier)
-  const minimumFareZar = Math.max(30, Math.round(30 * tariff.multiplier));
+  // Apply time-of-day multiplier with minimum fare floor (R25 * multiplier)
+  const minimumFareZar = Math.max(25, Math.round(25 * tariff.multiplier));
   const scaledFare = Math.round(subtotalZar * tariff.multiplier);
   const totalFare = Math.max(minimumFareZar, scaledFare);
 
@@ -2105,7 +2105,7 @@ export function calculateDynamicFare(
 
 /**
  * Calculates fare in South African Rand (ZAR)
- * Base fare: R20 | Per-km: R10 | Minimum fare: R30
+ * Base fare: R12 | Per-km: R8 | Minimum fare: R25
  * Supports optional Date or options object for time-of-day dynamic adjustment.
  */
 export function calculateFare(
@@ -2113,13 +2113,13 @@ export function calculateFare(
   dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean }
 ): number {
   if (!dateOrOptions) {
-    return Math.max(30, Math.round(20 + distanceKm * 10));
+    return Math.max(25, Math.round(12 + distanceKm * 8));
   }
   if (dateOrOptions instanceof Date) {
     return calculateDynamicFare(distanceKm, dateOrOptions).totalFare;
   }
   if (dateOrOptions.enforceStandard) {
-    return Math.max(30, Math.round(20 + distanceKm * 10));
+    return Math.max(25, Math.round(12 + distanceKm * 8));
   }
   return calculateDynamicFare(distanceKm, dateOrOptions.atTime || new Date()).totalFare;
 }

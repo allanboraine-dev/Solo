@@ -11,7 +11,7 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     const pickup = { lat: -26.1046, lng: 28.0540, name: 'Sandton City' };
     const dropoff = { lat: -26.1467, lng: 28.0417, name: 'Rosebank Mall' };
     const distanceKm = 5.9;
-    const fare = calculateFare(distanceKm); // R79
+    const fare = calculateFare(distanceKm); // R59
     const verificationPin = '4821';
 
     let trip = {
@@ -31,7 +31,7 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     };
 
     assert.strictEqual(trip.status, 'requested');
-    assert.strictEqual(trip.fare_amount, 79);
+    assert.strictEqual(trip.fare_amount, 59);
 
     // 2. Driver within 15km radar discovers the ride
     const driverCoords = { lat: -26.1200, lng: 28.0500 }; // ~2km from pickup

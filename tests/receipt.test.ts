@@ -8,14 +8,14 @@ describe('SARS Compliant Tax Invoice & Trip Receipt Suite', () => {
 
     for (const dist of testDistances) {
       const totalFare = calculateFare(dist);
-      const baseFare = 20;
+      const baseFare = 12;
       const distanceCharge = Math.max(0, totalFare - baseFare);
       const platformCommission = 0; // ZERO COMMISSION MODEL
       const driverTakeHome = totalFare - platformCommission;
 
       assert.strictEqual(platformCommission, 0);
       assert.strictEqual(driverTakeHome, totalFare);
-      assert.ok(totalFare >= 30, 'Enforces minimum R30 fare');
+      assert.ok(totalFare >= 25, 'Enforces minimum R25 fare');
     }
   });
 
