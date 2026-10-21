@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   calculateFare,
+  calculateDynamicFare,
+  getTimeOfDayTariff,
   getTileLayerConfig,
   parseHouseNumberFromQuery,
   toTitleCase,
@@ -21,6 +23,57 @@ describe('Commercial Map & Fare Pricing Suite', () => {
     assert.strictEqual(calculateFare(10), 120); // 20 + 100 = 120
     assert.strictEqual(calculateFare(25), 270); // 20 + 250 = 270
     assert.strictEqual(calculateFare(12.3), 143); // 20 + 123 = 143
+  });
+
+  it('automatically regulates trip fees based on South African Time-of-Day tariff schedule', () => {
+    // 1. Morning Rush: 07:30 (06:30 - 08:30) -> +15%
+    const morningDate = new Date();
+    morningDate.setHours(7, 30, 0, 0);
+    const morningTariff = getTimeOfDayTariff(morningDate);
+    assert.strictEqual(morningTariff.code, 'morning_peak');
+    assert.strictEqual(morningTariff.multiplier, 1.15);
+    const morningBreakdown = calculateDynamicFare(5, morningDate);
+    // 5km standard is R70. With +15%: 70 * 1.15 = 80.5 -> R81
+    assert.strictEqual(morningBreakdown.totalFare, 81);
+    assert.strictEqual(calculateFare(5, morningDate), 81);
+
+    // 2. Daytime Standard: 12:00 (08:30 - 16:30) -> 1.0x
+    const middayDate = new Date();
+    middayDate.setHours(12, 0, 0, 0);
+    const middayTariff = getTimeOfDayTariff(middayDate);
+    assert.strictEqual(middayTariff.code, 'standard');
+    assert.strictEqual(middayTariff.multiplier, 1.0);
+    assert.strictEqual(calculateFare(5, middayDate), 70);
+
+    // 3. Evening Commute: 17:30 (16:30 - 18:30) -> +15%
+    const eveningDate = new Date();
+    eveningDate.setHours(17, 30, 0, 0);
+    const eveningTariff = getTimeOfDayTariff(eveningDate);
+    assert.strictEqual(eveningTariff.code, 'evening_peak');
+    assert.strictEqual(eveningTariff.multiplier, 1.15);
+    assert.strictEqual(calculateFare(5, eveningDate), 81);
+
+    // 4. Night Owl: 23:30 (22:00 - 05:00) -> +25%
+    const nightDate = new Date();
+    nightDate.setHours(23, 30, 0, 0);
+    const nightTariff = getTimeOfDayTariff(nightDate);
+    assert.strictEqual(nightTariff.code, 'night_owl');
+    assert.strictEqual(nightTariff.multiplier, 1.25);
+    // 5km standard is R70. With +25%: 70 * 1.25 = 87.5 -> R88
+    assert.strictEqual(calculateDynamicFare(5, nightDate).totalFare, 88);
+    assert.strictEqual(calculateFare(5, nightDate), 88);
+
+    // 5. Early 02:00 AM (still Night Owl) -> +25%
+    const earlyHoursDate = new Date();
+    earlyHoursDate.setHours(2, 0, 0, 0);
+    assert.strictEqual(getTimeOfDayTariff(earlyHoursDate).code, 'night_owl');
+    assert.strictEqual(calculateFare(5, earlyHoursDate), 88);
+
+    // 6. Early Dawn: 05:30 -> 1.0x
+    const dawnDate = new Date();
+    dawnDate.setHours(5, 30, 0, 0);
+    assert.strictEqual(getTimeOfDayTariff(dawnDate).code, 'early_dawn');
+    assert.strictEqual(calculateFare(5, dawnDate), 70);
   });
 
   it('provides Mapbox tile layer configuration with retina high-DPI support', () => {

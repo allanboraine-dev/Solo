@@ -295,13 +295,22 @@ The SOLO Driver interface is optimized for in-vehicle mounting on modern smartph
    - **Tap "Complete Trip":** The trip state transitions to `completed`, releasing your vehicle back to `available` status for the next dispatch. The passenger immediately receives their digital SARS tax invoice at `/receipt/[tripId]`.
 
 ### 2.10 Fare Structure, Zero Commission Economics & Direct Cash/Card Liquidity
-SOLO operates on a standardized, non-surge fare structure designed to maintain strong passenger demand while maximizing driver net take-home earnings:
+SOLO operates on a transparent, time-regulated fare structure designed to maintain strong passenger demand while maximizing driver net take-home earnings during peak and unsociable hours:
 - **Base Flag-Fall Fare:** R20.00
 - **Rate per Kilometer:** R10.00 / km
 - **Minimum Trip Fare:** R30.00
 - **Platform Take-Rate:** **R0.00 (0.0% Commission)**
 
-$$\text{Driver Earnings per Trip} = 100\% \times \text{Metered Fare Charged to Passenger}$$
+#### Time-of-Day (TOD) Dynamic Tariff Schedule:
+To balance passenger demand and incentivize driver road availability during rush hours and late-night safety periods, fares are automatically regulated by scheduled time windows:
+1. **Morning Rush (06:30 – 08:30):** **+15% (1.15×)** — Accommodates heavy morning commuter and school drop-off traffic.
+2. **Daytime Standard (08:30 – 16:30):** **1.0× (Standard)** — Predictable baseline rate (`R20 base + R10/km`, min R30).
+3. **Evening Commute (16:30 – 18:30):** **+15% (1.15×)** — Accommodates peak home-bound commuting traffic.
+4. **Evening Standard (18:30 – 22:00):** **1.0× (Standard)** — Baseline rate for dinner, retail, and leisure trips.
+5. **Night Owl & Safety (22:00 – 05:00):** **+25% (1.25×)** — Compensates drivers for late-night risk, fuel station scarcity, and safety vigilance, preventing late-night passenger stranding.
+6. **Early Dawn (05:00 – 06:30):** **1.0× (Standard)** — Early morning transport and airport/rail connections.
+
+$$\text{Driver Earnings per Trip} = 100\% \times \text{Metered Dynamic Fare Charged to Passenger}$$
 
 #### Immediate Liquidity Advantage:
 - **Zero Commission Deductions:** Unlike legacy e-hailing apps that deduct 25% or more from every trip, you keep every single Rand of the fare.

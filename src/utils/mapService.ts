@@ -1986,12 +1986,142 @@ export async function getRouteDirections(
   return null;
 }
 
+export type TariffTierCode = 'standard' | 'morning_peak' | 'evening_peak' | 'night_owl' | 'early_dawn';
+
+export interface TariffTier {
+  code: TariffTierCode;
+  name: string;
+  multiplier: number;
+  badge: string;
+  description: string;
+}
+
+export interface FareBreakdown {
+  distanceKm: number;
+  baseFareZar: number;
+  distanceFareZar: number;
+  subtotalZar: number;
+  multiplier: number;
+  totalFare: number;
+  tariff: TariffTier;
+}
+
+/**
+ * Returns South African Time-of-Day Tariff tier based on local time:
+ *  - Morning Rush (06:30 - 08:30): +15% (1.15x) - peak commuting & school traffic
+ *  - Daytime Standard (08:30 - 16:30): 1.0x (Standard Base: R20 + R10/km, min R30)
+ *  - Evening Commute (16:30 - 18:30): +15% (1.15x) - peak home-bound traffic
+ *  - Evening Standard (18:30 - 22:00): 1.0x (Standard)
+ *  - Night Owl & Safety Surcharge (22:00 - 05:00): +25% (1.25x) - driver night safety & availability incentive
+ *  - Early Dawn (05:00 - 06:30): 1.0x (Standard)
+ */
+export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  const timeVal = hour + minute / 60;
+
+  // Night Owl: 22:00 to 05:00
+  if (timeVal >= 22.0 || timeVal < 5.0) {
+    return {
+      code: 'night_owl',
+      name: 'Night Owl & Safety',
+      multiplier: 1.25,
+      badge: '🦉 Night Owl (+25%)',
+      description: 'Late-night driver availability & safety incentive',
+    };
+  }
+
+  // Morning Rush: 06:30 to 08:30
+  if (timeVal >= 6.5 && timeVal < 8.5) {
+    return {
+      code: 'morning_peak',
+      name: 'Morning Rush',
+      multiplier: 1.15,
+      badge: '🌅 Morning Peak (+15%)',
+      description: 'Peak morning commuting and school traffic tariff',
+    };
+  }
+
+  // Evening Commute Peak: 16:30 to 18:30
+  if (timeVal >= 16.5 && timeVal < 18.5) {
+    return {
+      code: 'evening_peak',
+      name: 'Evening Commute',
+      multiplier: 1.15,
+      badge: '🌆 Evening Peak (+15%)',
+      description: 'Peak evening home-bound commuting traffic tariff',
+    };
+  }
+
+  // Early Dawn: 05:00 to 06:30
+  if (timeVal >= 5.0 && timeVal < 6.5) {
+    return {
+      code: 'early_dawn',
+      name: 'Early Dawn',
+      multiplier: 1.0,
+      badge: '☕ Early Dawn Standard',
+      description: 'Standard early morning transfer rate',
+    };
+  }
+
+  // Standard Daytime
+  return {
+    code: 'standard',
+    name: 'Standard Daytime',
+    multiplier: 1.0,
+    badge: '☀️ Standard Daytime',
+    description: 'Standard distance tariff (R20 base + R10/km, min R30)',
+  };
+}
+
+/**
+ * Computes full fare breakdown with South African Time-of-Day Tariff
+ */
+export function calculateDynamicFare(
+  distanceKm: number,
+  atTime: Date = new Date()
+): FareBreakdown {
+  const validDist = Math.max(0, Number(distanceKm) || 0);
+  const tariff = getTimeOfDayTariff(atTime);
+  const baseFareZar = 20;
+  const distanceFareZar = Math.round(validDist * 10);
+  const subtotalZar = baseFareZar + distanceFareZar;
+
+  // Apply time-of-day multiplier with minimum fare floor (R30 * multiplier)
+  const minimumFareZar = Math.max(30, Math.round(30 * tariff.multiplier));
+  const scaledFare = Math.round(subtotalZar * tariff.multiplier);
+  const totalFare = Math.max(minimumFareZar, scaledFare);
+
+  return {
+    distanceKm: validDist,
+    baseFareZar,
+    distanceFareZar,
+    subtotalZar,
+    multiplier: tariff.multiplier,
+    totalFare,
+    tariff,
+  };
+}
+
 /**
  * Calculates fare in South African Rand (ZAR)
  * Base fare: R20 | Per-km: R10 | Minimum fare: R30
+ * Supports optional Date or options object for time-of-day dynamic adjustment.
  */
-export function calculateFare(distanceKm: number): number {
-  return Math.max(30, Math.round(20 + distanceKm * 10));
+export function calculateFare(
+  distanceKm: number,
+  dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean }
+): number {
+  if (!dateOrOptions) {
+    return Math.max(30, Math.round(20 + distanceKm * 10));
+  }
+  if (dateOrOptions instanceof Date) {
+    return calculateDynamicFare(distanceKm, dateOrOptions).totalFare;
+  }
+  if (dateOrOptions.enforceStandard) {
+    return Math.max(30, Math.round(20 + distanceKm * 10));
+  }
+  return calculateDynamicFare(distanceKm, dateOrOptions.atTime || new Date()).totalFare;
 }
 
 /**

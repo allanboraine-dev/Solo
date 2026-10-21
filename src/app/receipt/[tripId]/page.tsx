@@ -15,7 +15,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { calculateDistanceKm } from "@/utils/geo";
-import { calculateFare } from "@/utils/mapService";
+import { calculateFare, getTimeOfDayTariff } from "@/utils/mapService";
 
 interface ReceiptTrip {
   id: string;
@@ -219,6 +219,15 @@ export default function TripReceiptPage() {
                 </td>
                 <td className="py-2.5 text-right text-zinc-500">R10.00 / km</td>
                 <td className="py-2.5 text-right font-medium">R{receipt.distanceFareZar.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 font-medium text-zinc-800">
+                  Time-of-Day Tariff
+                </td>
+                <td className="py-2.5 text-right text-zinc-500">Scheduled Adjustment</td>
+                <td className="py-2.5 text-right font-medium text-zinc-700">
+                  {getTimeOfDayTariff(new Date()).badge}
+                </td>
               </tr>
               <tr className="bg-emerald-50/60 font-semibold text-emerald-800">
                 <td className="py-2.5 px-2">SOLO Platform Commission (0% Model)</td>

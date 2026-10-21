@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import { generateUuid } from '@/utils/session'
-import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
+import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, type SearchResultPlace, type TariffTier } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
 import CustomSearchInput from './CustomSearchInput'
 
@@ -54,6 +54,7 @@ export default function BookingForm({
   const [dropoffDetail, setDropoffDetail] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [fare, setFare] = useState<number | null>(null)
+  const [appliedTariff, setAppliedTariff] = useState<TariffTier | null>(null)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [isBooking, setIsBooking] = useState(false)
@@ -126,13 +127,16 @@ export default function BookingForm({
         );
 
         if (details) {
+          const dynamicFare = calculateDynamicFare(details.distanceKm, new Date());
           setDistanceKm(details.distanceKm);
           setDurationMinutes(details.durationMinutes);
-          setFare(calculateFare(details.distanceKm));
+          setFare(dynamicFare.totalFare);
+          setAppliedTariff(dynamicFare.tariff);
         }
       } catch (err) {
         console.error("Commercial directions error:", err);
         setFare(null);
+        setAppliedTariff(null);
         setDistanceKm(null);
         setDurationMinutes(null);
       }
@@ -320,6 +324,16 @@ export default function BookingForm({
             <p className="text-[11px] md:text-xs text-blue-600 dark:text-blue-300 font-medium">
               {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''}
             </p>
+            {appliedTariff && (
+              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60 shadow-2xs">
+                  {appliedTariff.badge}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-zinc-400">
+                  {appliedTariff.multiplier > 1.0 ? `+${Math.round((appliedTariff.multiplier - 1) * 100)}% Time-of-Day` : 'Standard Rate'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="text-xl md:text-2xl font-black text-blue-600 dark:text-blue-400">
             R{fare}
