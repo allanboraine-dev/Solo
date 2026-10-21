@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
+import { generateUuid } from '@/utils/session'
 import { reverseGeocode, getRouteDirections, calculateFare, type SearchResultPlace } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
 import CustomSearchInput from './CustomSearchInput'
@@ -160,7 +161,7 @@ export default function BookingForm({
     try {
       const riderId = getRiderSessionId(currentUser?.id);
       const tripData: MockTrip = {
-        id: crypto.randomUUID(),
+        id: generateUuid(),
         rider_id: riderId,
         pickup_location: fullPickupAddress,
         pickup_lat: realPickupCoords.lat, 

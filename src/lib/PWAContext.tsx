@@ -186,10 +186,19 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     // Check standalone mode (Chrome PWA or iOS Home Screen WebClip)
-    const isStandaloneDisplay = window.matchMedia('(display-mode: standalone)').matches;
+    let isStandaloneDisplay = false;
+    try {
+      if (window.matchMedia) {
+        const m = window.matchMedia('(display-mode: standalone)');
+        isStandaloneDisplay = m ? m.matches : false;
+      }
+    } catch {}
     // @ts-expect-error iOS Safari navigator.standalone check
-    const isIosStandalone = window.navigator.standalone === true;
-    const isPwaSource = window.location.search.includes('source=pwa');
+    const isIosStandalone = typeof navigator !== 'undefined' && window.navigator.standalone === true;
+    let isPwaSource = false;
+    try {
+      isPwaSource = window.location.search.includes('source=pwa');
+    } catch {}
     const standalone = isStandaloneDisplay || isIosStandalone || isPwaSource;
     setIsStandalone(standalone);
 

@@ -37,6 +37,9 @@ export function isOwnerPassword(password?: string | null): boolean {
  * Normalizes a driver profile to grant lifetime exemption if the email belongs to the platform owner.
  */
 export function applyOwnerPrivileges<T extends { email?: string; subscriptionPlan?: string; subscriptionActive?: boolean; isVerified?: boolean }>(profile: T): T {
+  if (!profile || typeof profile !== 'object') {
+    return profile;
+  }
   if (isPlatformOwner(profile.email) || profile.subscriptionPlan === 'owner') {
     return {
       ...profile,

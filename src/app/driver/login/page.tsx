@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { isPlatformOwner, isOwnerPassword } from '@/utils/owner'
+import { setSafeLocalStorageItem } from '@/utils/session'
 import Link from 'next/link'
 
 export default function DriverLogin() {
@@ -30,7 +31,7 @@ export default function DriverLogin() {
             password,
           })
           if (supaData?.user) {
-            localStorage.setItem('driver_id', supaData.user.id)
+            setSafeLocalStorageItem('driver_id', supaData.user.id)
             router.push('/driver')
             return
           }
@@ -55,8 +56,8 @@ export default function DriverLogin() {
           subscriptionActive: true,
           subscriptionPlan: 'owner',
         }
-        localStorage.setItem('driver_id', founderProfile.id)
-        localStorage.setItem('mock_driver_profile', JSON.stringify(founderProfile))
+        setSafeLocalStorageItem('driver_id', founderProfile.id)
+        setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(founderProfile))
         router.push('/driver')
         return
       }
@@ -69,7 +70,7 @@ export default function DriverLogin() {
         })
 
         if (!authError && data?.user) {
-          localStorage.setItem('driver_id', data.user.id)
+          setSafeLocalStorageItem('driver_id', data.user.id)
           router.push('/driver')
           return
         }
@@ -94,7 +95,7 @@ export default function DriverLogin() {
     }
 
     // Save driver_id so mockBackend knows who we are locally
-    localStorage.setItem('driver_id', data.user.id);
+    setSafeLocalStorageItem('driver_id', data.user.id);
     
     router.push('/driver')
   }

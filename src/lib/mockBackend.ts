@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
-import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession } from '@/utils/session';
+import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession, generateUuid, safeJsonParse, getSafeLocalStorageItem, setSafeLocalStorageItem } from '@/utils/session';
 import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
 
 export const soloLocationEngine = new SoloLocationEngine(supabase);
@@ -110,19 +110,23 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
   }
 
   // Fallback to local cache if offline or missing
-  const localData = localStorage.getItem('mock_driver_profile');
-  if (localData) {
-    try {
-      const parsed = JSON.parse(localData);
-      if (!parsed.id) {
-        parsed.id = driverId || crypto.randomUUID();
-        localStorage.setItem('driver_id', parsed.id);
-        localStorage.setItem('mock_driver_profile', JSON.stringify(parsed));
+  try {
+    const localData = getSafeLocalStorageItem('mock_driver_profile');
+    if (localData) {
+      const parsed = safeJsonParse<any>(localData, null);
+      if (parsed && typeof parsed === 'object') {
+        if (!parsed.id) {
+          parsed.id = driverId || generateUuid();
+          try {
+            setSafeLocalStorageItem('driver_id', parsed.id);
+            setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(parsed));
+          } catch {}
+        }
+        return applyOwnerPrivileges(parsed);
       }
-      return applyOwnerPrivileges(parsed);
-    } catch {
-      return null;
     }
+  } catch {
+    return null;
   }
   return null;
 };
@@ -156,10 +160,10 @@ export const getDriverProfileById = async (driverId: string): Promise<MockDriver
 
   if (typeof window !== 'undefined') {
     try {
-      const cached = localStorage.getItem('mock_driver_profile');
+      const cached = getSafeLocalStorageItem('mock_driver_profile');
       if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && (parsed.id === driverId || !driverId)) {
+        const parsed = safeJsonParse<any>(cached, null);
+        if (parsed && typeof parsed === 'object' && (parsed.id === driverId || !driverId)) {
           return applyOwnerPrivileges(parsed);
         }
       }
@@ -172,23 +176,29 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
   if (typeof window === 'undefined') return;
   
   if (!profile.id) {
-    const { data: { session } } = await supabase.auth.getSession();
-    profile.id = session?.user?.id || localStorage.getItem('driver_id') || crypto.randomUUID();
+    let sessionUserId: string | null = null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      sessionUserId = session?.user?.id || null;
+    } catch {}
+    profile.id = sessionUserId || getSafeLocalStorageItem('driver_id') || generateUuid();
   }
-  localStorage.setItem('driver_id', profile.id);
+  setSafeLocalStorageItem('driver_id', profile.id);
 
   // Ensure owner privileges are applied before saving
   profile = applyOwnerPrivileges(profile);
 
   // Store locally for quick access/fallback
-  localStorage.setItem('mock_driver_profile', JSON.stringify(profile));
+  setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(profile));
 
   // Store in all_registered_drivers list
   try {
-    const allReg = JSON.parse(localStorage.getItem('all_registered_drivers') || '[]');
-    const filtered = allReg.filter((d: any) => d.id !== profile.id);
+    const rawAll = getSafeLocalStorageItem('all_registered_drivers');
+    const allReg = safeJsonParse<any[]>(rawAll, []);
+    const safeAll = Array.isArray(allReg) ? allReg : [];
+    const filtered = safeAll.filter((d: any) => d && d.id !== profile.id);
     filtered.push(profile);
-    localStorage.setItem('all_registered_drivers', JSON.stringify(filtered));
+    setSafeLocalStorageItem('all_registered_drivers', JSON.stringify(filtered));
   } catch {}
 
   // Sync to server API so Admin & Compliance portal can view driver across any device/browser

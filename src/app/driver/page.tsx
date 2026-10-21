@@ -6,7 +6,7 @@ import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
-import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession } from '@/utils/session'
+import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
@@ -50,14 +50,16 @@ export default function DriverPage() {
   const handleGoOnlineOnThisDevice = async () => {
     audioAlert.unlockMobileAudio(true)
     setPreemptedNotice(null)
-    const resolvedDriverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null)
+    const resolvedDriverId = profile?.id || getSafeLocalStorageItem('driver_id')
     if (resolvedDriverId) {
       setDriverActiveSession(resolvedDriverId, deviceIdRef.current)
     }
     setIsOnline(true)
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+    if (typeof window !== 'undefined') {
       try {
-        await registerForPushNotifications('driver', profile?.id)
+        if ('Notification' in window && Notification?.permission === 'default') {
+          await registerForPushNotifications('driver', profile?.id)
+        }
       } catch {}
     }
   }
@@ -254,7 +256,7 @@ export default function DriverPage() {
     
     // Check pending/active trips on mount and via polling
     const loadTrips = async () => {
-      const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+      const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
       if (driverId && isDriverSessionPreempted(driverId, deviceIdRef.current)) {
         setIsOnline(false);
         setRequest(null);
@@ -366,7 +368,7 @@ export default function DriverPage() {
 
       if (type === 'driver_session_preempted') {
         const payloadData = payload as { driverId: string; deviceId: string } | null;
-        const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+        const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
         if (
           payloadData &&
           payloadData.driverId === driverId &&
@@ -398,7 +400,7 @@ export default function DriverPage() {
       if (type === 'INSERT' || type === 'trip_updated') {
         const trip = payload as MockTrip;
         if (!trip) return;
-        const driverId = profile?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+        const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
         const currentActive = activeTripRef.current;
 
         if (trip.status === 'completed') {
@@ -642,8 +644,8 @@ export default function DriverPage() {
       const tripToAccept = request;
       const driverId =
         profile?.id ||
-        (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null) ||
-        crypto.randomUUID();
+        getSafeLocalStorageItem('driver_id') ||
+        generateUuid();
 
       const updated: MockTrip = { ...tripToAccept, status: 'accepted', driver_id: driverId };
       recordTripStatusOverride(updated.id, 'accepted', driverId);
@@ -680,7 +682,7 @@ export default function DriverPage() {
     const tripToDecline = request;
     const driverId =
       profile?.id ||
-      (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+      getSafeLocalStorageItem('driver_id');
     setRequest(null);
     lastAlertedTripIdRef.current = null;
     await declineTrip(tripToDecline, driverId);
@@ -1745,9 +1747,9 @@ export default function DriverPage() {
                 <button 
                   onClick={async () => {
                     const supabase = createClient();
-                    await supabase.auth.signOut();
-                    localStorage.removeItem('driver_id');
-                    localStorage.removeItem('mock_driver_profile');
+                    await supabase.auth.signOut().catch(() => {});
+                    removeSafeLocalStorageItem('driver_id');
+                    removeSafeLocalStorageItem('mock_driver_profile');
                     router.push('/driver/login');
                   }}
                   className="mt-6 w-full min-h-[48px] py-3.5 text-red-600 dark:text-red-400 font-bold bg-red-50/80 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl transition active:scale-[0.98] touch-manipulation flex items-center justify-center border border-red-200/60 dark:border-red-900/40 text-sm sm:text-base"

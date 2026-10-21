@@ -34,6 +34,7 @@ import {
 import { encodeGeohash } from "@/lib/solo_realtime_and_ride_service";
 import { broadcastEvent } from "@/lib/mockBackend";
 import { audioAlert } from "@/utils/audioAlert";
+import { generateUuid } from "@/utils/session";
 
 interface SafetyShieldModalProps {
   isOpen: boolean;
@@ -230,7 +231,7 @@ export default function SafetyShieldModal({
     const updated = saveTrustedContacts(role, [
       ...contacts,
       {
-        id: crypto.randomUUID(),
+        id: generateUuid(),
         name: newContactName,
         phone: newContactPhone,
         relationship: newContactRelation,

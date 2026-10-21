@@ -6,6 +6,7 @@ import { saveDriverProfile } from '@/lib/mockBackend'
 import { createClient } from '@/utils/supabase/client'
 import { uploadDriverKycDocument } from '@/utils/kyc'
 import { KycDocType } from '@/types/kyc'
+import { generateUuid, getSafeLocalStorageItem, setSafeLocalStorageItem, removeSafeLocalStorageItem, safeJsonParse } from '@/utils/session'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { 
   User, 
@@ -60,71 +61,92 @@ export default function DriverRegistration() {
   // Purge any existing cached owner/driver session on mount so registration is 100% clean
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    if (!params.get('card_setup')) {
-      localStorage.removeItem('driver_id')
-      localStorage.removeItem('pending_driver_email')
-      localStorage.removeItem('mock_driver_profile')
-      const supabase = createClient()
-      supabase.auth.signOut().catch(() => {})
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (!params.get('card_setup')) {
+        try {
+          localStorage.removeItem('driver_id')
+          localStorage.removeItem('pending_driver_email')
+          localStorage.removeItem('mock_driver_profile')
+        } catch {}
+        removeSafeLocalStorageItem('driver_id')
+        removeSafeLocalStorageItem('pending_driver_email')
+        removeSafeLocalStorageItem('mock_driver_profile')
+        const supabase = createClient()
+        if (supabase?.auth?.signOut) {
+          supabase.auth.signOut().catch(() => {})
+        }
+      }
+    } catch (e) {
+      console.warn('Registration session purge notice:', e)
     }
   }, [])
 
   // Dynamically load Paystack Inline JS script
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if ((window as any).PaystackPop) {
-      setIsPaystackLoaded(true)
-      return
-    }
+    try {
+      if ((window as any).PaystackPop) {
+        setIsPaystackLoaded(true)
+        return
+      }
 
-    const script = document.createElement('script')
-    script.src = 'https://js.paystack.co/v1/inline.js'
-    script.async = true
-    script.onload = () => setIsPaystackLoaded(true)
-    script.onerror = () => console.warn('Could not load Paystack inline JS; redirect fallback will be used.')
-    document.body.appendChild(script)
+      const script = document.createElement('script')
+      script.src = 'https://js.paystack.co/v1/inline.js'
+      script.async = true
+      script.onload = () => setIsPaystackLoaded(true)
+      script.onerror = () => console.warn('Could not load Paystack inline JS; redirect fallback will be used.')
+      if (document.body) {
+        document.body.appendChild(script)
+      }
+    } catch (e) {
+      console.warn('Paystack script load notice:', e)
+    }
   }, [])
 
   // Check if returning from Paystack hosted checkout redirect
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    const cardSetup = params.get('card_setup')
-    const reference = params.get('reference')
-    const driverId = params.get('driver_id') || localStorage.getItem('driver_id')
-    const pendingEmail = localStorage.getItem('pending_driver_email') || email
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const cardSetup = params.get('card_setup')
+      const reference = params.get('reference')
+      const driverId = params.get('driver_id') || getSafeLocalStorageItem('driver_id')
+      const pendingEmail = getSafeLocalStorageItem('pending_driver_email') || email
 
-    if (cardSetup === 'success' && reference && driverId) {
-      setIsSubmitting(true)
-      setUploadProgressText('Verifying card & activating your 7-day free trial...')
+      if (cardSetup === 'success' && reference && driverId) {
+        setIsSubmitting(true)
+        setUploadProgressText('Verifying card & activating your 7-day free trial...')
 
-      fetch('/api/driver/setup-trial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          driverId,
-          email: pendingEmail,
-          reference,
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            const billingDateStr = data.nextBillingDate 
-              ? new Date(data.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
-              : '7 days from now'
-            alert(`🎉 Card linked successfully! Your 7-day free trial has begun. Your first R499.00 monthly subscription is scheduled for ${billingDateStr}. Welcome to SOLO!`)
-            router.push('/driver')
-          } else {
-            setSubmitError(data.error || 'Failed to complete card verification.')
+        fetch('/api/driver/setup-trial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId,
+            email: pendingEmail,
+            reference,
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              const billingDateStr = data.nextBillingDate 
+                ? new Date(data.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '7 days from now'
+              alert(`🎉 Card linked successfully! Your 7-day free trial has begun. Your first R499.00 monthly subscription is scheduled for ${billingDateStr}. Welcome to SOLO!`)
+              router.push('/driver')
+            } else {
+              setSubmitError(data.error || 'Failed to complete card verification.')
+              setIsSubmitting(false)
+            }
+          })
+          .catch((err) => {
+            setSubmitError(err.message || 'Error completing trial setup.')
             setIsSubmitting(false)
-          }
-        })
-        .catch((err) => {
-          setSubmitError(err.message || 'Error completing trial setup.')
-          setIsSubmitting(false)
-        })
+          })
+      }
+    } catch (e) {
+      console.warn('Paystack redirect check error:', e)
     }
   }, [router, email])
 
@@ -171,19 +193,19 @@ export default function DriverRegistration() {
           if (authError.message.toLowerCase().includes('already registered')) {
             throw new Error('An account with this email already exists. Please sign in on the Driver Login page.')
           }
-          driverId = crypto.randomUUID()
+          driverId = generateUuid()
           hasSession = true
         }
       }
 
       if (!driverId) {
-        driverId = crypto.randomUUID()
+        driverId = generateUuid()
         hasSession = true
       }
 
       setCreatedDriverId(driverId)
-      localStorage.setItem('driver_id', driverId)
-      localStorage.setItem('pending_driver_email', email)
+      setSafeLocalStorageItem('driver_id', driverId)
+      setSafeLocalStorageItem('pending_driver_email', email)
     }
 
     // 2. Save Driver Profile linked to Auth/Driver ID
@@ -209,8 +231,9 @@ export default function DriverRegistration() {
 
     // Store in all_registered_drivers collection for multi-driver local testing
     try {
-      const existingDrivers = JSON.parse(localStorage.getItem('all_registered_drivers') || '[]')
-      const filteredDrivers = existingDrivers.filter((d: any) => d.id !== driverId)
+      const existingDrivers = safeJsonParse<any[]>(getSafeLocalStorageItem('all_registered_drivers'), [])
+      const safeDrivers = Array.isArray(existingDrivers) ? existingDrivers : []
+      const filteredDrivers = safeDrivers.filter((d: any) => d && d.id !== driverId)
       filteredDrivers.push({
         id: driverId,
         fullName,
@@ -224,7 +247,7 @@ export default function DriverRegistration() {
         subscriptionPlan: 'trial',
         createdAt: new Date().toISOString(),
       })
-      localStorage.setItem('all_registered_drivers', JSON.stringify(filteredDrivers))
+      setSafeLocalStorageItem('all_registered_drivers', JSON.stringify(filteredDrivers))
     } catch {}
 
     // Dispatch immediate notification to Driver Verification Command Centre
@@ -243,11 +266,13 @@ export default function DriverRegistration() {
       }
 
       if (typeof BroadcastChannel !== 'undefined') {
-        const ch = new BroadcastChannel('solo_driver_signup_channel')
-        ch.postMessage({ type: 'NEW_DRIVER_SIGNUP', alert: signupNotice })
-        ch.close()
+        try {
+          const ch = new BroadcastChannel('solo_driver_signup_channel')
+          ch.postMessage({ type: 'NEW_DRIVER_SIGNUP', alert: signupNotice })
+          ch.close()
+        } catch {}
       }
-      localStorage.setItem('solo_new_driver_signup_alert', JSON.stringify(signupNotice))
+      setSafeLocalStorageItem('solo_new_driver_signup_alert', JSON.stringify(signupNotice))
     } catch (broadcastErr) {
       console.warn('Signup alert dispatch notice:', broadcastErr)
     }

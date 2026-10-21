@@ -12,6 +12,8 @@
  * ============================================================================
  */
 
+import { generateUuid } from './session.ts';
+
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
 function encodeGeohash(lat: number, lng: number, precision = 6): string {
@@ -250,7 +252,7 @@ export function getTrustedContacts(role: SafetyRole): TrustedContact[] {
  */
 export function saveTrustedContacts(role: SafetyRole, contacts: TrustedContact[]): TrustedContact[] {
   const normalized = contacts.slice(0, 3).map(c => ({
-    id: c.id || crypto.randomUUID(),
+    id: c.id || generateUuid(),
     name: c.name.trim(),
     phone: formatPhoneNumber(c.phone.trim()),
     relationship: c.relationship.trim() || 'Emergency Contact',
@@ -300,7 +302,7 @@ export async function triggerRapidResponseSos(
     ...input,
     lat: validLat,
     lng: validLng,
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     incidentCode: generateSafetyIncidentCode(),
     geohash6,
     googleMapsUrl,

@@ -24,7 +24,13 @@ const ROOT_STORAGE_KEY = "solo_theme"
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light"
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+  try {
+    if (window.matchMedia) {
+      const m = window.matchMedia("(prefers-color-scheme: dark)")
+      return m && m.matches ? "dark" : "light"
+    }
+  } catch {}
+  return "light"
 }
 
 function getStorageKeyForPath(pathname: string | null): { key: string; portal: PortalScope; defaultTheme: Theme } {
@@ -39,13 +45,18 @@ function getStorageKeyForPath(pathname: string | null): { key: string; portal: P
 
 function applyThemeToDom(resolved: ResolvedTheme) {
   if (typeof document === "undefined") return
-  const root = document.documentElement
-  if (resolved === "dark") {
-    root.classList.add("dark")
-  } else {
-    root.classList.remove("dark")
-  }
-  root.style.colorScheme = resolved
+  try {
+    const root = document.documentElement
+    if (!root) return
+    if (resolved === "dark") {
+      root.classList.add("dark")
+    } else {
+      root.classList.remove("dark")
+    }
+    if (root.style) {
+      root.style.colorScheme = resolved
+    }
+  } catch {}
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -59,20 +70,48 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme)
   const [mounted, setMounted] = useState(false)
 
-  // Listen for system OS dark/light mode changes
+  // Listen for system OS dark/light mode changes with backwards-compatibility for older Android / iOS browsers
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)")
-    const updateSystem = () => setSystemTheme(media.matches ? "dark" : "light")
-    updateSystem()
-    media.addEventListener("change", updateSystem)
-    return () => media.removeEventListener("change", updateSystem)
+    try {
+      if (typeof window === "undefined" || !window.matchMedia) return
+      const media = window.matchMedia("(prefers-color-scheme: dark)")
+      if (!media) return
+
+      const updateSystem = () => {
+        try {
+          setSystemTheme(media.matches ? "dark" : "light")
+        } catch {}
+      }
+      updateSystem()
+
+      if (typeof media.addEventListener === "function") {
+        media.addEventListener("change", updateSystem)
+        return () => {
+          try {
+            media.removeEventListener("change", updateSystem)
+          } catch {}
+        }
+      } else if (typeof (media as any).addListener === "function") {
+        (media as any).addListener(updateSystem)
+        return () => {
+          try {
+            (media as any).removeListener(updateSystem)
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn("Theme media query listener unsupported on this device:", err)
+    }
   }, [])
 
   // Sync theme when switching between Rider and Driver portals or on initial mount
   useEffect(() => {
     setMounted(true)
     try {
-      const stored = localStorage.getItem(storageKey) as Theme | null
+      let stored: Theme | null = null
+      if (typeof window !== "undefined" && window.localStorage) {
+        stored = localStorage.getItem(storageKey) as Theme | null
+      }
       const currentTheme = stored || defaultTheme
       setThemeState(currentTheme)
 
@@ -103,15 +142,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     (newTheme: Theme) => {
       setThemeState(newTheme)
       try {
-        localStorage.setItem(storageKey, newTheme)
-        window.dispatchEvent(
-          new CustomEvent("solo_portal_theme_change", {
-            detail: { portal, storageKey, theme: newTheme },
-          })
-        )
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.setItem(storageKey, newTheme)
+        }
       } catch (err) {
-        console.error("Failed to persist portal theme:", err)
+        console.warn("Failed to persist portal theme:", err)
       }
+      try {
+        if (typeof window !== "undefined" && typeof window.CustomEvent === "function") {
+          window.dispatchEvent(
+            new CustomEvent("solo_portal_theme_change", {
+              detail: { portal, storageKey, theme: newTheme },
+            })
+          )
+        }
+      } catch {}
     },
     [storageKey, portal]
   )

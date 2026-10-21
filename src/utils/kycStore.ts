@@ -1,5 +1,6 @@
 import type { DriverDocument, KycDocType, KycDocStatus } from '../types/kyc.ts';
 import { isPlatformOwner } from './owner.ts';
+import { generateUuid } from './session.ts';
 
 export interface KycDriverProfile {
   id: string;
@@ -59,7 +60,7 @@ export function recordDriverSignupAlert(
   alert: Omit<DriverSignupAlert, 'id' | 'createdAt'> & { id?: string; createdAt?: string }
 ): DriverSignupAlert {
   const newAlert: DriverSignupAlert = {
-    id: alert.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `alert-${Date.now()}`),
+    id: alert.id || generateUuid(),
     driverId: alert.driverId,
     fullName: alert.fullName || 'New Driver',
     email: alert.email || '',
@@ -159,7 +160,7 @@ export function saveKycDocument(doc: DriverDocument): DriverDocument {
   const existing = driverMap.get(doc.doc_type);
 
   const mergedDoc: DriverDocument = {
-    id: doc.id || existing?.id || crypto.randomUUID(),
+    id: doc.id || existing?.id || generateUuid(),
     driver_id: doc.driver_id,
     doc_type: doc.doc_type,
     file_path: doc.file_path || existing?.file_path || `${doc.driver_id}/${doc.doc_type}.jpg`,
@@ -224,7 +225,7 @@ export function updateKycDocumentStatus(
   const now = new Date().toISOString();
 
   const updatedDoc: DriverDocument = {
-    id: existing?.id || crypto.randomUUID(),
+    id: existing?.id || generateUuid(),
     driver_id: driverId,
     doc_type: docType,
     file_path: existing?.file_path || `${driverId}/${docType}.jpg`,
@@ -275,7 +276,7 @@ export function approveAllKycDocuments(
   for (const type of MANDATORY_DOC_TYPES) {
     const existing = driverMap.get(type);
     driverMap.set(type, {
-      id: existing?.id || crypto.randomUUID(),
+      id: existing?.id || generateUuid(),
       driver_id: driverId,
       doc_type: type,
       file_path: existing?.file_path || `${driverId}/${type}.jpg`,

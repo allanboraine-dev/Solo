@@ -15,7 +15,9 @@ export interface MockTripIdentity {
 
 export const generateUuid = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+    try {
+      return crypto.randomUUID();
+    } catch {}
   }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -28,6 +30,44 @@ export const generateUuid = (): string => {
  * Resilient in-memory storage fallback for private browsing and restricted mobile WebViews
  */
 const inMemoryStore: Record<string, string> = {};
+
+export const getSafeLocalStorageItem = (key: string): string | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const val = window.localStorage.getItem(key);
+      if (val !== null) return val;
+    }
+  } catch {}
+  return inMemoryStore[key] ?? null;
+};
+
+export const setSafeLocalStorageItem = (key: string, value: string): void => {
+  inMemoryStore[key] = value;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {}
+};
+
+export const removeSafeLocalStorageItem = (key: string): void => {
+  delete inMemoryStore[key];
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {}
+};
+
+export const safeJsonParse = <T>(value: string | null | undefined, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return (parsed !== null && parsed !== undefined) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 export const getSessionItem = (key: string): string | null => {
   try {
