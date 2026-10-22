@@ -411,9 +411,10 @@ export function registerFleetProfile(params: {
     contactPerson: params.contactPerson.trim(),
     operatingCity: params.operatingCity.trim(),
     settlementBank: params.settlementBank,
-    subscriptionStatus: 'active',
+    subscriptionStatus: 'trial',
     subscriptionTier: (params.estimatedVehicles || 0) >= 15 ? 'fleet_enterprise' : (params.estimatedVehicles || 0) >= 5 ? 'fleet_pro' : 'fleet_starter',
     activeVehiclesCount: 0,
+    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -421,6 +422,30 @@ export function registerFleetProfile(params: {
   saveFleetProfile(newFleet);
   setActiveFleetSession(newFleet.id);
   return newFleet;
+}
+
+export function activateFleetSubscription(
+  fleetId: string,
+  details?: {
+    paymentReference?: string;
+    amountZar?: number;
+    cardLast4?: string;
+    cardBrand?: string;
+  }
+): FleetProfile | null {
+  const fleet = getFleetProfile(fleetId);
+  if (!fleet) return null;
+
+  const thirtyDaysAhead = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  fleet.subscriptionStatus = 'active';
+  fleet.subscriptionRenewsAt = thirtyDaysAhead;
+  if (details?.paymentReference) fleet.lastPaymentReference = details.paymentReference;
+  if (details?.amountZar) fleet.lastPaymentAmountZar = details.amountZar;
+  if (details?.cardLast4) fleet.cardLast4 = details.cardLast4;
+  if (details?.cardBrand) fleet.cardBrand = details.cardBrand;
+
+  saveFleetProfile(fleet);
+  return fleet;
 }
 
 export function loginFleetProfile(identifier: string): FleetProfile | null {

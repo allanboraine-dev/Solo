@@ -32,6 +32,10 @@ export interface FleetProfile {
   activeVehiclesCount: number;
   trialEndsAt?: string;
   subscriptionRenewsAt?: string;
+  lastPaymentReference?: string;
+  lastPaymentAmountZar?: number;
+  cardLast4?: string;
+  cardBrand?: string;
   createdAt: string;
   updatedAt: string;
 }

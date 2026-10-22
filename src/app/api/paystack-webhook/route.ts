@@ -101,6 +101,32 @@ export async function POST(req: Request) {
           }
         }
       }
+
+      // 3. SOLO FLEET B2B SAAS SUBSCRIPTION
+      const isFleetSub = paymentType === 'solo_fleet_subscription' || metadata.fleetId || metadata.fleet_id;
+      if (isFleetSub) {
+        const fleetId = metadata.fleetId || metadata.fleet_id;
+        const customerEmail = data.customer?.email;
+        const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const amountZar = (data.amount || 0) / 100;
+
+        console.log(`[Paystack Webhook] Fleet B2B subscription paid: Fleet ${fleetId || customerEmail}, Amount: R${amountZar}, Ref: ${data.reference}`);
+
+        try {
+          if (fleetId) {
+            await supabase
+              .from('fleets')
+              .update({
+                subscription_status: 'active',
+                subscription_renews_at: thirtyDaysFromNow,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', fleetId);
+          }
+        } catch (dbErr) {
+          console.warn('[Paystack Webhook] DB error updating fleet:', dbErr);
+        }
+      }
     } else if (eventType === 'subscription.disable' || eventType === 'invoice.payment_failed') {
       // Driver subscription renewal failed or cancelled
       const customerEmail = data?.customer?.email

@@ -19,6 +19,7 @@ import {
   getActiveFleetProfile,
   setActiveFleetSession,
   clearActiveFleetSession,
+  activateFleetSubscription,
   FLEET_PRICING,
 } from '../src/utils/fleetStore.ts';
 import type { FleetProfile, FleetVehicle, FleetShiftAudit } from '../src/types/fleet.ts';
@@ -244,7 +245,9 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
 
     assert.ok(registered.id);
     assert.strictEqual(registered.companyName, 'Cape Peninsula Trans (Pty) Ltd');
-    assert.strictEqual(registered.subscriptionStatus, 'active');
+    // Under Approach 2: Free onboarding setup with 14-day fleet pilot
+    assert.strictEqual(registered.subscriptionStatus, 'trial');
+    assert.ok(registered.trialEndsAt);
     assert.strictEqual(registered.subscriptionTier, 'fleet_pro'); // 6 vehicles = fleet_pro
 
     // Verify session was automatically set
@@ -252,6 +255,18 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
     assert.ok(active);
     assert.strictEqual(active?.id, registered.id);
     assert.strictEqual(active?.companyName, 'Cape Peninsula Trans (Pty) Ltd');
+
+    // Activate subscription via Paystack
+    const activated = activateFleetSubscription(registered.id, {
+      paymentReference: 'PAYSTACK-FLEET-TEST-001',
+      amountZar: 4327.45,
+      cardLast4: '4242',
+      cardBrand: 'visa',
+    });
+    assert.strictEqual(activated?.subscriptionStatus, 'active');
+    assert.strictEqual(activated?.lastPaymentReference, 'PAYSTACK-FLEET-TEST-001');
+    assert.strictEqual(activated?.lastPaymentAmountZar, 4327.45);
+    assert.strictEqual(activated?.cardLast4, '4242');
 
     // Sign out / Clear session
     clearActiveFleetSession();
@@ -261,6 +276,7 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
     const loggedIn = loginFleetProfile('zola@peninsulatrans.co.za');
     assert.ok(loggedIn);
     assert.strictEqual(loggedIn?.id, registered.id);
+    assert.strictEqual(loggedIn?.subscriptionStatus, 'active');
     assert.strictEqual(getActiveFleetProfile()?.id, registered.id);
 
     // Sign in via phone number

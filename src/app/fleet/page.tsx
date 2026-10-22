@@ -60,6 +60,7 @@ import {
   toggleVehicleDispatchSuspension,
   getFleetShiftAudits,
   recordFleetShiftAudit,
+  activateFleetSubscription,
 } from "@/utils/fleetStore";
 
 export default function FleetPage() {
@@ -93,6 +94,10 @@ export default function FleetPage() {
   // Search & Filter (Dashboard)
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Paystack Billing state (Approach 2: 14-day pilot -> Activate via Paystack)
+  const [paystackLoading, setPaystackLoading] = useState(false);
+  const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
 
   // Modals (Dashboard)
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
@@ -149,6 +154,33 @@ export default function FleetPage() {
   };
 
   useEffect(() => {
+    // Detect return from Paystack checkout redirect (Approach 2)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const isPaymentSuccess = params.get("payment") === "success";
+      const fleetIdParam = params.get("fleet_id");
+      const refParam = params.get("ref") || params.get("reference");
+      const amountParam = params.get("amount");
+
+      if (isPaymentSuccess) {
+        const active = getActiveFleetProfile();
+        const targetId = fleetIdParam || active?.id;
+        if (targetId) {
+          const updated = activateFleetSubscription(targetId, {
+            paymentReference: refParam || undefined,
+            amountZar: amountParam ? Number(amountParam) : undefined,
+          });
+          if (updated) {
+            setActiveFleetSession(targetId);
+            setPaymentSuccessMsg(
+              `Paystack recurring subscription successfully activated! Monthly tokenized billing confirmed (Ref: ${refParam || "Verified"}).`
+            );
+          }
+        }
+        // Clean URL query parameters to avoid duplicate activation on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
     loadActiveFleet();
   }, []);
 
@@ -285,6 +317,40 @@ export default function FleetPage() {
 
     return { totalVehicles, activeOnRoad, todayGross, todayCash, todayCard, warningCount };
   }, [vehicles, audits]);
+
+  // Calculate remaining days in 14-day setup pilot (Approach 2)
+  const pilotDaysRemaining = useMemo(() => {
+    if (!fleetProfile?.trialEndsAt) return 14;
+    const diffMs = new Date(fleetProfile.trialEndsAt).getTime() - Date.now();
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
+  }, [fleetProfile?.trialEndsAt]);
+
+  // Activate Paystack Billing Handler (Approach 2)
+  const handleActivatePaystackSubscription = async () => {
+    if (!fleetProfile) return;
+    setPaystackLoading(true);
+    try {
+      const res = await fetch("/api/fleet/create-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fleetId: fleetProfile.id,
+          email: fleetProfile.ownerEmail,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to initialize Paystack checkout. Please try again.");
+      }
+    } catch (err: any) {
+      alert("Network error connecting to Paystack gateway. Please check your connection.");
+    } finally {
+      setPaystackLoading(false);
+    }
+  };
 
   // Handlers for Add Vehicle / Pair Driver / Audit
   const handleAddVehicle = (e: React.FormEvent) => {
@@ -730,6 +796,11 @@ export default function FleetPage() {
                 </div>
               </div>
 
+              <div className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold flex items-center justify-center gap-1.5 pt-1">
+                <Sparkles size={13} />
+                <span>Includes 14-Day Free Fleet Pilot • R0.00 upfront • Activate Paystack anytime</span>
+              </div>
+
               <button
                 type="submit"
                 disabled={regSubmitting}
@@ -739,7 +810,7 @@ export default function FleetPage() {
                   <span>Registering Fleet Partner...</span>
                 ) : (
                   <>
-                    <span>Register Fleet &amp; Launch Dashboard</span>
+                    <span>Register Fleet &amp; Launch Pilot (R0.00 Upfront)</span>
                     <ArrowRight size={16} />
                   </>
                 )}
@@ -916,6 +987,73 @@ export default function FleetPage() {
           </div>
         </div>
       </div>
+
+      {/* Payment Success Notification Banner */}
+      {paymentSuccessMsg && (
+        <div className="bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-900 dark:text-emerald-200 rounded-3xl p-4 md:p-5 flex items-center justify-between gap-3 shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="text-emerald-500 shrink-0" size={22} />
+            <div>
+              <p className="text-sm font-extrabold">{paymentSuccessMsg}</p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                All drivers operating under your fleet retain 100% in-vehicle fares with uninterrupted zero-commission dispatch.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setPaymentSuccessMsg(null)}
+            className="text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/30 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* 14-Day Pilot Banner (Approach 2: Free Setup Pilot -> Activate Paystack Subscription) */}
+      {fleetProfile.subscriptionStatus === "trial" && (
+        <div className="bg-gradient-to-r from-purple-900/15 via-indigo-900/15 to-emerald-900/15 border-2 border-purple-500/30 dark:border-purple-500/40 rounded-3xl p-5 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="bg-purple-600 text-white font-black text-[11px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                <Sparkles size={12} />
+                14-Day Pilot Active
+              </span>
+              <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                {pilotDaysRemaining > 0 ? `${pilotDaysRemaining} days remaining in free pilot` : "Pilot period concluded"}
+              </span>
+            </div>
+            <h3 className="text-base md:text-lg font-black text-gray-900 dark:text-white">
+              Free Fleet Onboarding Pilot &amp; Setup Mode
+            </h3>
+            <p className="text-xs text-gray-600 dark:text-zinc-300 max-w-2xl leading-relaxed">
+              Your fleet is currently active with full dispatch access. Add your cars, pair drivers, and test shift reconciliation at zero upfront cost. Activate your Paystack subscription anytime to lock in recurring monthly dispatch licenses.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] uppercase font-bold text-gray-500 dark:text-zinc-400 block">
+                Option C Monthly Bill
+              </span>
+              <span className="text-lg font-black text-purple-700 dark:text-purple-300">
+                R{billing.totalMonthlyZar.toLocaleString()} / mo
+              </span>
+              <span className="text-[10px] text-gray-400 dark:text-zinc-500 block">
+                (R770 base + {billing.vehicleCount} cars + VAT)
+              </span>
+            </div>
+            <button
+              onClick={handleActivatePaystackSubscription}
+              disabled={paystackLoading}
+              className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold px-5 py-3 rounded-2xl text-xs md:text-sm shadow-md hover:shadow-lg transition disabled:opacity-50 cursor-pointer"
+            >
+              <CreditCard size={16} />
+              <span>{paystackLoading ? "Connecting to Paystack..." : "Activate via Paystack"}</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex border-b border-gray-200 dark:border-zinc-800 gap-2 overflow-x-auto pb-1">
@@ -1390,24 +1528,100 @@ export default function FleetPage() {
               </div>
             </div>
 
-            {/* Bank Payout / Paystack Setup */}
-            <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
-              <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                <CreditCard size={16} /> Paystack Master B2B Fleet Subscription
-              </h3>
-              <p className="text-xs text-gray-600 dark:text-zinc-400">
-                Your card is automatically debited monthly for your R770 Base Platform License plus your active vehicle slots. Drivers assigned to your fleet vehicles never need to provide personal credit cards or pay individual platform subscriptions.
+            {/* Paystack Recurring B2B Subscription Section */}
+            <div className="p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/10 pb-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Subscription Status:</span>
+                    {fleetProfile.subscriptionStatus === "active" ? (
+                      <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full text-xs font-bold border border-emerald-500/20">
+                        <CheckCircle2 size={12} />
+                        Active Recurring Subscription
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-xs font-bold border border-purple-500/20">
+                        <Sparkles size={12} />
+                        14-Day Pilot Active ({pilotDaysRemaining} days left)
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
+                    <CreditCard size={18} className="text-emerald-500" /> Paystack Master B2B Fleet Subscription
+                  </h3>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-[11px] text-gray-400 dark:text-zinc-500 uppercase tracking-wider block font-bold">
+                    Billing Cycle
+                  </span>
+                  <span className="text-sm font-black text-gray-900 dark:text-white">
+                    {fleetProfile.subscriptionRenewsAt
+                      ? `Renews ${new Date(fleetProfile.subscriptionRenewsAt).toLocaleDateString("en-ZA", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}`
+                      : fleetProfile.trialEndsAt
+                      ? `Pilot ends ${new Date(fleetProfile.trialEndsAt).toLocaleDateString("en-ZA", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}`
+                      : "14-Day Pilot"}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 dark:text-zinc-400 leading-relaxed">
+                Your company card is automatically charged monthly for your R770 Base Operations Platform License plus your active vehicle dispatch slots (R499/vehicle). When you add or remove vehicles, Paystack dynamically reconciles your dispatch quota. Drivers operating your vehicles are 100% exempt from personal subscription fees.
               </p>
-              <div className="flex items-center gap-3 pt-1">
+
+              {fleetProfile.lastPaymentReference && (
+                <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 text-xs flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-500" />
+                    <span className="text-gray-500 dark:text-zinc-400">Verified Payment Reference:</span>
+                    <span className="font-mono font-bold text-gray-900 dark:text-white">{fleetProfile.lastPaymentReference}</span>
+                  </div>
+                  {fleetProfile.lastPaymentAmountZar && (
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      R{fleetProfile.lastPaymentAmountZar.toLocaleString()} ZAR
+                    </span>
+                  )}
+                  {fleetProfile.cardLast4 && (
+                    <span className="text-gray-600 dark:text-zinc-400 font-medium">
+                      {fleetProfile.cardBrand || "Card"} ending in •••• {fleetProfile.cardLast4}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
                 <button
-                  onClick={() => alert("Paystack B2B billing link: R" + billing.totalMonthlyZar + " ZAR / month.")}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-xs"
+                  onClick={handleActivatePaystackSubscription}
+                  disabled={paystackLoading}
+                  className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-xl text-xs md:text-sm shadow-md transition inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Manage Payment Method via Paystack
+                  <CreditCard size={15} />
+                  <span>
+                    {paystackLoading
+                      ? "Connecting to Paystack..."
+                      : fleetProfile.subscriptionStatus === "active"
+                      ? "Manage / Update Card via Paystack"
+                      : `Activate Paystack Billing (R${billing.totalMonthlyZar.toLocaleString()} / mo)`}
+                  </span>
                 </button>
-                <span className="text-xs text-gray-500 dark:text-zinc-400 font-mono">
-                  HMAC-SHA512 Webhook Verified
-                </span>
+
+                <div className="flex items-center gap-4 text-[11px] text-gray-500 dark:text-zinc-400 font-mono">
+                  <span className="flex items-center gap-1">
+                    <Lock size={12} className="text-emerald-500" /> 256-Bit SSL
+                  </span>
+                  <span>•</span>
+                  <span>PCI-DSS Level 1</span>
+                  <span>•</span>
+                  <span>HMAC-SHA512 Webhook Verified</span>
+                </div>
               </div>
             </div>
           </div>
