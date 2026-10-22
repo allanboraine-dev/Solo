@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendWebPushNotification } from '@/utils/webPush';
 import { getMemorySubscriptions } from '@/utils/pushStore';
-import { checkRateLimit } from '@/utils/rateLimit';
+import { checkRateLimit, createRateLimitExceededResponse } from '@/utils/rateLimit';
 
 // Memory store for serverless fallback
 const inMemoryTickets: any[] = [];
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
     windowMs: 15 * 60 * 1000,
   });
 
-  if (!rateLimit.allowed && rateLimit.response) {
-    return rateLimit.response;
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse(rateLimit, 'Too many reports submitted. Please wait before trying again.');
   }
 
   try {
@@ -163,20 +163,24 @@ export async function POST(req: NextRequest) {
     if (ticket.driverId) {
       try {
         const subs = getMemorySubscriptions('driver', ticket.driverId);
-        const payload = JSON.stringify({
+        const payload = {
           title: '🚨 URGENT: Passenger Lost Phone Alert',
           body: `Passenger left a ${phoneMakeModel} in your vehicle. Alternative Contact: ${alternativeContactPhone}`,
-          data: {
-            type: 'lost_item_alert',
-            ticketCode,
-            ticketId,
-            driverId: ticket.driverId,
-            alternativePhone: alternativeContactPhone,
-          },
-        });
+          role: 'driver' as const,
+          tag: 'lost_item_alert',
+        };
 
         for (const sub of subs) {
-          sendWebPushNotification(sub, payload).catch(() => {});
+          sendWebPushNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: sub.p256dh,
+                auth: sub.auth,
+              },
+            },
+            payload
+          ).catch(() => {});
         }
       } catch (pushErr) {
         console.warn('Driver web push dispatch error:', pushErr);

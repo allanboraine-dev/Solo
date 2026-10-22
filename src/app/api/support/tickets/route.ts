@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimit } from '@/utils/rateLimit';
+import { checkRateLimit, createRateLimitExceededResponse } from '@/utils/rateLimit';
 
 const inMemoryGeneralTickets: any[] = [];
 
@@ -16,8 +16,8 @@ export async function POST(req: NextRequest) {
     windowMs: 15 * 60 * 1000,
   });
 
-  if (!rateLimit.allowed && rateLimit.response) {
-    return rateLimit.response;
+  if (!rateLimit.allowed) {
+    return createRateLimitExceededResponse(rateLimit, 'Too many tickets submitted. Please wait before trying again.');
   }
 
   try {

@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type UserType = 'driver' | 'rider' | 'corp_admin' | 'admin'
+export type UserType = 'driver' | 'rider' | 'corp_admin' | 'fleet_owner' | 'admin'
 export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'expired' | 'cancelled'
 export type TripStatus = 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled'
 export type DocumentType = 'license_front' | 'license_back' | 'prdp' | 'roadworthy' | 'vehicle_photo'

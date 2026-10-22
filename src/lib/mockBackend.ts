@@ -48,7 +48,7 @@ export type MockDriverProfile = {
   hasRoadworthy: boolean;
   isVerified?: boolean;
   subscriptionActive: boolean;
-  subscriptionPlan?: 'trial' | 'paid' | 'owner';
+  subscriptionPlan?: 'trial' | 'paid' | 'owner' | 'fleet_pro';
   trialStartedAt?: number;
   trialEndsAt?: number;
   cardLast4?: string;

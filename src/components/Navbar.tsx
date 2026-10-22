@@ -62,6 +62,15 @@ export function Navbar() {
               <span>Driver</span>
             </Link>
           )}
+
+          {!isDriverApp && !isRiderApp && (
+            <Link
+              href="/fleet"
+              className="hidden sm:flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 border border-purple-500/20 px-2.5 py-1 rounded-full transition-all"
+            >
+              <span>Fleet</span>
+            </Link>
+          )}
         </div>
         
         <div className="flex items-center gap-2">

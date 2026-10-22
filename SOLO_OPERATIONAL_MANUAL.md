@@ -457,6 +457,40 @@ Background notifications adhere to the Web Push Protocol (RFC 8291 / RFC 8292) s
 
 ---
 
+## Section 11: B2B Fleet Partner Program, Vehicle Management & Shift Reconciliation
+
+### 11.1 The South African Fleet Operating Model
+Over 60% of South African e-hailing vehicles operate under commercial **Fleet Partner / Investor** ownership. Traditional aggregators (Uber/Bolt) extract 20% to 30% commission from gross vehicle turnover, costing fleet owners R5,000 to R8,000+ per car every month.
+
+The **SOLO Fleet Partner Hub** (`/fleet`) replaces this commission model with an enterprise B2B SaaS architecture:
+1. **Zero Commission (0.0% Take-Rate):** Drivers retain 100% of all rider fares directly in the vehicle via Cash or the Fleet Owner's registered in-vehicle Speedpoint (Yoco / iKhokha / bank speedpoint).
+2. **Predictable B2B SaaS Fleet Licensing (Base License + Vehicle Slots):**
+   - **Fleet Operations Hub Base License:** **R770.00 / month** (covers central multi-car dashboard, live telematics, shift reconciliation sheets, compliance watchdog, and consolidated SARS B2B tax invoicing).
+   - **Active Vehicle Dispatch Slots:** **R499.00 / vehicle / month** (matches standard individual SOLO driver fee per vehicle slot, allowing unlimited driver shift rotations).
+   - *Billing Formula:* Total = R770 base + (Active Vehicles × R499) + 15% VAT.
+   - *Example (3 Vehicles):* R770 + (3 × R499) = R2,267.00/mo ex. VAT (R2,607.05 incl. VAT).
+   - *Example (5 Vehicles):* R770 + (5 × R499) = R3,265.00/mo ex. VAT (R3,754.75 incl. VAT).
+   - *Example (10 Vehicles):* R770 + (10 × R499) = R5,760.00/mo ex. VAT (R6,624.00 incl. VAT).
+3. **SARS OpEx Deductibility:** B2B fleet subscription invoices are issued monthly by Boraine Tech (Pty) Ltd with 15% South African VAT, fully deductible as operational business expenditure.
+
+### 11.2 In-Vehicle Hardware & Direct Banking Alignment
+- **Speedpoint Ownership:** The Fleet Owner installs their own business card machine (e.g. Yoco Neo/Go or iKhokha) in each fleet vehicle. All card payments settle directly into the **Fleet Owner's corporate bank account**, ensuring immediate custody of digital earnings.
+- **Cash Trips:** Cash banknotes and coins collected by the driver are audited through the daily shift reconciliation sheet against the agreed weekly rental target (e.g., R2,200 – R2,800/week).
+
+### 11.3 Multi-Driver Shift Pairing & Double-Shifting
+- **Shift Swapping:** Allows a single vehicle to be assigned to multiple drivers across distinct shifts (e.g. Day Shift: 06:00–18:00, Night Shift: 18:00–06:00).
+- **Automated Driver Paywall Bypass:** When an authorized driver is paired with an active fleet vehicle, the driver's mobile terminal automatically unlocks unrestricted dispatch clearance without requiring individual personal debit card billing.
+- **Remote Dispatch Suspension:** If a driver falls into rental arrears or the vehicle requires immediate mechanical service, the fleet owner can toggle a remote dispatch hold (`dispatchSuspended = true`), pausing trip dispatch until the dispute is resolved.
+
+### 11.4 Compliance Watchdog
+The fleet dashboard continuously monitors:
+- **Certificate of Fitness (CoF / Roadworthy):** Annual roadworthy certification under the National Land Transport Act.
+- **Vehicle Double License Discs:** Annual provincial motor vehicle licensing.
+- **Professional Driving Permits (PrDP):** Category P/G permit verification for all assigned drivers.
+- **Passenger Liability Insurance:** Active commercial passenger insurance policy coverage.
+
+---
+
 ## Appendix: South African Banking & Statutory Directory
 
 ### Retail Bank Clearing Codes (Universal Branch Codes)

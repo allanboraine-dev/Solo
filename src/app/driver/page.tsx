@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -16,6 +16,7 @@ import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { isPlatformOwner } from '@/utils/owner'
+import { checkVehicleFleetCoverage } from '@/utils/fleetStore'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
 import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
@@ -227,6 +228,11 @@ export default function DriverPage() {
         }
 
         const isOwnerAccount = isPlatformOwner(prof.email) || prof.subscriptionPlan === 'owner';
+        const fleetCoverage = checkVehicleFleetCoverage({
+          driverId: prof.id,
+          licensePlate: prof.licensePlate,
+        });
+
         if (isOwnerAccount) {
           prof.subscriptionPlan = 'owner';
           prof.subscriptionActive = true;
@@ -234,6 +240,16 @@ export default function DriverPage() {
           setIsDriverVerified(true);
           setIsTrialExpired(false);
           setShowSubModal(false);
+        } else if (fleetCoverage.isCovered) {
+          prof.subscriptionPlan = 'fleet_pro';
+          prof.subscriptionActive = true;
+          prof.isVerified = true;
+          setIsDriverVerified(true);
+          setIsTrialExpired(false);
+          setShowSubModal(false);
+        } else if (fleetCoverage.dispatchSuspended) {
+          setPreemptedNotice(fleetCoverage.reason || 'Vehicle dispatch is paused by your fleet manager.');
+          setIsDriverVerified(!!prof.isVerified);
         } else if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
           const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - prof.trialStartedAt > SEVEN_DAYS) {
@@ -896,6 +912,11 @@ export default function DriverPage() {
                 <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60 uppercase tracking-wider flex items-center gap-1 shadow-sm shrink-0 truncate">
                   <Crown size={10} className="text-amber-600 dark:text-amber-400 shrink-0" />
                   <span className="hidden sm:inline">Platform </span>Owner
+                </span>
+              ) : profile?.subscriptionPlan === 'fleet_pro' ? (
+                <span className="bg-purple-100/90 text-purple-900 border border-purple-300 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-purple-950/80 dark:text-purple-200 dark:border-purple-700/60 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0 truncate">
+                  <Building2 size={10} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span className="hidden sm:inline">Fleet </span>Partner
                 </span>
               ) : profile?.subscriptionPlan === 'paid' ? (
                 <span className="bg-blue-100/80 text-blue-800 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider shrink-0">
@@ -1683,6 +1704,10 @@ export default function DriverPage() {
                         <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
                           <Crown size={14} /> Lifetime Free (Founder Exemption)
                         </span>
+                      ) : profile?.subscriptionPlan === 'fleet_pro' ? (
+                        <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1.5">
+                          <Building2 size={14} /> Active (Covered by Fleet Partner)
+                        </span>
                       ) : profile?.subscriptionPlan === 'paid' ? (
                         <span className="text-blue-600 dark:text-blue-400">Active (Paid R499/mo)</span>
                       ) : (
@@ -2159,6 +2184,8 @@ export default function DriverPage() {
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       <span>Connecting to Paystack...</span>
                     </>
+                  ) : profile?.subscriptionPlan === 'fleet_pro' ? (
+                    'Covered by Fleet Partner'
                   ) : profile?.subscriptionPlan === 'paid' ? (
                     'Subscription Active'
                   ) : (

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link";
-import { Car, User, Map, Navigation, ShieldCheck, Download, UserPlus, ArrowRight } from "lucide-react";
+import { Car, User, Map, Navigation, ShieldCheck, Download, UserPlus, ArrowRight, Building2, ArrowUpRight } from "lucide-react";
 import { usePWA } from "@/lib/PWAContext";
 import { useRouter } from "next/navigation";
 
@@ -138,6 +138,26 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Fleet Partner Hub Banner */}
+          <div className="md:col-span-2 group relative flex flex-col sm:flex-row items-center justify-between p-6 sm:p-8 bg-gradient-to-r from-purple-950/50 via-zinc-900/90 to-zinc-900/90 backdrop-blur-xl border border-purple-500/30 rounded-[2.5rem] hover:border-purple-500/60 transition-all duration-300 gap-6 shadow-xl">
+            <div className="space-y-2 text-center sm:text-left">
+              <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                <Building2 size={13} /> Fleet Partner Program
+              </div>
+              <h3 className="text-2xl font-extrabold text-white">Own 2 or More Vehicles?</h3>
+              <p className="text-gray-300 text-xs sm:text-sm max-w-xl">
+                Replace 25% Uber &amp; Bolt aggregator deductions with a flat SaaS fee (R770/mo base + R499/veh). Manage multiple cars, live telematics, shift driver pairing, and cash/speedpoint remittance audits.
+              </p>
+            </div>
+            <Link
+              href="/fleet"
+              className="shrink-0 flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/30 text-sm transition-all active:scale-95 whitespace-nowrap"
+            >
+              <span>Open Fleet Hub</span>
+              <ArrowUpRight size={16} />
+            </Link>
           </div>
         </div>
 

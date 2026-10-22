@@ -277,7 +277,7 @@ function findDriverProfileLocally(driverId?: string): CandidateDriver | null {
 
     // Check mock driver profile
     const rawMock = getSafeLocalStorageItem('mock_driver_profile');
-    const mock = safeJsonParse<CandidateDriver>(rawMock, null);
+    const mock = safeJsonParse<CandidateDriver | null>(rawMock, null);
     if (mock && mock.id === driverId) return mock;
   } catch {}
   return null;
