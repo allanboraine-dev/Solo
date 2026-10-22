@@ -22,6 +22,7 @@ import type {
   FleetSubscriptionTier,
   VehicleOperationalStatus,
   ShiftType,
+  FleetSettlementBank,
 } from '../types/fleet.ts';
 import { generateUuid, getSafeLocalStorageItem, setSafeLocalStorageItem, safeJsonParse } from './session.ts';
 
@@ -354,6 +355,98 @@ export function saveFleetProfile(profile: FleetProfile): FleetProfile {
     setSafeLocalStorageItem(STORAGE_KEY_FLEET_PROFILES, JSON.stringify(all));
   }
   return updated;
+}
+
+// ----------------------------------------------------------------------------
+// Active Session & Authentication
+// ----------------------------------------------------------------------------
+
+const STORAGE_KEY_ACTIVE_FLEET_ID = 'solo_active_fleet_id';
+let memoryActiveFleetId: string | null = null;
+
+export function getActiveFleetProfile(): FleetProfile | null {
+  const activeId = typeof window !== 'undefined'
+    ? getSafeLocalStorageItem(STORAGE_KEY_ACTIVE_FLEET_ID)
+    : memoryActiveFleetId;
+
+  if (activeId) {
+    const found = getFleetProfile(activeId);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function setActiveFleetSession(fleetId: string): void {
+  memoryActiveFleetId = fleetId;
+  if (typeof window !== 'undefined') {
+    setSafeLocalStorageItem(STORAGE_KEY_ACTIVE_FLEET_ID, fleetId);
+  }
+}
+
+export function clearActiveFleetSession(): void {
+  memoryActiveFleetId = null;
+  if (typeof window !== 'undefined') {
+    setSafeLocalStorageItem(STORAGE_KEY_ACTIVE_FLEET_ID, '');
+  }
+}
+
+export function registerFleetProfile(params: {
+  companyName: string;
+  contactPerson: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  operatingCity: string;
+  registrationNumber?: string;
+  vatNumber?: string;
+  settlementBank?: FleetSettlementBank;
+  estimatedVehicles?: number;
+}): FleetProfile {
+  const newFleet: FleetProfile = {
+    id: `fleet-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    ownerEmail: params.ownerEmail.trim().toLowerCase(),
+    ownerPhone: params.ownerPhone.trim(),
+    companyName: params.companyName.trim(),
+    registrationNumber: params.registrationNumber?.trim() || undefined,
+    vatNumber: params.vatNumber?.trim() || undefined,
+    contactPerson: params.contactPerson.trim(),
+    operatingCity: params.operatingCity.trim(),
+    settlementBank: params.settlementBank,
+    subscriptionStatus: 'active',
+    subscriptionTier: (params.estimatedVehicles || 0) >= 15 ? 'fleet_enterprise' : (params.estimatedVehicles || 0) >= 5 ? 'fleet_pro' : 'fleet_starter',
+    activeVehiclesCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveFleetProfile(newFleet);
+  setActiveFleetSession(newFleet.id);
+  return newFleet;
+}
+
+export function loginFleetProfile(identifier: string): FleetProfile | null {
+  const clean = (identifier || '').trim().toLowerCase();
+  if (!clean) return null;
+
+  const cleanDigits = clean.replace(/[^\d]/g, '');
+  const all = getAllFleetProfiles();
+  const matched = all.find((f) => {
+    if (f.id.toLowerCase() === clean) return true;
+    if (f.ownerEmail.toLowerCase() === clean) return true;
+    if (f.companyName.toLowerCase() === clean) return true;
+    if (cleanDigits.length >= 7) {
+      const fleetPhoneDigits = f.ownerPhone.replace(/[^\d]/g, '');
+      if (fleetPhoneDigits.includes(cleanDigits) || cleanDigits.includes(fleetPhoneDigits)) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  if (matched) {
+    setActiveFleetSession(matched.id);
+    return matched;
+  }
+  return null;
 }
 
 // ----------------------------------------------------------------------------

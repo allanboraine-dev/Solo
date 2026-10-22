@@ -14,6 +14,11 @@ import {
   recordFleetShiftAudit,
   getFleetShiftAudits,
   checkVehicleFleetCoverage,
+  registerFleetProfile,
+  loginFleetProfile,
+  getActiveFleetProfile,
+  setActiveFleetSession,
+  clearActiveFleetSession,
   FLEET_PRICING,
 } from '../src/utils/fleetStore.ts';
 import type { FleetProfile, FleetVehicle, FleetShiftAudit } from '../src/types/fleet.ts';
@@ -220,5 +225,48 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
     assert.strictEqual(found?.cashCollectedZar, 700);
     assert.strictEqual(found?.speedpointCollectedZar, 1400);
     assert.strictEqual(found?.settlementStatus, 'settled');
+  });
+
+  it('registers a new fleet partner and establishes an active fleet session', () => {
+    clearActiveFleetSession();
+    assert.strictEqual(getActiveFleetProfile(), null);
+
+    const registered = registerFleetProfile({
+      companyName: 'Cape Peninsula Trans (Pty) Ltd',
+      contactPerson: 'Zola Matshoba',
+      ownerEmail: 'zola@peninsulatrans.co.za',
+      ownerPhone: '+27 72 333 4455',
+      operatingCity: 'Cape Town',
+      registrationNumber: '2024/987654/07',
+      vatNumber: '4882736451',
+      estimatedVehicles: 6,
+    });
+
+    assert.ok(registered.id);
+    assert.strictEqual(registered.companyName, 'Cape Peninsula Trans (Pty) Ltd');
+    assert.strictEqual(registered.subscriptionStatus, 'active');
+    assert.strictEqual(registered.subscriptionTier, 'fleet_pro'); // 6 vehicles = fleet_pro
+
+    // Verify session was automatically set
+    const active = getActiveFleetProfile();
+    assert.ok(active);
+    assert.strictEqual(active?.id, registered.id);
+    assert.strictEqual(active?.companyName, 'Cape Peninsula Trans (Pty) Ltd');
+
+    // Sign out / Clear session
+    clearActiveFleetSession();
+    assert.strictEqual(getActiveFleetProfile(), null);
+
+    // Sign in via email
+    const loggedIn = loginFleetProfile('zola@peninsulatrans.co.za');
+    assert.ok(loggedIn);
+    assert.strictEqual(loggedIn?.id, registered.id);
+    assert.strictEqual(getActiveFleetProfile()?.id, registered.id);
+
+    // Sign in via phone number
+    clearActiveFleetSession();
+    const loggedInPhone = loginFleetProfile('+27 72 333 4455');
+    assert.ok(loggedInPhone);
+    assert.strictEqual(loggedInPhone?.id, registered.id);
   });
 });
