@@ -496,6 +496,19 @@ export function activateFleetSubscription(
   return fleet;
 }
 
+export function updateFleetSubscriptionStatus(
+  fleetId: string,
+  status: FleetProfile['subscriptionStatus']
+): FleetProfile | null {
+  const fleet = getFleetProfile(fleetId);
+  if (!fleet) return null;
+
+  fleet.subscriptionStatus = status;
+  fleet.updatedAt = new Date().toISOString();
+  saveFleetProfile(fleet);
+  return fleet;
+}
+
 export function loginFleetProfile(identifier: string): FleetProfile | null {
   const clean = (identifier || '').trim().toLowerCase();
   if (!clean) return null;
