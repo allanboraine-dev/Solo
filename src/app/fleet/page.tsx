@@ -98,7 +98,7 @@ export default function FleetPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  // Paystack Billing state (Approach 2: 14-day pilot -> Activate via Paystack)
+  // Paystack Billing state (7-day free trial -> Activate via Paystack)
   const [paystackLoading, setPaystackLoading] = useState(false);
   const [paymentSuccessMsg, setPaymentSuccessMsg] = useState<string | null>(null);
 
@@ -368,9 +368,9 @@ export default function FleetPage() {
     return { totalVehicles, activeOnRoad, todayGross, todayCash, todayCard, warningCount };
   }, [vehicles, audits]);
 
-  // Calculate remaining days in 14-day setup pilot (Approach 2)
+  // Calculate remaining days in 7-day free trial
   const pilotDaysRemaining = useMemo(() => {
-    if (!fleetProfile?.trialEndsAt) return 14;
+    if (!fleetProfile?.trialEndsAt) return 7;
     const diffMs = new Date(fleetProfile.trialEndsAt).getTime() - Date.now();
     const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     return Math.max(0, days);
@@ -942,7 +942,7 @@ export default function FleetPage() {
 
               <div className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold flex items-center justify-center gap-1.5 pt-1">
                 <Sparkles size={13} />
-                <span>Includes 14-Day Free Fleet Pilot • R0.00 upfront • Activate Paystack anytime</span>
+                <span>Includes 7-Day Free Trial • R0.00 upfront • Activate Paystack anytime</span>
               </div>
 
               <div className="flex items-stretch gap-2.5 pt-1">
@@ -964,7 +964,7 @@ export default function FleetPage() {
                     <span>Registering Fleet Partner...</span>
                   ) : (
                     <>
-                      <span>Register Fleet &amp; Launch Pilot (R0.00 Upfront)</span>
+                      <span>Register Fleet &amp; Launch 7-Day Free Trial (R0.00 Upfront)</span>
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -1187,24 +1187,24 @@ export default function FleetPage() {
         </div>
       )}
 
-      {/* 14-Day Pilot Banner (Approach 2: Free Setup Pilot -> Activate Paystack Subscription) */}
+      {/* 7-Day Free Trial Banner */}
       {fleetProfile.subscriptionStatus === "trial" && (
         <div className="bg-gradient-to-r from-purple-900/15 via-indigo-900/15 to-emerald-900/15 border-2 border-purple-500/30 dark:border-purple-500/40 rounded-3xl p-5 md:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <span className="bg-purple-600 text-white font-black text-[11px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
                 <Sparkles size={12} />
-                14-Day Pilot Active
+                7-Day Free Trial Active
               </span>
               <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
-                {pilotDaysRemaining > 0 ? `${pilotDaysRemaining} days remaining in free pilot` : "Pilot period concluded"}
+                {pilotDaysRemaining > 0 ? `${pilotDaysRemaining} days remaining in free trial` : "Trial period concluded"}
               </span>
             </div>
             <h3 className="text-base md:text-lg font-black text-gray-900 dark:text-white">
-              Free Fleet Onboarding Pilot &amp; Setup Mode
+              Free Fleet Onboarding &amp; 7-Day Trial Mode
             </h3>
             <p className="text-xs text-gray-600 dark:text-zinc-300 max-w-2xl leading-relaxed">
-              Your fleet is currently active with full dispatch access. Add your cars, pair drivers, and test shift reconciliation at zero upfront cost. Activate your Paystack subscription anytime to lock in recurring monthly dispatch licenses.
+              Your fleet is currently enjoying a complimentary 7-day free trial with full dispatch access. Add your cars, pair drivers, and test shift reconciliation at zero upfront cost. Activate your Paystack subscription anytime to lock in recurring monthly dispatch licenses.
             </p>
           </div>
 
@@ -1726,7 +1726,7 @@ export default function FleetPage() {
                     ) : (
                       <span className="inline-flex items-center gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2.5 py-0.5 rounded-full text-xs font-bold border border-purple-500/20">
                         <Sparkles size={12} />
-                        14-Day Pilot Active ({pilotDaysRemaining} days left)
+                        7-Day Free Trial Active ({pilotDaysRemaining} days left)
                       </span>
                     )}
                   </div>
@@ -1747,12 +1747,12 @@ export default function FleetPage() {
                           day: "numeric",
                         })}`
                       : fleetProfile.trialEndsAt
-                      ? `Pilot ends ${new Date(fleetProfile.trialEndsAt).toLocaleDateString("en-ZA", {
+                      ? `Trial ends ${new Date(fleetProfile.trialEndsAt).toLocaleDateString("en-ZA", {
                           year: "numeric",
                           month: "short",
                           day: "numeric",
                         })}`
-                      : "14-Day Pilot"}
+                      : "7-Day Free Trial"}
                   </span>
                 </div>
               </div>

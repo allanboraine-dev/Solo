@@ -462,7 +462,7 @@ export function registerFleetProfile(params: {
     subscriptionStatus: 'trial',
     subscriptionTier: (params.estimatedVehicles || 0) >= 15 ? 'fleet_enterprise' : (params.estimatedVehicles || 0) >= 5 ? 'fleet_pro' : 'fleet_starter',
     activeVehiclesCount: 0,
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

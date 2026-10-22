@@ -248,9 +248,11 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
 
     assert.ok(registered.id);
     assert.strictEqual(registered.companyName, 'Cape Peninsula Trans (Pty) Ltd');
-    // Under Approach 2: Free onboarding setup with 14-day fleet pilot
+    // Under Approach 2: Free onboarding setup with 7-day free fleet trial
     assert.strictEqual(registered.subscriptionStatus, 'trial');
     assert.ok(registered.trialEndsAt);
+    const diffDays = Math.round((new Date(registered.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    assert.strictEqual(diffDays, 7, 'Fleet subscription must initialize with a 7-day free trial');
     assert.strictEqual(registered.subscriptionTier, 'fleet_pro'); // 6 vehicles = fleet_pro
 
     // Verify session was automatically set
