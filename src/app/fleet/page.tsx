@@ -32,6 +32,7 @@ import {
   ArrowRight,
   Check,
   Lock,
+  RotateCcw,
 } from "lucide-react";
 import {
   FleetProfile,
@@ -45,6 +46,7 @@ import {
   calculateFleetMonthlyBilling,
   checkComplianceExpiry,
   seedDefaultFleetIfNeeded,
+  resetDemoFleet,
   getAllFleetProfiles,
   getFleetProfile,
   getActiveFleetProfile,
@@ -185,6 +187,40 @@ export default function FleetPage() {
     loadActiveFleet();
   }, []);
 
+  // Reset Registration Form (Clears all fields that were just entered or added)
+  const handleResetRegisterForm = () => {
+    setRegCompanyName("");
+    setRegContactPerson("");
+    setRegEmail("");
+    setRegPhone("");
+    setRegCity("Johannesburg");
+    setRegCipro("");
+    setRegVat("");
+    setRegBankName("First National Bank (FNB)");
+    setRegAccountHolder("");
+    setRegAccountNumber("");
+    setRegBranchCode("250655");
+    setRegEstimatedVehicles(5);
+    setRegError(null);
+  };
+
+  // Auto-fill Demo Fleet details for rapid registration testing
+  const handleFillDemoRegistration = () => {
+    setRegCompanyName("Mzansi Express Fleet (Pty) Ltd");
+    setRegContactPerson("Kagiso Molefe");
+    setRegEmail("fleet@mzansiexpress.co.za");
+    setRegPhone("+27 82 555 7890");
+    setRegCity("Johannesburg");
+    setRegCipro("2023/892011/07");
+    setRegVat("4990182746");
+    setRegBankName("First National Bank (FNB)");
+    setRegAccountHolder("Mzansi Express Fleet Pty Ltd");
+    setRegAccountNumber("62948201948");
+    setRegBranchCode("250655");
+    setRegEstimatedVehicles(5);
+    setRegError(null);
+  };
+
   // Registration Handler
   const handleRegisterFleet = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +254,9 @@ export default function FleetPage() {
         settlementBank,
         estimatedVehicles: Number(regEstimatedVehicles) || 1,
       });
+
+      // Clear the registration form fields that were just added
+      handleResetRegisterForm();
 
       setFleetProfile(registered);
       setVehicles([]);
@@ -256,6 +295,7 @@ export default function FleetPage() {
   // Sign out / Switch Fleet
   const handleSignOutFleet = () => {
     clearActiveFleetSession();
+    handleResetRegisterForm();
     setFleetProfile(null);
     setVehicles([]);
     setAudits([]);
@@ -267,6 +307,13 @@ export default function FleetPage() {
   const handleLaunchDemoFleet = () => {
     const demo = seedDefaultFleetIfNeeded();
     setActiveFleetSession(demo.id);
+    loadActiveFleet();
+  };
+
+  // Reset Demo Fleet to initial defaults
+  const handleResetDemoFleet = () => {
+    const clean = resetDemoFleet();
+    setActiveFleetSession(clean.id);
     loadActiveFleet();
   };
 
@@ -303,7 +350,9 @@ export default function FleetPage() {
   const metrics = useMemo(() => {
     const totalVehicles = vehicles.length;
     const activeOnRoad = vehicles.filter((v) => v.currentStatus === "online" || v.currentStatus === "on_trip").length;
-    const todayAudits = audits.slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const dateMatchedAudits = audits.filter((a) => a.shiftDate === today);
+    const todayAudits = dateMatchedAudits.length > 0 ? dateMatchedAudits : audits.slice(0, 10);
     const todayGross = todayAudits.reduce((acc, a) => acc + (a.totalGrossZar || 0), 0);
     const todayCash = todayAudits.reduce((acc, a) => acc + (a.cashCollectedZar || 0), 0);
     const todayCard = todayAudits.reduce((acc, a) => acc + (a.speedpointCollectedZar || 0), 0);
@@ -368,6 +417,20 @@ export default function FleetPage() {
     }
   };
 
+  // Reset Add Vehicle form fields
+  const handleResetAddVehicleForm = () => {
+    setNewVehMake("Toyota");
+    setNewVehModel("Corolla Quest 1.8");
+    setNewVehYear(2023);
+    setNewVehColor("White");
+    setNewVehPlate("");
+    setNewVehVin("");
+    setNewVehSpeedpoint("yoco");
+    setNewVehTerminalId("");
+    setNewVehCoFExpiry("");
+    setNewVehDiscExpiry("");
+  };
+
   // Handlers for Add Vehicle / Pair Driver / Audit
   const handleAddVehicle = (e: React.FormEvent) => {
     e.preventDefault();
@@ -393,9 +456,7 @@ export default function FleetPage() {
     };
 
     saveFleetVehicle(newVehicle);
-    setNewVehPlate("");
-    setNewVehVin("");
-    setNewVehTerminalId("");
+    handleResetAddVehicleForm();
     setIsAddVehicleOpen(false);
     loadActiveFleet();
   };
@@ -636,8 +697,46 @@ export default function FleetPage() {
                 </div>
               )}
 
+              {/* Demo / Testing Actions Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-purple-50/70 dark:bg-zinc-800/60 rounded-2xl border border-purple-200/60 dark:border-zinc-700/60 text-xs">
+                <span className="font-semibold text-gray-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />
+                  <span>Demo &amp; Testing Actions:</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleFillDemoRegistration}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                    title="Populate registration fields with demo fleet partner details"
+                  >
+                    <Sparkles size={12} />
+                    <span>Auto-Fill Demo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetRegisterForm}
+                    className="px-3 py-1.5 bg-white dark:bg-zinc-700 hover:bg-gray-100 dark:hover:bg-zinc-600 text-gray-700 dark:text-zinc-200 border border-gray-300 dark:border-zinc-600 rounded-xl font-bold text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                    title="Clear all fields that were just entered or added"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Reset / Clear Fields</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-3">
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">1. Company & Contact Details</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">1. Company &amp; Contact Details</h4>
+                  <button
+                    type="button"
+                    onClick={handleResetRegisterForm}
+                    className="text-[11px] text-gray-400 hover:text-red-500 transition inline-flex items-center gap-1 cursor-pointer"
+                    title="Clear fields that were just entered"
+                  >
+                    <RotateCcw size={11} /> Reset Fields
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Company / Entity Name *</label>
@@ -730,10 +829,24 @@ export default function FleetPage() {
 
               {/* Settlement Bank Details */}
               <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
-                  <CreditCard size={15} className="text-emerald-500" />
-                  2. Speedpoint Settlement Banking (For Digital Card Fares)
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                    <CreditCard size={15} className="text-emerald-500" />
+                    2. Speedpoint Settlement Banking (For Digital Card Fares)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRegAccountHolder("");
+                      setRegAccountNumber("");
+                      setRegBranchCode("250655");
+                    }}
+                    className="text-[11px] text-gray-400 hover:text-red-500 transition inline-flex items-center gap-1 cursor-pointer"
+                    title="Clear banking fields"
+                  >
+                    <RotateCcw size={11} /> Clear Bank
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Settlement Bank</label>
@@ -832,20 +945,31 @@ export default function FleetPage() {
                 <span>Includes 14-Day Free Fleet Pilot • R0.00 upfront • Activate Paystack anytime</span>
               </div>
 
-              <button
-                type="submit"
-                disabled={regSubmitting}
-                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
-              >
-                {regSubmitting ? (
-                  <span>Registering Fleet Partner...</span>
-                ) : (
-                  <>
-                    <span>Register Fleet &amp; Launch Pilot (R0.00 Upfront)</span>
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
+              <div className="flex items-stretch gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetRegisterForm}
+                  className="px-4 py-3.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-bold rounded-2xl transition text-xs md:text-sm flex items-center justify-center gap-1.5 cursor-pointer shrink-0 border border-gray-200 dark:border-zinc-700 active:scale-95"
+                  title="Clear all fields that were just entered or added"
+                >
+                  <RotateCcw size={15} />
+                  <span>Reset Fields</span>
+                </button>
+                <button
+                  type="submit"
+                  disabled={regSubmitting}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
+                >
+                  {regSubmitting ? (
+                    <span>Registering Fleet Partner...</span>
+                  ) : (
+                    <>
+                      <span>Register Fleet &amp; Launch Pilot (R0.00 Upfront)</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           )}
 
@@ -883,13 +1007,22 @@ export default function FleetPage() {
           )}
 
           {/* Developer / Demo Quick Link */}
-          <div className="pt-4 border-t border-gray-100 dark:border-zinc-800 text-center">
+          <div className="pt-4 border-t border-gray-100 dark:border-zinc-800 flex flex-wrap items-center justify-center gap-3 text-center">
             <button
               onClick={handleLaunchDemoFleet}
-              className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1.5"
+              className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Sparkles size={13} />
               <span>Explore Demo Fleet (Apex Logistics Cape Town)</span>
+            </button>
+            <span className="text-gray-300 dark:text-zinc-700">•</span>
+            <button
+              onClick={handleResetDemoFleet}
+              className="text-xs font-semibold text-gray-500 dark:text-zinc-400 hover:text-purple-600 dark:hover:text-purple-400 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+              title="Reset the demo fleet data back to original 3 vehicles and audits"
+            >
+              <RotateCcw size={12} />
+              <span>Reset Demo Fleet to Defaults</span>
             </button>
           </div>
         </div>
@@ -942,6 +1075,20 @@ export default function FleetPage() {
               >
                 <DollarSign size={16} />
                 <span>Record Shift Audit</span>
+              </button>
+            )}
+            {fleetProfile.id === "fleet-apex-capetown" && (
+              <button
+                onClick={() => {
+                  if (confirm("Reset demo fleet to defaults? This will clear any extra vehicles or shift audits added during testing.")) {
+                    handleResetDemoFleet();
+                  }
+                }}
+                title="Reset demo fleet to initial 3 vehicles & audits"
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800/40 transition cursor-pointer"
+              >
+                <RotateCcw size={14} />
+                <span className="hidden sm:inline">Reset Demo Fleet</span>
               </button>
             )}
             <button
@@ -1693,7 +1840,13 @@ export default function FleetPage() {
                 <Car className="text-emerald-500" size={18} />
                 Add Vehicle to Fleet
               </h3>
-              <button onClick={() => setIsAddVehicleOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => {
+                  handleResetAddVehicleForm();
+                  setIsAddVehicleOpen(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
                 <XCircle size={20} />
               </button>
             </div>
@@ -1802,20 +1955,34 @@ export default function FleetPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 dark:border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setIsAddVehicleOpen(false)}
-                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold rounded-xl"
+                  onClick={handleResetAddVehicleForm}
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
+                  title="Clear all fields that were just entered"
                 >
-                  Cancel
+                  <RotateCcw size={13} />
+                  <span>Reset Fields</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs"
-                >
-                  Save Vehicle
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleResetAddVehicleForm();
+                      setIsAddVehicleOpen(false);
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-700 dark:text-zinc-300 font-bold rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    Save Vehicle
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -42,16 +42,20 @@ export default function DriverRegistration() {
   // Step 2: Vehicle & Payment Equipment Details
   const [vehicleMake, setVehicleMake] = useState('')
   const [vehicleModel, setVehicleModel] = useState('')
+  const [vehicleYear, setVehicleYear] = useState(2023)
+  const [vehicleColor, setVehicleColor] = useState('White')
   const [licensePlate, setLicensePlate] = useState('')
   const [prdpNumber, setPrdpNumber] = useState('')
   const [hasSpeedpointConfirmed, setHasSpeedpointConfirmed] = useState(false)
   
-  // Step 3: Real KYC Document Files
+  // Step 3: Real KYC Document Files & Camera Snaps
+  const [selfieFile, setSelfieFile] = useState<File | null>(null)
   const [licenseFrontFile, setLicenseFrontFile] = useState<File | null>(null)
   const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null)
   const [prdpFile, setPrdpFile] = useState<File | null>(null)
-  const [roadworthyFile, setRoadworthyFile] = useState<File | null>(null)
+  const [licenseDiscFile, setLicenseDiscFile] = useState<File | null>(null)
   const [vehiclePhotoFile, setVehiclePhotoFile] = useState<File | null>(null)
+  const [roadworthyFile, setRoadworthyFile] = useState<File | null>(null)
 
   // Step 4: Card & Trial Setup State
   const [createdDriverId, setCreatedDriverId] = useState<string | null>(null)
@@ -217,6 +221,8 @@ export default function DriverRegistration() {
       phone,
       vehicleMake,
       vehicleModel,
+      vehicleYear,
+      vehicleColor,
       licensePlate,
       prdpNumber,
       hasLicense: !!(licenseFrontFile || licenseBackFile),
@@ -241,6 +247,8 @@ export default function DriverRegistration() {
         phone,
         vehicleMake,
         vehicleModel,
+        vehicleYear,
+        vehicleColor,
         licensePlate,
         prdpNumber,
         isVerified: false,
@@ -260,6 +268,8 @@ export default function DriverRegistration() {
         email,
         vehicleMake,
         vehicleModel,
+        vehicleYear,
+        vehicleColor,
         licensePlate,
         prdpNumber,
         createdAt: new Date().toISOString(),
@@ -277,13 +287,15 @@ export default function DriverRegistration() {
       console.warn('Signup alert dispatch notice:', broadcastErr)
     }
 
-    // 3. Upload KYC Documents
+    // 3. Upload KYC Documents & Photo Verification
     const documentsToUpload: { file: File | null; type: KycDocType; label: string }[] = [
+      { file: selfieFile, type: 'driver_selfie', label: 'Driver Selfie / ID Photo' },
       { file: licenseFrontFile, type: 'license_front', label: "Driver's License (Front)" },
       { file: licenseBackFile, type: 'license_back', label: "Driver's License (Back)" },
       { file: prdpFile, type: 'prdp', label: 'PrDP Permit' },
-      { file: roadworthyFile, type: 'roadworthy', label: 'Roadworthy Certificate' },
+      { file: licenseDiscFile, type: 'license_disc', label: 'Vehicle License Disc' },
       { file: vehiclePhotoFile, type: 'vehicle_photo', label: 'Vehicle Photo' },
+      { file: roadworthyFile, type: 'roadworthy', label: 'Roadworthy Certificate' },
     ]
 
     for (const item of documentsToUpload) {
@@ -415,7 +427,25 @@ export default function DriverRegistration() {
     }
   }
 
-  const hasRequiredDocs = !!(licenseFrontFile && licenseBackFile && prdpFile && roadworthyFile)
+  const hasRequiredDocs = !!(
+    selfieFile &&
+    licenseFrontFile &&
+    licenseBackFile &&
+    prdpFile &&
+    licenseDiscFile &&
+    vehiclePhotoFile &&
+    roadworthyFile
+  )
+
+  const readyDocsCount = [
+    selfieFile,
+    licenseFrontFile,
+    licenseBackFile,
+    prdpFile,
+    licenseDiscFile,
+    vehiclePhotoFile,
+    roadworthyFile,
+  ].filter(Boolean).length
 
   // 7-day trial date string for UI display
   const trialEndDateString = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', {
@@ -528,6 +558,32 @@ export default function DriverRegistration() {
                   <input required type="text" value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Corolla Quest" />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Model Year</label>
+                  <input 
+                    required 
+                    type="number" 
+                    min="2000" 
+                    max={new Date().getFullYear() + 1} 
+                    value={vehicleYear} 
+                    onChange={e => setVehicleYear(parseInt(e.target.value) || new Date().getFullYear())} 
+                    className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" 
+                    placeholder="2022" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle Color</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={vehicleColor} 
+                    onChange={e => setVehicleColor(e.target.value)} 
+                    className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" 
+                    placeholder="e.g. Silver / White" 
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">License Plate Number</label>
                 <input required type="text" value={licensePlate} onChange={e => setLicensePlate(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm uppercase" placeholder="CA 123-456" />
@@ -585,22 +641,40 @@ export default function DriverRegistration() {
 
           {/* STEP 3: KYC Documents */}
           {step === 3 && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 mb-2">
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4">
                 <div className="flex items-center gap-3 text-xl font-bold">
                   <FileText className="text-blue-500" /> Compliance &amp; Verification
                 </div>
-                <span className="text-xs font-semibold text-gray-500">
-                  Max 10MB (PDF, JPG, PNG)
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                  hasRequiredDocs
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40'
+                    : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/50'
+                }`}>
+                  {readyDocsCount} / 7 Required Ready
                 </span>
               </div>
 
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                South African law requires valid PrDP and roadworthiness verification for commercial e-hailing vehicles. Documents are stored in encrypted private storage.
+                To prevent fraud and maintain passenger safety, SOLO verifies driver identity and vehicle road legality prior to platform activation. You can take live photos directly using your phone/device camera or upload clear document files.
               </p>
 
-              <div className="space-y-3 pt-2">
-                {/* 1. Driver's License Front */}
+              {/* 1. DRIVER IDENTIFICATION & ANTI-IMPERSONATION */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  <User size={15} className="text-blue-500" />
+                  <span>1. Driver Identity Verification (Anti-Impersonation)</span>
+                </div>
+
+                {/* 1. Driver Live Selfie */}
+                <KycDocumentUploader
+                  docType="driver_selfie"
+                  selectedFile={selfieFile}
+                  onFileSelect={setSelfieFile}
+                  disabled={isSubmitting}
+                />
+
+                {/* 2. Driver's License Front */}
                 <KycDocumentUploader
                   docType="license_front"
                   selectedFile={licenseFrontFile}
@@ -608,7 +682,7 @@ export default function DriverRegistration() {
                   disabled={isSubmitting}
                 />
 
-                {/* 2. Driver's License Back */}
+                {/* 3. Driver's License Back */}
                 <KycDocumentUploader
                   docType="license_back"
                   selectedFile={licenseBackFile}
@@ -616,30 +690,53 @@ export default function DriverRegistration() {
                   disabled={isSubmitting}
                 />
 
-                {/* 3. PrDP Document */}
+                {/* 4. PrDP Document */}
                 <KycDocumentUploader
                   docType="prdp"
                   selectedFile={prdpFile}
                   onFileSelect={setPrdpFile}
                   disabled={isSubmitting}
                 />
+              </div>
 
-                {/* 4. Roadworthy Certificate */}
+              {/* 2. VEHICLE VERIFICATION & ROAD LEGALITY */}
+              <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 pb-1 text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  <Car size={15} className="text-emerald-500" />
+                  <span>2. Vehicle Verification &amp; Road Legality</span>
+                </div>
+
+                {/* 5. Vehicle License Disc */}
                 <KycDocumentUploader
-                  docType="roadworthy"
-                  selectedFile={roadworthyFile}
-                  onFileSelect={setRoadworthyFile}
+                  docType="license_disc"
+                  selectedFile={licenseDiscFile}
+                  onFileSelect={setLicenseDiscFile}
                   disabled={isSubmitting}
                 />
 
-                {/* 5. Vehicle Photo (Optional) */}
+                {/* 6. Vehicle Exterior Photo */}
                 <KycDocumentUploader
                   docType="vehicle_photo"
                   selectedFile={vehiclePhotoFile}
                   onFileSelect={setVehiclePhotoFile}
                   disabled={isSubmitting}
                 />
+
+                {/* 7. Roadworthy Certificate */}
+                <KycDocumentUploader
+                  docType="roadworthy"
+                  selectedFile={roadworthyFile}
+                  onFileSelect={setRoadworthyFile}
+                  disabled={isSubmitting}
+                />
               </div>
+
+              {!hasRequiredDocs && (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2.5">
+                  <AlertCircle size={16} className="shrink-0 text-amber-600" />
+                  <span>Please capture or upload all 7 required items above before proceeding to the 7-day trial step.</span>
+                </div>
+              )}
 
               <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/40">
                 <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed text-center font-medium">
@@ -662,7 +759,7 @@ export default function DriverRegistration() {
                   disabled={!hasRequiredDocs || isSubmitting}
                   className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-blue-500/20 active:scale-95"
                 >
-                  <span>Continue to 7-Day Trial Setup</span>
+                  <span>Continue to 7-Day Trial Setup ({readyDocsCount}/7)</span>
                   <ChevronRight size={18} />
                 </button>
               </div>

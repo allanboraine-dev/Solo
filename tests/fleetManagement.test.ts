@@ -20,6 +20,9 @@ import {
   setActiveFleetSession,
   clearActiveFleetSession,
   activateFleetSubscription,
+  seedDefaultFleetIfNeeded,
+  resetDemoFleet,
+  recordCompletedTripToFleetAudit,
   FLEET_PRICING,
 } from '../src/utils/fleetStore.ts';
 import type { FleetProfile, FleetVehicle, FleetShiftAudit } from '../src/types/fleet.ts';
@@ -284,5 +287,109 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
     const loggedInPhone = loginFleetProfile('+27 72 333 4455');
     assert.ok(loggedInPhone);
     assert.strictEqual(loggedInPhone?.id, registered.id);
+  });
+
+  it('resets demo fleet back to initial clean state and clears vehicles/audits that were just added', () => {
+    // 1. Initialize demo fleet
+    const demo = seedDefaultFleetIfNeeded(true);
+    assert.strictEqual(demo.id, 'fleet-apex-capetown');
+    assert.strictEqual(getFleetVehicles(demo.id).length, 3);
+    assert.strictEqual(getFleetShiftAudits(demo.id).length, 2);
+
+    // 2. Simulate user adding a temporary vehicle to demo fleet
+    const tempVehicle: FleetVehicle = {
+      id: 'veh-demo-temp-999',
+      fleetId: demo.id,
+      make: 'Hyundai',
+      model: 'Grand i10',
+      year: 2024,
+      color: 'Phantom Black',
+      licensePlate: 'CA 999-000',
+      currentStatus: 'idle',
+      dispatchSuspended: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    saveFleetVehicle(tempVehicle);
+    assert.strictEqual(getFleetVehicles(demo.id).length, 4);
+
+    // 3. Simulate user adding an extra shift audit to demo fleet
+    const tempAudit: FleetShiftAudit = {
+      id: 'audit-demo-temp-999',
+      fleetId: demo.id,
+      vehicleId: 'veh-demo-temp-999',
+      licensePlate: 'CA 999-000',
+      driverId: 'driver-temp',
+      driverName: 'Temp Driver',
+      shiftDate: '2026-10-22',
+      tripsCompleted: 5,
+      totalGrossZar: 600,
+      cashCollectedZar: 200,
+      speedpointCollectedZar: 400,
+      settlementStatus: 'settled',
+      createdAt: new Date().toISOString(),
+    };
+    recordFleetShiftAudit(tempAudit);
+    assert.strictEqual(getFleetShiftAudits(demo.id).length, 3);
+
+    // 4. Trigger reset function
+    const resetResult = resetDemoFleet();
+    assert.strictEqual(resetResult.id, 'fleet-apex-capetown');
+
+    // 5. Verify demo fleet is restored to original clean state with extra items cleared
+    const vehiclesAfterReset = getFleetVehicles(demo.id);
+    const auditsAfterReset = getFleetShiftAudits(demo.id);
+    assert.strictEqual(vehiclesAfterReset.length, 3);
+    assert.strictEqual(auditsAfterReset.length, 2);
+    assert.strictEqual(vehiclesAfterReset.some((v) => v.id === 'veh-demo-temp-999'), false);
+    assert.strictEqual(auditsAfterReset.some((a) => a.id === 'audit-demo-temp-999'), false);
+    assert.strictEqual(getActiveFleetProfile()?.id, demo.id);
+  });
+
+  it('automatically records completed trip earnings to the daily fleet audit for fleet manager visibility', () => {
+    // 1. Initialize fleet and pair a driver to a vehicle
+    const demo = seedDefaultFleetIfNeeded(true);
+    const vehicle = getFleetVehicles(demo.id)[0]; // CA 892-149, driver Thabo Mthembu (driver-thabo-01)
+    assert.ok(vehicle);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const existingAuditsBefore = getFleetShiftAudits(demo.id, vehicle.id);
+    const baselineTrips = existingAuditsBefore.find(a => a.shiftDate === today)?.tripsCompleted || 0;
+    const baselineGross = existingAuditsBefore.find(a => a.shiftDate === today)?.totalGrossZar || 0;
+    const baselineCash = existingAuditsBefore.find(a => a.shiftDate === today)?.cashCollectedZar || 0;
+
+    // 2. Complete a cash trip (R85, 9.2 km)
+    const audit1 = recordCompletedTripToFleetAudit({
+      driverId: vehicle.assignedDriverId,
+      licensePlate: vehicle.licensePlate,
+      fareAmountZar: 85,
+      paymentMethod: 'cash',
+      distanceKm: 9.2,
+    });
+
+    assert.ok(audit1);
+    assert.strictEqual(audit1?.tripsCompleted, baselineTrips + 1);
+    assert.strictEqual(audit1?.totalGrossZar, baselineGross + 85);
+    assert.strictEqual(audit1?.cashCollectedZar, baselineCash + 85);
+
+    // 3. Complete a speedpoint card trip (R120, 14.5 km)
+    const audit2 = recordCompletedTripToFleetAudit({
+      driverId: vehicle.assignedDriverId,
+      licensePlate: vehicle.licensePlate,
+      fareAmountZar: 120,
+      paymentMethod: 'in_app',
+      distanceKm: 14.5,
+    });
+
+    assert.ok(audit2);
+    assert.strictEqual(audit2?.tripsCompleted, baselineTrips + 2);
+    assert.strictEqual(audit2?.totalGrossZar, baselineGross + 205);
+    assert.strictEqual((audit2?.speedpointCollectedZar || 0) >= 120, true);
+
+    // 4. Verify audits list has updated audit record accessible by fleet manager
+    const auditsForFleet = getFleetShiftAudits(demo.id, vehicle.id);
+    const todayAudit = auditsForFleet.find(a => a.shiftDate === today);
+    assert.ok(todayAudit);
+    assert.strictEqual(todayAudit?.totalGrossZar, baselineGross + 205);
   });
 });

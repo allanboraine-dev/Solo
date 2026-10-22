@@ -70,6 +70,22 @@ export default function TripRequestModal({ request, onAccept, onDecline }: TripR
                 {request.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
               </span>
             </div>
+            <div className="flex justify-between items-center border-t border-gray-200/50 dark:border-white/10 pt-2.5">
+              <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-wider">Payment Method</span>
+              <span className={`font-bold text-xs px-2.5 py-0.5 rounded-full border ${
+                request.payment_method === 'paystack'
+                  ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-800'
+                  : request.payment_method === 'speedpoint'
+                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                  : 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+              }`}>
+                {request.payment_method === 'paystack'
+                  ? '💳 Paystack In-App Card'
+                  : request.payment_method === 'speedpoint'
+                  ? '💳 Speedpoint (Card / Tap)'
+                  : '💵 Cash'}
+              </span>
+            </div>
             <div className="flex justify-between items-center border-t border-gray-200/50 dark:border-white/10 pt-3 mt-1">
               <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold tracking-wider">Estimated Fare</span>
               <span className="font-black text-xl sm:text-2xl text-green-600 dark:text-green-400">R{request.fare_amount}</span>

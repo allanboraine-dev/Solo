@@ -111,6 +111,7 @@ export default function DriverPage() {
   const [showSubModal, setShowSubModal] = useState(false)
   const [isProcessingSub, setIsProcessingSub] = useState(false)
   const [showFareCollection, setShowFareCollection] = useState(false)
+  const [isAwaitingRiderPayment, setIsAwaitingRiderPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
   const [showBankModal, setShowBankModal] = useState(false)
   const [completionNotice, setCompletionNotice] = useState<string | null>(null)
@@ -802,10 +803,23 @@ export default function DriverPage() {
     setShowFareCollection(true);
   }
 
+  const handleRequestInAppPaystack = async () => {
+    const current = activeTripRef.current || activeTrip;
+    if (current) {
+      const tripSnapshot: MockTrip = { ...current, status: 'payment_pending' };
+      setIsAwaitingRiderPayment(true);
+      setCompletionNotice(`Requested R${tripSnapshot.fare_amount} Paystack payment from rider...`);
+      await completeTripAtomic(tripSnapshot.id, 'in_app', tripSnapshot);
+      await saveTrip(tripSnapshot);
+      broadcastEvent('trip_updated', tripSnapshot);
+    }
+  };
+
   const handleCashPayment = async () => {
     const current = activeTripRef.current || activeTrip;
     if (current) {
       const tripToComplete = current;
+      setIsAwaitingRiderPayment(false);
       markTripCompleted(tripToComplete.id);
       markTripDismissed(tripToComplete.id);
       updateActiveTripState(null);
@@ -1779,7 +1793,7 @@ export default function DriverPage() {
                   </p>
 
                   <div className="space-y-3">
-                    {(['license_front', 'license_back', 'prdp', 'roadworthy', 'vehicle_photo'] as KycDocType[]).map((type) => {
+                    {(['driver_selfie', 'license_front', 'license_back', 'prdp', 'license_disc', 'vehicle_photo', 'roadworthy'] as KycDocType[]).map((type) => {
                       const doc = driverDocs.find(d => d.doc_type === type);
                       return (
                         <KycDocumentUploader
@@ -2043,7 +2057,32 @@ export default function DriverPage() {
               <span className="text-[11px] text-green-700 dark:text-green-400/80 font-medium mt-2 text-center">100% of this fare belongs to you (0% platform commission)</span>
             </div>
 
+            {(isAwaitingRiderPayment || activeTrip.status === 'payment_pending') && (
+              <div className="p-4 mb-4 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-center space-y-2">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-bold text-blue-900 dark:text-blue-200">
+                  Awaiting Rider Paystack Payment...
+                </p>
+                <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                  The Paystack checkout prompt is active on the rider&apos;s screen. This trip will automatically complete once confirmed.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2.5">
+              <button 
+                type="button"
+                onClick={handleRequestInAppPaystack}
+                disabled={isAwaitingRiderPayment || activeTrip.status === 'payment_pending'}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-blue-600/20 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"
+              >
+                <CreditCard size={18} />
+                <span>
+                  {activeTrip.payment_method === 'paystack'
+                    ? 'Request Rider Paystack Payment (Preferred)'
+                    : 'Request Rider Paystack Payment (In-App)'}
+                </span>
+              </button>
               <button 
                 onClick={handleCashPayment}
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 sm:py-4 min-h-[48px] rounded-2xl transition-all shadow-lg shadow-emerald-600/20 flex justify-center items-center gap-2 active:scale-95 text-sm sm:text-base touch-manipulation"

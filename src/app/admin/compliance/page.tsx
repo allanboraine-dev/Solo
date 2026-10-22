@@ -827,7 +827,7 @@ export default function AdminComplianceDashboard() {
               <CheckCircle2 size={16} className="text-emerald-400 group-hover:scale-110 transition" />
             </div>
             <h3 className="text-3xl font-extrabold mt-2 text-emerald-400">{metrics.verifiedCount}</h3>
-            <p className="text-[11px] text-emerald-500/80 mt-1">All 4 mandatory documents approved</p>
+            <p className="text-[11px] text-emerald-500/80 mt-1">All 7 mandatory documents approved</p>
           </div>
 
           <div
@@ -1002,9 +1002,12 @@ export default function AdminComplianceDashboard() {
                       <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                         {(
                           [
+                            { type: "driver_selfie", label: "Selfie (Face)" },
                             { type: "license_front", label: "License (Front)" },
                             { type: "license_back", label: "License (Back)" },
                             { type: "prdp", label: "PrDP Permit" },
+                            { type: "license_disc", label: "License Disc" },
+                            { type: "vehicle_photo", label: "Vehicle Photo" },
                             { type: "roadworthy", label: "Roadworthy CoR" },
                           ] as const
                         ).map((item) => {
@@ -1049,7 +1052,7 @@ export default function AdminComplianceDashboard() {
                       onClick={() => setSelectedDriver(driver)}
                       className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95 border border-zinc-700"
                     >
-                      <span>Inspect & Review ({driver.totalDocs}/5 Docs)</span>
+                      <span>Inspect & Review ({driver.totalDocs}/7 Docs)</span>
                       <ChevronRight size={14} />
                     </button>
                     {!isOwnerDriver && (
@@ -1134,11 +1137,13 @@ export default function AdminComplianceDashboard() {
 
               {(
                 [
+                  "driver_selfie",
                   "license_front",
                   "license_back",
                   "prdp",
-                  "roadworthy",
+                  "license_disc",
                   "vehicle_photo",
+                  "roadworthy",
                 ] as KycDocType[]
               ).map((docType) => {
                 const config = KYC_DOCUMENT_CONFIGS[docType];

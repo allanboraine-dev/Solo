@@ -272,7 +272,7 @@ export function approveAllKycDocuments(
 
   const now = new Date().toISOString();
 
-  // Ensure all 4 mandatory docs exist as approved
+  // Ensure all mandatory docs exist as approved
   for (const type of MANDATORY_DOC_TYPES) {
     const existing = driverMap.get(type);
     driverMap.set(type, {
@@ -290,14 +290,13 @@ export function approveAllKycDocuments(
     });
   }
 
-  // Also approve vehicle_photo if present
-  const vehiclePhoto = driverMap.get('vehicle_photo');
-  if (vehiclePhoto) {
-    vehiclePhoto.status = 'approved';
-    vehiclePhoto.rejection_reason = null;
-    vehiclePhoto.reviewed_at = now;
-    vehiclePhoto.reviewed_by = reviewedBy || null;
-    vehiclePhoto.updated_at = now;
+  // Also approve all other uploaded documents (driver_selfie, license_disc, vehicle_photo)
+  for (const [, doc] of driverMap.entries()) {
+    doc.status = 'approved';
+    doc.rejection_reason = null;
+    doc.reviewed_at = now;
+    doc.reviewed_by = reviewedBy || null;
+    doc.updated_at = now;
   }
 
   // Mark driver verified

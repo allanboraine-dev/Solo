@@ -147,12 +147,19 @@ let memoryFleetVehicles: FleetVehicle[] = [];
 let memoryFleetAudits: FleetShiftAudit[] = [];
 
 /**
- * Initializes default fleet seed for demonstration or test environments
+ * Initializes default fleet seed for demonstration or test environments.
+ * When forceReset is true, bypasses existing profile check and recreates clean demo data.
  */
-export function seedDefaultFleetIfNeeded(): FleetProfile {
-  const existing = getAllFleetProfiles();
-  if (existing.length > 0) {
-    return existing[0];
+export function seedDefaultFleetIfNeeded(forceReset = false): FleetProfile {
+  if (!forceReset) {
+    const existing = getAllFleetProfiles();
+    const existingApex = existing.find((f) => f.id === 'fleet-apex-capetown');
+    if (existingApex) {
+      return existingApex;
+    }
+    if (existing.length > 0) {
+      return existing[0];
+    }
   }
 
   const defaultFleet: FleetProfile = {
@@ -317,6 +324,38 @@ export function seedDefaultFleetIfNeeded(): FleetProfile {
   }
 
   return defaultFleet;
+}
+
+/**
+ * Resets the default demo fleet (Apex Logistics Cape Town) and its associated vehicles and audits
+ * back to the pristine initial state, clearing any test vehicles or modifications that were just added.
+ */
+export function resetDemoFleet(): FleetProfile {
+  const defaultFleetId = 'fleet-apex-capetown';
+
+  // 1. Purge existing demo vehicles and audits
+  const remainingVehicles = getAllFleetVehicles().filter((v) => v.fleetId !== defaultFleetId);
+  memoryFleetVehicles = remainingVehicles;
+  if (typeof window !== 'undefined') {
+    setSafeLocalStorageItem(STORAGE_KEY_FLEET_VEHICLES, JSON.stringify(remainingVehicles));
+  }
+
+  const remainingAudits = getAllFleetAudits().filter((a) => a.fleetId !== defaultFleetId);
+  memoryFleetAudits = remainingAudits;
+  if (typeof window !== 'undefined') {
+    setSafeLocalStorageItem(STORAGE_KEY_FLEET_AUDITS, JSON.stringify(remainingAudits));
+  }
+
+  const remainingProfiles = getAllFleetProfiles().filter((f) => f.id !== defaultFleetId);
+  memoryFleetProfiles = remainingProfiles;
+  if (typeof window !== 'undefined') {
+    setSafeLocalStorageItem(STORAGE_KEY_FLEET_PROFILES, JSON.stringify(remainingProfiles));
+  }
+
+  // 2. Re-seed clean demo fleet
+  const cleanDemo = seedDefaultFleetIfNeeded(true);
+  setActiveFleetSession(cleanDemo.id);
+  return cleanDemo;
 }
 
 // ----------------------------------------------------------------------------
@@ -645,18 +684,91 @@ export function getFleetShiftAudits(fleetId: string, vehicleId?: string): FleetS
 
 export function recordFleetShiftAudit(audit: FleetShiftAudit): FleetShiftAudit {
   const all = getAllFleetAudits();
+  const existingIdx = audit.id ? all.findIndex((a) => a.id === audit.id) : -1;
   const newAudit: FleetShiftAudit = {
     ...audit,
     id: audit.id || generateUuid(),
     createdAt: audit.createdAt || new Date().toISOString(),
   };
 
-  all.unshift(newAudit);
+  if (existingIdx >= 0) {
+    all[existingIdx] = newAudit;
+  } else {
+    all.unshift(newAudit);
+  }
+
   memoryFleetAudits = all;
   if (typeof window !== 'undefined') {
     setSafeLocalStorageItem(STORAGE_KEY_FLEET_AUDITS, JSON.stringify(all));
   }
   return newAudit;
+}
+
+/**
+ * Automatically records or increments a completed trip's earnings into the daily FleetShiftAudit
+ * for the fleet vehicle/driver, making live daily earnings immediately visible to the Fleet Manager.
+ */
+export function recordCompletedTripToFleetAudit(params: {
+  driverId?: string | null;
+  driverName?: string | null;
+  licensePlate?: string | null;
+  fareAmountZar: number;
+  paymentMethod: 'cash' | 'in_app' | 'speedpoint' | string;
+  distanceKm?: number;
+}): FleetShiftAudit | null {
+  const coverage = checkVehicleFleetCoverage({
+    driverId: params.driverId,
+    licensePlate: params.licensePlate,
+  });
+
+  if (!coverage.isCovered || !coverage.fleetId || !coverage.vehicle) {
+    return null;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const existingAudits = getFleetShiftAudits(coverage.fleetId, coverage.vehicle.id);
+  const todayAudit = existingAudits.find(
+    (a) => a.shiftDate === today && a.vehicleId === coverage.vehicle!.id
+  );
+
+  const isCash = params.paymentMethod === 'cash';
+  const fare = Math.max(0, Number(params.fareAmountZar) || 0);
+  const distance = Math.max(0, Number(params.distanceKm) || 0);
+
+  if (todayAudit) {
+    // Increment existing shift audit for today
+    todayAudit.tripsCompleted += 1;
+    todayAudit.totalGrossZar += fare;
+    if (isCash) {
+      todayAudit.cashCollectedZar += fare;
+    } else {
+      todayAudit.speedpointCollectedZar += fare;
+    }
+    todayAudit.distanceKm = Math.round((todayAudit.distanceKm + distance) * 10) / 10;
+    return recordFleetShiftAudit(todayAudit);
+  }
+
+  // Create initial shift audit for today
+  const newAudit: FleetShiftAudit = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    fleetId: coverage.fleetId,
+    vehicleId: coverage.vehicle.id,
+    licensePlate: coverage.vehicle.licensePlate,
+    driverId: params.driverId || coverage.vehicle.assignedDriverId || 'driver-live',
+    driverName: params.driverName || coverage.vehicle.assignedDriverName || 'Assigned Driver',
+    shiftDate: today,
+    tripsCompleted: 1,
+    totalGrossZar: fare,
+    cashCollectedZar: isCash ? fare : 0,
+    speedpointCollectedZar: isCash ? 0 : fare,
+    distanceKm: distance,
+    shiftHours: 1,
+    rentalTargetZar: Math.round((coverage.vehicle.rentalRateWeeklyZar || 2400) / 5),
+    settlementStatus: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  return recordFleetShiftAudit(newAudit);
 }
 
 // ----------------------------------------------------------------------------

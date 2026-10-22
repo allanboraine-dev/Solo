@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
 import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession, generateUuid, safeJsonParse, getSafeLocalStorageItem, setSafeLocalStorageItem } from '@/utils/session';
 import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
+import { recordCompletedTripToFleetAudit } from '@/utils/fleetStore';
 
 export const soloLocationEngine = new SoloLocationEngine(supabase);
 export const soloDispatchService = new SoloDispatchService(supabase);
@@ -18,6 +19,7 @@ export type MockTrip = {
   dropoff_lng: number;
   fare_amount: number;
   passenger_count?: 1 | 2; // Maximum 2 riders per trip
+  payment_method?: 'paystack' | 'speedpoint' | 'cash';
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   verification_pin?: string;
   scheduled_time?: string;
@@ -891,6 +893,23 @@ export const completeTripAtomic = async (
           'solo_last_completed_trip',
           JSON.stringify({ tripId, status: 'completed', timestamp: Date.now() })
         );
+
+        // Automatically record driver earnings into the Fleet Shift Audit if driver or vehicle is paired to a fleet
+        try {
+          const fare = target?.fare_amount || 0;
+          const driverId = target?.driver_id || localStorage.getItem('driver_id');
+          const driverName = target?.driver_name || undefined;
+          const plate = target?.vehicle_plate || undefined;
+          recordCompletedTripToFleetAudit({
+            driverId,
+            driverName,
+            licensePlate: plate,
+            fareAmountZar: fare,
+            paymentMethod,
+          });
+        } catch (fleetErr) {
+          console.warn('Fleet shift audit sync note:', fleetErr);
+        }
       }
     } catch (e) {
       console.error('Error updating local trip during completeTripAtomic:', e);

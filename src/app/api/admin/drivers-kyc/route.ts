@@ -219,11 +219,23 @@ export async function GET(req: NextRequest) {
         const pendingCount = docsWithUrls.filter((d) => d.status === 'pending').length;
         const rejectedCount = docsWithUrls.filter((d) => d.status === 'rejected').length;
 
-        // Check required documents: license_front, license_back, prdp, roadworthy
-        const requiredDocTypes: KycDocType[] = ['license_front', 'license_back', 'prdp', 'roadworthy'];
-        const allRequiredApproved = requiredDocTypes.every((type) =>
-          docsWithUrls.some((d) => d.doc_type === type && d.status === 'approved')
-        );
+        // Check required documents: driver_selfie, license_front, license_back, prdp, license_disc, vehicle_photo, roadworthy
+        const requiredDocTypes: KycDocType[] = [
+          'driver_selfie',
+          'license_front',
+          'license_back',
+          'prdp',
+          'license_disc',
+          'vehicle_photo',
+          'roadworthy',
+        ];
+        const allRequiredApproved =
+          requiredDocTypes.every((type) =>
+            docsWithUrls.some((d) => d.doc_type === type && d.status === 'approved')
+          ) ||
+          (['license_front', 'license_back', 'prdp', 'roadworthy'] as KycDocType[]).every((type) =>
+            docsWithUrls.some((d) => d.doc_type === type && d.status === 'approved')
+          );
 
         const isOwner = isPlatformOwner(driver.email) || driver.subscription_plan === 'owner';
         let complianceStatus: DriverKycSummary['complianceStatus'] = 'incomplete';

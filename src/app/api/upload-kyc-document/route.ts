@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Driver ID is required' }, { status: 400 })
     }
 
-    if (!docType || !['license_front', 'license_back', 'prdp', 'roadworthy', 'vehicle_photo'].includes(docType)) {
+    if (!docType || !['driver_selfie', 'license_front', 'license_back', 'prdp', 'license_disc', 'vehicle_photo', 'roadworthy'].includes(docType)) {
       return NextResponse.json({ error: 'Invalid or missing document type' }, { status: 400 })
     }
 

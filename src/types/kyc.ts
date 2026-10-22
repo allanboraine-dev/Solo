@@ -1,9 +1,11 @@
 export type KycDocType = 
+  | 'driver_selfie'
   | 'license_front'
   | 'license_back'
   | 'prdp'
-  | 'roadworthy'
-  | 'vehicle_photo';
+  | 'license_disc'
+  | 'vehicle_photo'
+  | 'roadworthy';
 
 export type KycDocStatus = 'pending' | 'approved' | 'rejected';
 
@@ -31,10 +33,18 @@ export interface KycDocumentConfig {
 }
 
 export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
+  driver_selfie: {
+    type: 'driver_selfie',
+    title: 'Driver Selfie / ID Photo',
+    description: 'Clear, well-lit photo of your face (looking directly into camera, no sunglasses or hats) for identity verification.',
+    required: true,
+    acceptedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+    maxSizeMb: 10,
+  },
   license_front: {
     type: 'license_front',
     title: "Driver's License (Front)",
-    description: "Clear photo or PDF of the front of your valid South African driver's license (Code B/EB).",
+    description: "Clear photo or scan of the front of your valid South African driver's license (Code B/EB).",
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
@@ -55,20 +65,28 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
   },
-  roadworthy: {
-    type: 'roadworthy',
-    title: "Roadworthy Certificate (CoR)",
-    description: "Certificate of Roadworthiness or recent 40-point safety inspection certificate.",
+  license_disc: {
+    type: 'license_disc',
+    title: "Vehicle License Disc",
+    description: "Clear close-up photo of the current valid license disc on your vehicle's windscreen showing expiry date, plate, and VIN.",
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
   },
   vehicle_photo: {
     type: 'vehicle_photo',
-    title: "Vehicle Photo (Plate Visible)",
-    description: "Clear photo of your registered vehicle showing license plate and overall condition.",
-    required: false,
+    title: "Vehicle Photo (Front & Plate Visible)",
+    description: "Clear photo of your registered vehicle taken from the front, clearly showing the license plate and overall condition.",
+    required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+    maxSizeMb: 10,
+  },
+  roadworthy: {
+    type: 'roadworthy',
+    title: "Roadworthy Certificate (CoR)",
+    description: "Certificate of Roadworthiness or recent 40-point safety inspection certificate.",
+    required: true,
+    acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
   },
 };

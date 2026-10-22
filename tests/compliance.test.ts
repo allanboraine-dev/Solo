@@ -53,12 +53,14 @@ function calculateComplianceStatus(docs: { doc_type: KycDocType; status: KycDocS
 }
 
 describe('Admin Driver Compliance & KYC Verification Suite', () => {
-  it('enforces all 4 South African statutory regulatory document requirements', () => {
+  it('enforces all South African statutory regulatory document and vehicle photo requirements', () => {
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.driver_selfie.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_front.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_back.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.prdp.required, true);
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_disc.required, true);
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.vehicle_photo.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.roadworthy.required, true);
-    assert.strictEqual(KYC_DOCUMENT_CONFIGS.vehicle_photo.required, false);
   });
 
   it('marks driver incomplete when missing one or more required statutory documents', () => {

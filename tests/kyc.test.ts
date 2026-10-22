@@ -5,11 +5,13 @@ import { validateKycFile } from '../src/utils/kyc.ts';
 
 describe('Driver KYC & Compliance Validation Suite', () => {
   it('defines required South African regulatory document configurations', () => {
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.driver_selfie.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_front.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_back.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.prdp.required, true);
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.license_disc.required, true);
+    assert.strictEqual(KYC_DOCUMENT_CONFIGS.vehicle_photo.required, true);
     assert.strictEqual(KYC_DOCUMENT_CONFIGS.roadworthy.required, true);
-    assert.strictEqual(KYC_DOCUMENT_CONFIGS.vehicle_photo.required, false);
   });
 
   it('validates compliant document files (JPEG, PNG, WEBP, PDF under 10MB)', () => {
