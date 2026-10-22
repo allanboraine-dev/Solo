@@ -37,6 +37,15 @@ export const FLEET_PRICING = {
 } as const;
 
 /**
+ * Global Testing Switch: Set to true to disable payment requirements during fleet testing.
+ * When true:
+ *  - Registration is 100% free with immediate full access.
+ *  - Paystack checkouts run in zero-charge simulation mode without touching credit cards.
+ * Set back to `false` when ready to go live with real Paystack billing.
+ */
+export const DISABLE_FLEET_PAYMENT_FOR_TESTING = true;
+
+/**
  * Calculates monthly fleet billing with South African VAT and savings vs Uber/Bolt.
  * Pricing Model: R770/mo Base Fleet Hub License + R499/vehicle/mo active dispatch.
  */

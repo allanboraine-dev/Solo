@@ -4,6 +4,7 @@ import {
   getFleetVehicles,
   calculateFleetMonthlyBilling,
   seedDefaultFleetIfNeeded,
+  DISABLE_FLEET_PAYMENT_FOR_TESTING,
 } from '@/utils/fleetStore';
 import { checkRateLimit, createRateLimitExceededResponse } from '@/utils/rateLimit';
 
@@ -50,17 +51,17 @@ export async function POST(req: Request) {
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
-    // Resilient fallback for development / offline / mock mode when PAYSTACK_SECRET_KEY is not set
-    if (!secretKey) {
-      console.warn('[Paystack Fleet] PAYSTACK_SECRET_KEY not set. Using dev simulation redirect.');
-      const mockReference = `SOLO-FLEET-SIM-${Date.now()}`;
+    // Resilient testing bypass / dev mode: When payment function is disabled for testing or when PAYSTACK_SECRET_KEY is absent
+    if (DISABLE_FLEET_PAYMENT_FOR_TESTING || !secretKey) {
+      console.warn('[Paystack Fleet] Testing mode active (DISABLE_FLEET_PAYMENT_FOR_TESTING = true). Payment gateway bypassed.');
+      const mockReference = `SOLO-FLEET-TEST-${Date.now()}`;
       return NextResponse.json({
         success: true,
         mock: true,
         url: `${callbackUrl}&mock=true&ref=${mockReference}`,
         reference: mockReference,
         amountZar: billing.totalMonthlyZar,
-        message: 'Paystack simulation mode (dev)',
+        message: 'Testing mode: Payment function disabled. Instant activation granted with R0.00 charge.',
       });
     }
 

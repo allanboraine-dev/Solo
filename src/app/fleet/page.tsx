@@ -61,6 +61,7 @@ import {
   getFleetShiftAudits,
   recordFleetShiftAudit,
   activateFleetSubscription,
+  DISABLE_FLEET_PAYMENT_FOR_TESTING,
 } from "@/utils/fleetStore";
 
 export default function FleetPage() {
@@ -340,7 +341,22 @@ export default function FleetPage() {
         }),
       });
       const data = await res.json();
-      if (data.success && data.url) {
+      if (data.success && data.mock) {
+        // Direct instant activation in testing mode (No card charge / no external redirect)
+        const updated = activateFleetSubscription(fleetProfile.id, {
+          paymentReference: data.reference,
+          amountZar: data.amountZar,
+          cardLast4: "4242",
+          cardBrand: "test card",
+        });
+        if (updated) {
+          setFleetProfile(updated);
+          setActiveFleetSession(fleetProfile.id);
+          setPaymentSuccessMsg(
+            `[Testing Mode Active] Simulated subscription activated! Ref: ${data.reference}. No real card charges applied.`
+          );
+        }
+      } else if (data.success && data.url) {
         window.location.href = data.url;
       } else {
         alert(data.error || "Failed to initialize Paystack checkout. Please try again.");
@@ -595,6 +611,21 @@ export default function FleetPage() {
               <Lock size={16} /> Fleet Manager Sign In
             </button>
           </div>
+
+          {/* Testing Mode Notice (When payment function is disabled for testing) */}
+          {DISABLE_FLEET_PAYMENT_FOR_TESTING && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300 rounded-2xl p-3.5 text-xs flex items-center justify-between gap-2 shadow-xs">
+              <span className="flex items-center gap-2">
+                <Sparkles size={15} className="text-amber-500 shrink-0" />
+                <span>
+                  <strong>Testing Mode Active:</strong> Payment function is temporarily disabled. You can register any fleet and test the dashboard with R0.00 and zero payment prompts.
+                </span>
+              </span>
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shrink-0">
+                Payment Disabled
+              </span>
+            </div>
+          )}
 
           {/* Form: Register New Fleet */}
           {authMode === "register" && (
@@ -1048,7 +1079,13 @@ export default function FleetPage() {
               className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold px-5 py-3 rounded-2xl text-xs md:text-sm shadow-md hover:shadow-lg transition disabled:opacity-50 cursor-pointer"
             >
               <CreditCard size={16} />
-              <span>{paystackLoading ? "Connecting to Paystack..." : "Activate via Paystack"}</span>
+              <span>
+                {paystackLoading
+                  ? "Activating..."
+                  : DISABLE_FLEET_PAYMENT_FOR_TESTING
+                  ? "Simulate Paystack Activation (Test Mode)"
+                  : "Activate via Paystack"}
+              </span>
               <ArrowRight size={14} />
             </button>
           </div>
@@ -1577,6 +1614,21 @@ export default function FleetPage() {
                 Your company card is automatically charged monthly for your R770 Base Operations Platform License plus your active vehicle dispatch slots (R499/vehicle). When you add or remove vehicles, Paystack dynamically reconciles your dispatch quota. Drivers operating your vehicles are 100% exempt from personal subscription fees.
               </p>
 
+              {/* Testing Mode Indicator (When payment function is disabled for testing) */}
+              {DISABLE_FLEET_PAYMENT_FOR_TESTING && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-900 dark:text-amber-300 text-xs flex items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={14} className="text-amber-500 shrink-0" />
+                    <span>
+                      <strong>Testing Mode Active:</strong> Real Paystack gateway charges are paused. You can test tokenization and renewal tracking with R0.00 debit.
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full shrink-0">
+                    R0.00 Test
+                  </span>
+                </div>
+              )}
+
               {fleetProfile.lastPaymentReference && (
                 <div className="p-3.5 bg-white dark:bg-zinc-900 rounded-2xl border border-gray-200 dark:border-zinc-800 text-xs flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -1606,7 +1658,9 @@ export default function FleetPage() {
                   <CreditCard size={15} />
                   <span>
                     {paystackLoading
-                      ? "Connecting to Paystack..."
+                      ? "Activating Simulation..."
+                      : DISABLE_FLEET_PAYMENT_FOR_TESTING
+                      ? `Simulate Paystack Activation (Test Mode - R0.00)`
                       : fleetProfile.subscriptionStatus === "active"
                       ? "Manage / Update Card via Paystack"
                       : `Activate Paystack Billing (R${billing.totalMonthlyZar.toLocaleString()} / mo)`}
