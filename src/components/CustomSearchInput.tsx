@@ -225,38 +225,75 @@ export default function CustomSearchInput({
     setResults(instantLocal)
     setHasSearched(Boolean(value && value.trim().length > 0))
 
-    if (!isUserTypingRef.current || !value || value.trim().length < 2) {
+    if (!value || value.trim().length < 2) {
       setIsLoading(false)
       return
     }
 
-    // 2. Debounced multi-provider geocoding (internal API with Mapbox & Photon) to enrich results
+    // 2. Debounced multi-provider geocoding (Google Places, Mapbox & Nominatim) to enrich results
     setIsLoading(true)
     const delayDebounceFn = setTimeout(async () => {
       try {
         const remotePlaces = await searchPlaces(value, proximityCoords)
-        setResults((prev) => {
-          const seen = new Set(prev.map((p) => `${p.name.toLowerCase()}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}`))
-          const merged = [...prev]
-          for (const p of remotePlaces) {
-            if (activeCategory === 'streets' && p.category !== 'address') continue
-            if (activeCategory === 'malls' && p.category !== 'building') continue
-            if (activeCategory === 'suburbs' && p.category !== 'area') continue
-
-            const key = `${p.name.toLowerCase()}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}`
-            if (!seen.has(key)) {
-              seen.add(key)
-              merged.push(p)
-            }
-          }
-          return merged
-        })
+        if (remotePlaces && remotePlaces.length > 0) {
+          const filtered = activeCategory === 'all'
+            ? remotePlaces
+            : remotePlaces.filter((p) => {
+                const pName = p.name.toLowerCase()
+                if (activeCategory === 'streets') return p.category === 'address'
+                if (activeCategory === 'malls') {
+                  return (
+                    p.category === 'building' &&
+                    (pName.includes('mall') ||
+                      pName.includes('shop') ||
+                      pName.includes('centre') ||
+                      pName.includes('center') ||
+                      pName.includes('spar') ||
+                      pName.includes('checkers'))
+                  )
+                }
+                if (activeCategory === 'hospitals') {
+                  return pName.includes('hospital') || pName.includes('clinic') || pName.includes('mediclinic')
+                }
+                if (activeCategory === 'schools') {
+                  return (
+                    pName.includes('school') ||
+                    pName.includes('skool') ||
+                    pName.includes('college') ||
+                    pName.includes('high') ||
+                    pName.includes('primary') ||
+                    pName.includes('university') ||
+                    pName.includes('spu')
+                  )
+                }
+                if (activeCategory === 'parks') {
+                  return (
+                    pName.includes('park') ||
+                    pName.includes('stadium') ||
+                    pName.includes('ground') ||
+                    pName.includes('field') ||
+                    pName.includes('oval')
+                  )
+                }
+                if (activeCategory === 'transport') {
+                  return (
+                    p.category === 'poi' ||
+                    pName.includes('taxi') ||
+                    pName.includes('airport') ||
+                    pName.includes('station')
+                  )
+                }
+                if (activeCategory === 'suburbs') return p.category === 'area'
+                return true
+              })
+          setResults(filtered.length > 0 ? filtered : remotePlaces)
+        }
       } catch (err) {
         console.warn('Geocoding search notice:', err)
       } finally {
         setIsLoading(false)
       }
-    }, 200)
+    }, 150)
 
     return () => clearTimeout(delayDebounceFn)
   }, [value, proximityCoords?.lat, proximityCoords?.lng, activeCategory])
@@ -447,27 +484,17 @@ export default function CustomSearchInput({
           type="text"
           value={value}
           onClick={() => {
-            if (isMobile) {
-              setIsMobileModalOpen(true)
-            } else {
-              setIsOpen(true)
-            }
+            setIsOpen(true)
           }}
           onChange={(e) => {
             isUserTypingRef.current = true
             onChange(e.target.value)
-            if (isMobile) {
-              setIsMobileModalOpen(true)
-            } else {
-              setIsOpen(true)
-            }
+            setIsOpen(true)
+            const instant = searchLocalPlaces(e.target.value, proximityCoords, activeCategory)
+            setResults(instant)
           }}
           onFocus={() => {
-            if (isMobile) {
-              setIsMobileModalOpen(true)
-            } else {
-              setIsOpen(true)
-            }
+            setIsOpen(true)
           }}
           onKeyDown={handleKeyDown}
           autoCapitalize="words"
@@ -503,11 +530,11 @@ export default function CustomSearchInput({
         ) : null}
       </div>
 
-      {/* Desktop Suggestions Dropdown (md+ screens) */}
-      {isOpen && !isMobile && (
+      {/* Instant Suggestions Dropdown (Desktop & Mobile Unified) */}
+      {isOpen && (
         <div
           ref={listRef}
-          className="hidden md:flex absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[460px] flex-col animate-in fade-in zoom-in-95 duration-150"
+          className="flex absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[60vh] sm:max-h-[460px] flex-col animate-in fade-in zoom-in-95 duration-150"
         >
           {/* Quick Actions Header: Current Location & Choose on Map */}
           {(!value || value.trim().length === 0) && (

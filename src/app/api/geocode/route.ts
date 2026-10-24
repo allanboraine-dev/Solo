@@ -534,10 +534,12 @@ export async function GET(req: NextRequest) {
             if (distFromUser > 150) return; // Discard distant foreign or out-of-province results
 
             const houseNo = props.housenumber || targetHouseNo || undefined;
-            const street = props.street || undefined;
+            const isPropStreet =
+              props.name && /\b(street|road|avenue|ave|crescent|drive|dr|way|lane|place|boulevard|blvd|str)\b/i.test(props.name);
+            const street = props.street || (isPropStreet ? props.name : undefined);
             const suburb = props.district || props.suburb || undefined;
             const city = props.city || props.town || props.state || 'Kimberley';
-            const buildingName = props.name && (!street || props.name !== street) ? props.name : undefined;
+            const buildingName = props.name && !isPropStreet && (!street || props.name !== street) ? props.name : undefined;
 
             const streetWithNumber = [houseNo, street].filter(Boolean).join(' ').trim();
             let primaryName = buildingName || streetWithNumber || props.name || q;

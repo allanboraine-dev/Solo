@@ -138,8 +138,14 @@ function formatNominatimResult(item: any, userHouseNumber?: string): SearchResul
     addr.leisure ||
     undefined;
 
+  const isCandidateStreet =
+    buildingCandidate && /\b(street|road|avenue|ave|crescent|drive|dr|way|lane|place|boulevard|blvd|str)\b/i.test(buildingCandidate);
+  if (isCandidateStreet && !street) {
+    street = buildingCandidate;
+  }
+
   const buildingName =
-    buildingCandidate && (!street || buildingCandidate.toLowerCase() !== street.toLowerCase())
+    buildingCandidate && !isCandidateStreet && (!street || buildingCandidate.toLowerCase() !== street.toLowerCase())
       ? buildingCandidate
       : undefined;
 
@@ -273,10 +279,12 @@ function formatPhotonFeature(feat: any, userHouseNumber?: string): SearchResultP
   const props = feat.properties || {};
   const coords = feat.geometry?.coordinates || [0, 0];
   const houseNumber = props.housenumber || userHouseNumber || undefined;
-  const street = props.street || undefined;
+  const isPropStreet =
+    props.name && /\b(street|road|avenue|ave|crescent|drive|dr|way|lane|place|boulevard|blvd|str)\b/i.test(props.name);
+  const street = props.street || (isPropStreet ? props.name : undefined);
   const suburb = props.district || props.suburb || undefined;
   const city = props.city || props.town || props.state || 'Kimberley';
-  const buildingName = props.name && (!street || props.name !== street) ? props.name : undefined;
+  const buildingName = props.name && !isPropStreet && (!street || props.name !== street) ? props.name : undefined;
 
   const streetWithNumber = [houseNumber, street].filter(Boolean).join(' ').trim();
   let primaryName = buildingName || streetWithNumber || props.name || '';
@@ -2164,13 +2172,15 @@ function scorePlaceRelevance(
     }
   }
 
-  // 7. Category Bonuses
-  if (place.category === 'building') {
-    score += 25;
-  } else if (place.category === 'address') {
-    score += 20;
-  } else if (place.category === 'poi') {
-    score += 20;
+  // 7. Category Bonuses (only if query actually matched the place!)
+  if (score > 0) {
+    if (place.category === 'building') {
+      score += 25;
+    } else if (place.category === 'address') {
+      score += 20;
+    } else if (place.category === 'poi') {
+      score += 20;
+    }
   }
 
   // 8. Proximity Bonus (closer to Kimberley center or user's GPS coords)
