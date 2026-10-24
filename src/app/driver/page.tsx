@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -110,6 +110,7 @@ export default function DriverPage() {
   const [completedTrips, setCompletedTrips] = useState<MockTrip[]>([])
   const [showSubModal, setShowSubModal] = useState(false)
   const [isProcessingSub, setIsProcessingSub] = useState(false)
+  const [isCancellingSub, setIsCancellingSub] = useState(false)
   const [showFareCollection, setShowFareCollection] = useState(false)
   const [isAwaitingRiderPayment, setIsAwaitingRiderPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
@@ -187,6 +188,13 @@ export default function DriverPage() {
 
   const isOwner = isPlatformOwner(profile?.email) || profile?.subscriptionPlan === 'owner';
 
+  const isSubscriptionActive = isOwner || profile?.subscriptionPlan === 'fleet_pro' || (
+    !!profile?.subscriptionActive &&
+    profile?.subscriptionPlan !== 'cancelled' &&
+    profile?.subscriptionPlan !== 'past_due' &&
+    !isTrialExpired
+  );
+
   useEffect(() => {
     const loadProfile = async () => {
       const prof = await getDriverProfile();
@@ -211,7 +219,7 @@ export default function DriverPage() {
                   setProfile({ ...prof });
                   setShowSubModal(false);
                   setIsTrialExpired(false);
-                  alert('Subscription activated! Welcome to SOLO Driver Pro (Zero Commission).');
+                  alert('Subscription activated! Welcome to SOLO Driver Pro (Zero Commission). Platform access is now fully active.');
                 }
               } catch (err) {
                 console.error('Subscription verification failed:', err);
@@ -251,10 +259,15 @@ export default function DriverPage() {
         } else if (fleetCoverage.dispatchSuspended) {
           setPreemptedNotice(fleetCoverage.reason || 'Vehicle dispatch is paused by your fleet manager.');
           setIsDriverVerified(!!prof.isVerified);
+        } else if (prof.subscriptionPlan === 'cancelled' || prof.subscriptionActive === false) {
+          setIsOnline(false);
+          setShowSubModal(true);
+          setIsDriverVerified(!!prof.isVerified);
         } else if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
           const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - prof.trialStartedAt > SEVEN_DAYS) {
             setIsTrialExpired(true);
+            setIsOnline(false);
             setShowSubModal(true);
           }
           setIsDriverVerified(!!prof.isVerified);
@@ -270,6 +283,12 @@ export default function DriverPage() {
   useEffect(() => {
     if (!isOnline) {
       setRequest(null)
+      return;
+    }
+
+    if (!isSubscriptionActive) {
+      setIsOnline(false);
+      setRequest(null);
       return;
     }
     
@@ -683,6 +702,65 @@ export default function DriverPage() {
     }
   };
 
+  const handleCancelSubscription = async () => {
+    if (!profile) return;
+    if (isOwner) {
+      alert('Platform Owner accounts cannot be cancelled. Lifetime free access is permanent.');
+      return;
+    }
+
+    const confirmCancel = window.confirm(
+      '⚠️ Cancel SOLO Driver Pro Subscription?\n\n' +
+      '• Your monthly automatic billing will be stopped immediately.\n' +
+      '• Your access to the SOLO platform and dispatch will be suspended immediately.\n' +
+      '• You will not be able to go online until your subscription is reactivated.\n\n' +
+      'Are you sure you want to cancel your subscription now?'
+    );
+
+    if (!confirmCancel) return;
+
+    setIsCancellingSub(true);
+    try {
+      const res = await fetch('/api/driver/cancel-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: profile.id,
+          email: profile.email,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const updated: MockDriverProfile = {
+          ...profile,
+          subscriptionPlan: 'cancelled',
+          subscriptionActive: false,
+          paystackSubscriptionCode: undefined,
+        };
+        await saveDriverProfile(updated);
+        setProfile(updated);
+
+        // Force driver offline immediately and clear trip requests
+        setIsOnline(false);
+        audioAlert.stopTripRingtoneLoop();
+        setRequest(null);
+
+        // Open subscription paywall modal
+        setShowSubModal(true);
+
+        alert('Your subscription has been cancelled. Platform access has been paused until you reactivate by paying R499.00.');
+      } else {
+        alert(data.error || 'Failed to cancel subscription.');
+      }
+    } catch (err: unknown) {
+      console.error('Cancellation error:', err);
+      alert((err as Error).message || 'An error occurred while cancelling your subscription.');
+    } finally {
+      setIsCancellingSub(false);
+    }
+  };
+
   const handleAccept = async () => {
     if (request) {
       const tripToAccept = request;
@@ -932,6 +1010,16 @@ export default function DriverPage() {
                   <Building2 size={10} className="text-purple-600 dark:text-purple-400 shrink-0" />
                   <span className="hidden sm:inline">Fleet </span>Partner
                 </span>
+              ) : profile?.subscriptionPlan === 'cancelled' || (!profile?.subscriptionActive && !isTrialExpired) ? (
+                <span className="bg-red-100/90 text-red-900 border border-red-300 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-red-950/80 dark:text-red-200 dark:border-red-800 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
+                  <AlertCircle size={10} className="text-red-600 dark:text-red-400" />
+                  <span>Cancelled</span>
+                </span>
+              ) : isTrialExpired ? (
+                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-800 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
+                  <AlertCircle size={10} className="text-amber-600 dark:text-amber-400" />
+                  <span>Expired</span>
+                </span>
               ) : profile?.subscriptionPlan === 'paid' ? (
                 <span className="bg-blue-100/80 text-blue-800 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider shrink-0">
                   <span className="hidden sm:inline">Premium </span>Pro
@@ -952,6 +1040,13 @@ export default function DriverPage() {
               onClick={async () => {
                 const nextOnline = !isOnline;
                 if (nextOnline) {
+                  if (!isSubscriptionActive) {
+                    audioAlert.stopTripRingtoneLoop();
+                    setIsOnline(false);
+                    setShowSubModal(true);
+                    alert('Active subscription required: Your subscription is inactive or cancelled. You must pay R499.00 to go online and receive passenger trips.');
+                    return;
+                  }
                   audioAlert.unlockMobileAudio(true);
                   setPreemptedNotice(null);
                   if (profile?.id) {
@@ -1722,6 +1817,14 @@ export default function DriverPage() {
                         <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1.5">
                           <Building2 size={14} /> Active (Covered by Fleet Partner)
                         </span>
+                      ) : profile?.subscriptionPlan === 'cancelled' || (!profile?.subscriptionActive && !isTrialExpired) ? (
+                        <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1">
+                          <AlertCircle size={14} /> Cancelled (No Platform Access)
+                        </span>
+                      ) : isTrialExpired ? (
+                        <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                          <AlertCircle size={14} /> Expired (No Platform Access)
+                        </span>
                       ) : profile?.subscriptionPlan === 'paid' ? (
                         <span className="text-blue-600 dark:text-blue-400">Active (Paid R499/mo)</span>
                       ) : (
@@ -1731,13 +1834,13 @@ export default function DriverPage() {
                       )}
                     </span>
                   </div>
-                  {!isOwner && profile?.subscriptionPlan === 'trial' && profile?.cardLast4 && (
+                  {!isOwner && profile?.subscriptionPlan === 'trial' && profile?.cardLast4 && profile?.subscriptionActive && (
                     <div className="py-1.5 px-3 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300">
                       <span className="flex items-center gap-1.5 font-medium">
                         <CreditCard size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                         Card Linked: {profile.cardBrand || 'Card'} •••• {profile.cardLast4}
                       </span>
-                      <span className="font-bold">Auto-bills R499 after trial</span>
+                      <span className="font-bold">Auto-bills R499 on Day 8</span>
                     </div>
                   )}
                 </div>
@@ -1887,12 +1990,45 @@ export default function DriverPage() {
                     </span>
                   </div>
                 ) : (
-                  <button 
-                    onClick={() => setShowSubModal(true)}
-                    className="mt-6 w-full min-h-[48px] py-3.5 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center text-sm sm:text-base"
-                  >
-                    {profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to R499/mo'}
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => setShowSubModal(true)}
+                      className={`mt-6 w-full min-h-[48px] py-3.5 font-bold rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-xl touch-manipulation flex items-center justify-center gap-2 text-sm sm:text-base ${
+                        !isSubscriptionActive 
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20' 
+                          : 'bg-black dark:bg-white text-white dark:text-black'
+                      }`}
+                    >
+                      <CreditCard size={18} />
+                      <span>
+                        {!isSubscriptionActive 
+                          ? 'Pay R499.00 & Reactivate Access' 
+                          : profile?.subscriptionPlan === 'paid' 
+                            ? 'Manage Subscription' 
+                            : 'Upgrade to R499/mo'}
+                      </span>
+                    </button>
+
+                    {!isOwner && profile?.subscriptionPlan !== 'fleet_pro' && isSubscriptionActive && (
+                      <button
+                        onClick={handleCancelSubscription}
+                        disabled={isCancellingSub}
+                        className="mt-2.5 w-full min-h-[44px] py-2.5 text-red-600 dark:text-red-400 font-bold bg-red-50/80 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl transition active:scale-[0.98] touch-manipulation flex items-center justify-center gap-2 border border-red-200/60 dark:border-red-900/40 text-xs sm:text-sm"
+                      >
+                        {isCancellingSub ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
+                            <span>Cancelling Subscription...</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle size={16} />
+                            <span>Cancel Subscription</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </>
                 )}
                 <button 
                   onClick={async () => {
@@ -2122,7 +2258,7 @@ export default function DriverPage() {
       {showSubModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar">
-            {(!isTrialExpired || isOwner) && (
+            {(isSubscriptionActive || isOwner) && (
               <button 
                 onClick={() => setShowSubModal(false)}
                 className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
@@ -2173,10 +2309,24 @@ export default function DriverPage() {
             ) : (
               <>
                 <h2 className="text-2xl font-black mb-1">
-                  {isTrialExpired ? 'Trial Expired' : profile?.subscriptionPlan === 'paid' ? 'Manage Subscription' : 'Upgrade to Premium'}
+                  {!isSubscriptionActive
+                    ? (profile?.subscriptionPlan === 'cancelled'
+                        ? 'Platform Access Suspended'
+                        : isTrialExpired
+                          ? 'Trial Expired'
+                          : 'Subscription Inactive')
+                    : profile?.subscriptionPlan === 'paid'
+                      ? 'Manage Subscription'
+                      : 'Upgrade to Premium'}
                 </h2>
                 <p className="text-gray-500 mb-6 text-sm">
-                  {isTrialExpired ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.' : 'Keep 100% of your earnings for a flat fee.'}
+                  {!isSubscriptionActive
+                    ? (profile?.subscriptionPlan === 'cancelled'
+                        ? 'Your subscription is cancelled. Pay R499.00 to reactivate and go online.'
+                        : isTrialExpired
+                          ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.'
+                          : 'Active subscription required to go online and receive trips.')
+                    : 'Keep 100% of your earnings for a flat fee.'}
                 </p>
                 
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-5 mb-5 border border-blue-100 dark:border-blue-900/50 shadow-inner">
@@ -2215,7 +2365,7 @@ export default function DriverPage() {
 
                 <button 
                   onClick={handleSubscribe}
-                  disabled={isProcessingSub || profile?.subscriptionPlan === 'paid'}
+                  disabled={isProcessingSub || (isSubscriptionActive && profile?.subscriptionPlan === 'paid')}
                   className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95"
                 >
                   {isProcessingSub ? (
@@ -2225,15 +2375,36 @@ export default function DriverPage() {
                     </>
                   ) : profile?.subscriptionPlan === 'fleet_pro' ? (
                     'Covered by Fleet Partner'
-                  ) : profile?.subscriptionPlan === 'paid' ? (
+                  ) : isSubscriptionActive && profile?.subscriptionPlan === 'paid' ? (
                     'Subscription Active'
                   ) : (
                     <>
                       <CreditCard size={18} />
-                      <span>Subscribe via Paystack (R499/mo)</span>
+                      <span>{!isSubscriptionActive ? 'Pay R499.00 & Reactivate Access' : 'Subscribe via Paystack (R499/mo)'}</span>
                     </>
                   )}
                 </button>
+
+                {/* Cancel Subscription Option for currently active subscribers */}
+                {!isOwner && profile?.subscriptionPlan !== 'fleet_pro' && isSubscriptionActive && (
+                  <button 
+                    onClick={handleCancelSubscription}
+                    disabled={isCancellingSub}
+                    className="w-full mt-3 py-3 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 font-bold rounded-2xl border border-red-200/70 dark:border-red-900/50 text-xs sm:text-sm transition flex items-center justify-center gap-2 active:scale-95"
+                  >
+                    {isCancellingSub ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin"></div>
+                        <span>Cancelling Subscription...</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={16} />
+                        <span>Cancel Subscription (Suspend Platform Access)</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </>
             )}
           </div>

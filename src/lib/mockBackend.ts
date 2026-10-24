@@ -50,7 +50,7 @@ export type MockDriverProfile = {
   hasRoadworthy: boolean;
   isVerified?: boolean;
   subscriptionActive: boolean;
-  subscriptionPlan?: 'trial' | 'paid' | 'owner' | 'fleet_pro';
+  subscriptionPlan?: 'trial' | 'paid' | 'owner' | 'fleet_pro' | 'cancelled' | 'past_due';
   trialStartedAt?: number;
   trialEndsAt?: number;
   cardLast4?: string;

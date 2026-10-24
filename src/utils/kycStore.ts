@@ -13,7 +13,8 @@ export interface KycDriverProfile {
   licensePlate: string;
   prdpNumber: string;
   isVerified: boolean;
-  subscriptionPlan: 'trial' | 'paid' | 'owner' | 'expired';
+  subscriptionPlan: 'trial' | 'paid' | 'owner' | 'expired' | 'cancelled' | 'past_due';
+  subscriptionActive?: boolean;
   trialStartedAt?: string | null;
   trialEndsAt?: string | null;
   cardLast4?: string | null;
@@ -117,6 +118,7 @@ export function saveKycDriverProfile(profile: Partial<KycDriverProfile> & { id: 
     prdpNumber: profile.prdpNumber || existing?.prdpNumber || '',
     isVerified: isOwner || (profile.isVerified !== undefined ? profile.isVerified : existing?.isVerified ?? false),
     subscriptionPlan: isOwner ? 'owner' : (profile.subscriptionPlan || existing?.subscriptionPlan || 'trial'),
+    subscriptionActive: isOwner ? true : (profile.subscriptionActive !== undefined ? profile.subscriptionActive : (profile.subscriptionPlan ? (profile.subscriptionPlan === 'paid' || profile.subscriptionPlan === 'trial' || profile.subscriptionPlan === 'owner') : existing?.subscriptionActive ?? true)),
     trialStartedAt: profile.trialStartedAt !== undefined ? profile.trialStartedAt : (existing?.trialStartedAt || new Date().toISOString()),
     trialEndsAt: profile.trialEndsAt !== undefined ? profile.trialEndsAt : (existing?.trialEndsAt || null),
     cardLast4: profile.cardLast4 !== undefined ? profile.cardLast4 : (existing?.cardLast4 || null),
