@@ -88,6 +88,19 @@ export default function RiderPage() {
   const [ratingTrip, setRatingTrip] = useState<MockTrip | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [declineNotice, setDeclineNotice] = useState<string | null>(null)
+
+  // Centralized, bulletproof transition when a trip is completed on rider phone
+  const transitionToTripCompleted = (trip: MockTrip) => {
+    if (!trip) return;
+    markTripCompleted(trip.id);
+    audioAlert.alertRiderOfTripStatus('completed', trip);
+    setRatingTrip(trip);
+    setShowRatingModal(true);
+    updateActiveTripState(null);
+    setDriverCoords(null);
+    setIsProcessingPayment(false);
+    setPaymentError(null);
+  };
   const [showDriversModal, setShowDriversModal] = useState(false)
   const [showSafetyModal, setShowSafetyModal] = useState(false)
   const [showSupportModal, setShowSupportModal] = useState(false)
@@ -203,7 +216,8 @@ export default function RiderPage() {
     const isTrackingActive =
       activeTrip.status === 'accepted' ||
       activeTrip.status === 'arrived' ||
-      activeTrip.status === 'in_progress';
+      activeTrip.status === 'in_progress' ||
+      activeTrip.status === 'payment_pending';
 
     if (!isTrackingActive) {
       return;
@@ -217,6 +231,24 @@ export default function RiderPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (!isMounted || !data.success) return;
+
+        // Immediate completion detection from authoritative server tracking
+        if (data.trip?.status === 'completed') {
+          transitionToTripCompleted({
+            ...(activeTripRef.current || {}),
+            ...data.trip,
+            status: 'completed',
+          });
+          return;
+        }
+
+        if (data.trip?.status === 'cancelled') {
+          audioAlert.alertRiderOfTripStatus('cancelled', data.trip);
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
+          return;
+        }
 
         if (data.liveCoordinates?.lat && data.liveCoordinates?.lng) {
           setDriverCoords({
@@ -267,6 +299,67 @@ export default function RiderPage() {
       clearInterval(interval);
     };
   }, [activeTrip?.id, activeTrip?.status]);
+
+  // Resilient wake-up handler for mobile phones: when a phone is unlocked or browser tab un-minimized,
+  // immediately check if the active trip completed while the device was asleep.
+  useEffect(() => {
+    const handlePhoneWakeup = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        const currentActive = activeTripRef.current;
+        if (currentActive?.id) {
+          fetch(`/api/trips/tracking?tripId=${encodeURIComponent(currentActive.id)}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data?.trip?.status === 'completed') {
+                transitionToTripCompleted({
+                  ...currentActive,
+                  ...data.trip,
+                  status: 'completed',
+                });
+              } else if (data?.trip?.status === 'cancelled') {
+                audioAlert.alertRiderOfTripStatus('cancelled', data.trip);
+                updateActiveTripState(null);
+                setDriverCoords(null);
+                setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handlePhoneWakeup);
+    window.addEventListener('focus', handlePhoneWakeup);
+    window.addEventListener('pageshow', handlePhoneWakeup);
+
+    // Cross-tab/window storage sync when another tab or driver completes the trip
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'solo_last_completed_trip' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const currentActive = activeTripRef.current;
+          if (parsed?.tripId && currentActive && parsed.tripId === currentActive.id) {
+            transitionToTripCompleted({ ...currentActive, status: 'completed' });
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handlePhoneWakeup);
+      window.removeEventListener('focus', handlePhoneWakeup);
+      window.removeEventListener('pageshow', handlePhoneWakeup);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  // Fail-safe watchdog: If activeTrip ever receives 'completed' status, immediately transition to Rating Modal
+  useEffect(() => {
+    if (activeTrip && (activeTrip.status === 'completed' || isTripCompleted(activeTrip.id))) {
+      transitionToTripCompleted(activeTrip);
+    }
+  }, [activeTrip?.status, activeTrip?.id]);
 
   // Fetch active registered drivers in proximity to rider + subscribe to Geohash-6 WebSocket mesh
   useEffect(() => {
@@ -381,14 +474,7 @@ export default function RiderPage() {
         }
 
         if (completedIds.has(currentActive.id) || isTripCompleted(currentActive.id)) {
-          if (!isTripDismissed(currentActive.id)) {
-            setRatingTrip(currentActive);
-            setShowRatingModal(true);
-          }
-          updateActiveTripState(null);
-          setDriverCoords(null);
-          setIsProcessingPayment(false);
-          setPaymentError(null);
+          transitionToTripCompleted(currentActive);
           return;
         }
         const matched = trips.find(t => t.id === currentActive.id);
@@ -401,16 +487,7 @@ export default function RiderPage() {
             return;
           }
           if (matched.status === 'completed') {
-            markTripCompleted(matched.id);
-            audioAlert.alertRiderOfTripStatus('completed', matched);
-            if (!isTripDismissed(matched.id)) {
-              setRatingTrip(matched);
-              setShowRatingModal(true);
-            }
-            updateActiveTripState(null);
-            setDriverCoords(null);
-            setIsProcessingPayment(false);
-            setPaymentError(null);
+            transitionToTripCompleted(matched);
             return;
           }
           const matchedPrio = STATUS_PRIORITY[matched.status] || 0;
@@ -435,17 +512,10 @@ export default function RiderPage() {
             if (statusData?.trip?.status === 'completed') {
               const completedTrip: MockTrip = {
                 ...currentActive,
+                ...statusData.trip,
                 status: 'completed',
               };
-              markTripCompleted(completedTrip.id);
-              if (!isTripDismissed(completedTrip.id)) {
-                setRatingTrip(completedTrip);
-                setShowRatingModal(true);
-              }
-              updateActiveTripState(null);
-              setDriverCoords(null);
-              setIsProcessingPayment(false);
-              setPaymentError(null);
+              transitionToTripCompleted(completedTrip);
               return;
             }
           } catch {
@@ -520,8 +590,8 @@ export default function RiderPage() {
     };
 
     const unsubscribeEvents = subscribeToEvents((type, payload) => {
-      if (type === 'trip_updated') {
-        const trip = payload as MockTrip;
+      if (type === 'trip_updated' || type === 'trip_completed') {
+        const trip = (type === 'trip_completed' ? (payload as any)?.trip || payload : payload) as MockTrip;
         if (!trip) return;
         const currentActive = activeTripRef.current || activeTrip;
         const storedActiveTripId = getRiderActiveTripId();
@@ -538,20 +608,11 @@ export default function RiderPage() {
           return;
         }
 
-        if (trip.status === 'completed') {
-          markTripCompleted(trip.id);
+        if (trip.status === 'completed' || type === 'trip_completed') {
           const completedSnapshot: MockTrip = currentActive
             ? { ...currentActive, ...trip, status: 'completed' }
-            : trip;
-          audioAlert.alertRiderOfTripStatus('completed', completedSnapshot);
-          if (!isTripDismissed(trip.id)) {
-            setRatingTrip(completedSnapshot);
-            setShowRatingModal(true);
-          }
-          updateActiveTripState(null);
-          setDriverCoords(null);
-          setIsProcessingPayment(false);
-          setPaymentError(null);
+            : { ...trip, status: 'completed' };
+          transitionToTripCompleted(completedSnapshot);
         } else if (trip.status === 'cancelled') {
           audioAlert.alertRiderOfTripStatus('cancelled', trip);
           updateActiveTripState(null);
@@ -655,16 +716,9 @@ export default function RiderPage() {
   const handleSettleWithCash = async () => {
     if (!activeTrip) return;
     const current = activeTrip;
-    markTripCompleted(current.id);
-    markTripDismissed(current.id);
     await completeTripAtomic(current.id, 'cash', current);
     await saveTrip({ ...current, status: 'completed' });
-    setRatingTrip(current);
-    setShowRatingModal(true);
-    updateActiveTripState(null);
-    setDriverCoords(null);
-    setIsProcessingPayment(false);
-    setPaymentError(null);
+    transitionToTripCompleted(current);
   };
 
   const handleForceCloseTrip = async () => {
@@ -1385,8 +1439,8 @@ export default function RiderPage() {
           <RatingModal
             isOpen={showRatingModal}
             trip={ratingTrip}
-            driverName={ratedDriver?.fullName || "Your Driver"}
-            driverVehicle={ratedDriver ? [ratedDriver.vehicleMake, ratedDriver.vehicleModel].filter(Boolean).join(' ') : undefined}
+            driverName={ratedDriver?.fullName || assignedDriverInfo?.fullName || (ratingTrip as any)?.driver_name || "Your Driver"}
+            driverVehicle={ratedDriver ? [ratedDriver.vehicleMake, ratedDriver.vehicleModel].filter(Boolean).join(' ') : (assignedDriverInfo ? [assignedDriverInfo.vehicleMake, assignedDriverInfo.vehicleModel].filter(Boolean).join(' ') : undefined)}
             onSubmit={handleRatingSubmit}
             onSkip={handleRatingSkip}
           />
