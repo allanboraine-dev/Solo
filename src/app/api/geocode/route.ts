@@ -33,7 +33,7 @@ const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 /**
  * Calculates Haversine distance in kilometers between two GPS coordinates
  */
-export function haversineDistKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function haversineDistKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;

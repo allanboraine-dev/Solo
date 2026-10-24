@@ -23,6 +23,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Driver email is required' }, { status: 400 });
     }
 
+    if (isPlatformOwner(email)) {
+      return NextResponse.json({
+        success: true,
+        exempt: true,
+        message: 'Platform owner exempt from subscription fees',
+      });
+    }
+
 
 
     if (!reference) {

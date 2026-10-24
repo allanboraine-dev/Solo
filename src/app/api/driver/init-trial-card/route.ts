@@ -16,6 +16,14 @@ export async function POST(req: NextRequest) {
     }
 
 
+    if (isPlatformOwner(email)) {
+      return NextResponse.json({
+        success: true,
+        exempt: true,
+        message: 'Platform owner exempt from subscription fees',
+      });
+    }
+
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {
       return NextResponse.json(
@@ -24,8 +32,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const callbackUrl = `${siteUrl}/driver/register?card_setup=success&driver_id=${encodeURIComponent(driverId)}`;
+    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const callbackUrl = `${origin}/driver/register?card_setup=success&driver_id=${encodeURIComponent(driverId)}`;
 
     // Initialize Paystack nominal R1.00 card tokenization transaction
     const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {

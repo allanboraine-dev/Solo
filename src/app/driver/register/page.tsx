@@ -115,34 +115,59 @@ export default function DriverRegistration() {
     if (typeof window === 'undefined') return
     try {
       const params = new URLSearchParams(window.location.search)
-      const isPaymentSuccess = params.get('payment') === 'success' || params.get('card_setup') === 'success'
+      const isCardSetup = params.get('card_setup') === 'success' || params.get('payment') === 'success'
       const reference = params.get('reference')
       const driverId = params.get('driver_id') || getSafeLocalStorageItem('driver_id')
+      const pendingEmail = getSafeLocalStorageItem('pending_driver_email') || email
 
-      if (isPaymentSuccess && reference && driverId) {
+      if (isCardSetup && reference && driverId) {
         setIsSubmitting(true)
-        setUploadProgressText('Verifying payment & activating your SOLO Driver Pro membership...')
+        setUploadProgressText('Verifying R1 card test & activating 7-day free trial...')
 
-        fetch('/api/verify-subscription', {
+        fetch('/api/driver/setup-trial', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             driverId,
+            email: pendingEmail,
             reference,
           }),
         })
           .then((res) => res.json())
-          .then((data) => {
+          .then(async (data) => {
             if (data.success) {
-              alert('🎉 Payment of R499.00 successful! Your SOLO Driver Pro membership is now active. Welcome to SOLO!')
+              const billingDateStr = data.nextBillingDate 
+                ? new Date(data.nextBillingDate).toLocaleDateString('en-ZA', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+                : 'on the 8th day'
+
+              const now = Date.now()
+              const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+              const existingProf = safeJsonParse<any>(getSafeLocalStorageItem('mock_driver_profile'), null) || {}
+              await saveDriverProfile({
+                ...existingProf,
+                id: driverId,
+                subscriptionActive: true,
+                subscriptionPlan: 'trial',
+                trialStartedAt: now,
+                trialEndsAt: now + SEVEN_DAYS_MS,
+                cardLast4: data.card?.last4 || '••••',
+                cardBrand: data.card?.brand || 'Card',
+                cardExpMonth: data.card?.expMonth ? String(data.card.expMonth) : undefined,
+                cardExpYear: data.card?.expYear ? String(data.card.expYear) : undefined,
+                paystackSubscriptionCode: data.subscriptionCode,
+                nextBillingDate: data.nextBillingDate,
+                cardCaptured: true,
+              })
+
+              alert(`🎉 R1.00 card test successful!\n\nYour 7-day free trial has begun. You keep 100% of your earnings with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 8th day (${billingDateStr}).\n\nWelcome to SOLO!`)
               router.push('/driver')
             } else {
-              setSubmitError(data.error || 'Failed to complete payment verification.')
+              setSubmitError(data.error || 'Failed to complete card verification.')
               setIsSubmitting(false)
             }
           })
           .catch((err) => {
-            setSubmitError(err.message || 'Error completing payment verification.')
+            setSubmitError(err.message || 'Error completing trial card verification.')
             setIsSubmitting(false)
           })
       }
@@ -346,7 +371,7 @@ export default function DriverRegistration() {
       hasRoadworthy: !!roadworthyFile,
       isVerified: false,
       subscriptionActive: false,
-      subscriptionPlan: 'pending',
+      subscriptionPlan: 'trial',
     })
 
     // Store in all_registered_drivers collection for multi-driver local testing
@@ -435,8 +460,8 @@ export default function DriverRegistration() {
     return { driverId, hasSession }
   }
 
-  // Handle Step 4 Real Direct Paystack Card Payment (R499.00)
-  const handleDirectSubscriptionPayment = async () => {
+  // Handle Step 4 R1 Card Verification Test & 7-Day Free Trial Setup
+  const handleTrialCardSetup = async () => {
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -444,21 +469,23 @@ export default function DriverRegistration() {
       // 1. Register account & upload documents if not done yet
       const { driverId, hasSession } = await performAccountRegistration()
 
-      // 2. Initialize real Paystack R499.00 monthly subscription checkout
-      setUploadProgressText('Connecting to Paystack secure card gateway...')
-      const initRes = await fetch('/api/create-subscription', {
+      // 2. Initialize Paystack nominal R1.00 card tokenization transaction
+      setUploadProgressText('Connecting to Paystack secure card vault for R1 test...')
+      const initRes = await fetch('/api/driver/init-trial-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           driverId,
           email,
+          fullName,
+          phone,
         }),
       })
 
       const initData = await initRes.json()
 
-      if (!initData.success && !initData.url) {
-        throw new Error(initData.error || 'Failed to initialize Paystack subscription checkout.')
+      if (!initData.success && !initData.authorization_url) {
+        throw new Error(initData.error || 'Failed to initialize Paystack card verification.')
       }
 
       // If platform owner is exempt, redirect directly
@@ -468,36 +495,99 @@ export default function DriverRegistration() {
         return
       }
 
-      // 3. Open Paystack Inline Modal popup
+      // 3. Open Paystack Inline Modal popup for R1.00 test
       const paystackPop = (window as any).PaystackPop
       const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
       if (paystackPop && publicKey && initData.reference) {
         setUploadProgressText('Waiting for card details entry...')
 
-        const completeSubscriptionVerification = (reference: string) => {
-          setUploadProgressText('Verifying R499.00 payment & activating subscription...')
-          fetch('/api/verify-subscription', {
+        const completeTrialCardSetup = (reference: string) => {
+          setUploadProgressText('Verifying R1 card test & setting up 7-day free trial...')
+          fetch('/api/driver/setup-trial', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               driverId,
+              email,
               reference,
             }),
           })
             .then((res) => res.json())
-            .then((subData) => {
-              if (subData.success) {
-                alert(`🎉 Payment of R499.00 successful! Your SOLO Driver Pro membership is now active. You keep 100% of all fares. Welcome to SOLO!`)
+            .then(async (trialData) => {
+              if (trialData.success) {
+                const billingDateStr = trialData.nextBillingDate 
+                  ? new Date(trialData.nextBillingDate).toLocaleDateString('en-ZA', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'on the 8th day'
+
+                // Save local driver profile with active 7-day trial
+                const now = Date.now()
+                const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+                await saveDriverProfile({
+                  id: driverId,
+                  fullName,
+                  email,
+                  phone,
+                  vehicleMake,
+                  vehicleModel,
+                  vehicleYear,
+                  vehicleColor,
+                  licensePlate,
+                  prdpNumber,
+                  hasLicense: !!(licenseFrontFile || licenseBackFile),
+                  hasPrdp: !!prdpFile,
+                  hasRoadworthy: !!roadworthyFile,
+                  isVerified: false,
+                  subscriptionActive: true,
+                  subscriptionPlan: 'trial',
+                  trialStartedAt: now,
+                  trialEndsAt: now + SEVEN_DAYS_MS,
+                  cardLast4: trialData.card?.last4 || '••••',
+                  cardBrand: trialData.card?.brand || 'Card',
+                  cardExpMonth: trialData.card?.expMonth ? String(trialData.card.expMonth) : undefined,
+                  cardExpYear: trialData.card?.expYear ? String(trialData.card.expYear) : undefined,
+                  paystackSubscriptionCode: trialData.subscriptionCode,
+                  nextBillingDate: trialData.nextBillingDate,
+                  cardCaptured: true,
+                })
+
+                // Also update all_registered_drivers in localStorage
+                try {
+                  const existingDrivers = safeJsonParse<any[]>(getSafeLocalStorageItem('all_registered_drivers'), [])
+                  const safeDrivers = Array.isArray(existingDrivers) ? existingDrivers : []
+                  const filteredDrivers = safeDrivers.filter((d: any) => d && d.id !== driverId)
+                  filteredDrivers.push({
+                    id: driverId,
+                    fullName,
+                    email,
+                    phone,
+                    vehicleMake,
+                    vehicleModel,
+                    vehicleYear,
+                    vehicleColor,
+                    licensePlate,
+                    prdpNumber,
+                    isVerified: false,
+                    subscriptionPlan: 'trial',
+                    subscriptionActive: true,
+                    trialStartedAt: now,
+                    trialEndsAt: now + SEVEN_DAYS_MS,
+                    nextBillingDate: trialData.nextBillingDate,
+                    createdAt: new Date().toISOString(),
+                  })
+                  setSafeLocalStorageItem('all_registered_drivers', JSON.stringify(filteredDrivers))
+                } catch {}
+
+                alert(`🎉 R1.00 card test successful!\n\nYour 7-day free trial has begun. You keep 100% of your rider fares with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 8th day (${billingDateStr}).\n\nWelcome to SOLO!`)
                 router.push(hasSession ? '/driver' : '/driver/login')
               } else {
-                setSubmitError(subData.error || 'Failed to verify subscription payment with Paystack.')
+                setSubmitError(trialData.error || 'Failed to verify trial card with Paystack.')
                 setIsSubmitting(false)
                 setUploadProgressText('')
               }
             })
             .catch((err: unknown) => {
-              setSubmitError((err as Error).message || 'Error completing subscription verification.')
+              setSubmitError((err as Error).message || 'Error completing trial card verification.')
               setIsSubmitting(false)
               setUploadProgressText('')
             })
@@ -506,17 +596,33 @@ export default function DriverRegistration() {
         const handler = paystackPop.setup({
           key: publicKey,
           email,
-          amount: 49900, // R499.00 in ZAR cents
+          amount: 100, // R1.00 in ZAR cents
           currency: 'ZAR',
           ref: initData.reference,
-          plan: initData.plan,
           metadata: {
             driverId,
             email,
-            payment_type: 'solo_saas_subscription',
+            payment_type: 'driver_trial_card_capture',
+            custom_fields: [
+              {
+                display_name: 'Trial Duration',
+                variable_name: 'trial_duration',
+                value: '7 Days Free Trial (R0.00)',
+              },
+              {
+                display_name: 'Subsequent Billing',
+                variable_name: 'subsequent_billing',
+                value: 'R499.00 / month starting on Day 8',
+              },
+              {
+                display_name: 'Driver ID',
+                variable_name: 'driver_id',
+                value: driverId,
+              },
+            ],
           },
           callback: function (response: { reference: string }) {
-            completeSubscriptionVerification(response.reference)
+            completeTrialCardSetup(response.reference)
           },
           onClose: function () {
             setIsSubmitting(false)
@@ -525,16 +631,16 @@ export default function DriverRegistration() {
         })
 
         handler.openIframe()
-      } else if (initData.url) {
+      } else if (initData.authorization_url) {
         // Fallback: Redirect to hosted checkout if inline popup script is unavailable
         setUploadProgressText('Redirecting to Paystack secure checkout...')
-        window.location.href = initData.url
+        window.location.href = initData.authorization_url
       } else {
         throw new Error('Unable to launch Paystack card gateway. Please try again.')
       }
     } catch (err: unknown) {
-      console.error('Registration/Subscription error:', err)
-      setSubmitError((err as Error).message || 'An error occurred during payment. Please try again.')
+      console.error('Registration/Trial setup error:', err)
+      setSubmitError((err as Error).message || 'An error occurred during card verification. Please try again.')
       setIsSubmitting(false)
       setUploadProgressText('')
     }
@@ -560,7 +666,7 @@ export default function DriverRegistration() {
     roadworthyFile,
   ].filter(Boolean).length
 
-  // 7-day trial date string for UI display
+  // 7-day trial date string (Day 8 first billing) for UI display
   const trialEndDateString = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', {
     weekday: 'long',
     day: 'numeric',
@@ -879,40 +985,56 @@ export default function DriverRegistration() {
             </div>
           )}
 
-          {/* STEP 4: Direct R499.00 Card Payment & Subscription */}
+          {/* STEP 4: 7-Day Free Trial & R1 Card Verification Test */}
           {step === 4 && (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 mb-2">
                 <div className="flex items-center gap-3 text-xl font-bold">
-                  <CreditCard className="text-emerald-500" /> Driver Pro Subscription
+                  <CreditCard className="text-emerald-500" /> 7-Day Free Trial &amp; Card Test
                 </div>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 rounded-full flex items-center gap-1">
                   <Sparkles size={13} /> 0% Commission
                 </span>
               </div>
 
-              {/* Direct R499.00 Subscription Card */}
+              {/* 7-Day Free Trial & R1 Card Test Breakdown */}
               <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white p-5 rounded-2xl shadow-xl border border-zinc-800 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
-                      SOLO Driver Pro Monthly
+                      7-Day Free Trial + R1 Card Test
                     </span>
                     <h3 className="text-xl font-black mt-1">Platform Membership</h3>
                   </div>
                   <div className="text-right">
-                    <span className="text-2xl font-black text-emerald-400">R499.00</span>
-                    <span className="block text-[11px] text-zinc-400">Due Today</span>
+                    <span className="text-2xl font-black text-emerald-400">R1.00</span>
+                    <span className="block text-[11px] text-zinc-400">Card Test Today</span>
                   </div>
                 </div>
 
                 <div className="space-y-2.5 pt-2 border-t border-zinc-800 text-xs">
                   <div className="flex items-center justify-between text-zinc-300">
                     <span className="flex items-center gap-2">
-                      <Zap size={14} className="text-emerald-400" />
-                      <span>Full Driver Dispatch Access</span>
+                      <Sparkles size={14} className="text-amber-400" />
+                      <span>Free Trial Duration</span>
                     </span>
-                    <span className="font-bold text-white">Instant Activation</span>
+                    <span className="font-bold text-emerald-400">7 Days Free (R0.00 / week)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <CreditCard size={14} className="text-blue-400" />
+                      <span>Card Verification Test</span>
+                    </span>
+                    <span className="font-bold text-white">R1.00 (Once-off 3D-Secure Test)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <Calendar size={14} className="text-blue-400" />
+                      <span>First Recurring Billing</span>
+                    </span>
+                    <span className="font-bold text-white">R499.00 on Day 8 ({trialEndDateString})</span>
                   </div>
 
                   <div className="flex items-center justify-between text-zinc-300">
@@ -925,18 +1047,10 @@ export default function DriverRegistration() {
 
                   <div className="flex items-center justify-between text-zinc-300">
                     <span className="flex items-center gap-2">
-                      <Calendar size={14} className="text-blue-400" />
-                      <span>Billing Frequency</span>
-                    </span>
-                    <span className="font-bold text-white">Monthly (R499.00 / mo)</span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span className="flex items-center gap-2">
                       <ShieldCheck size={14} className="text-emerald-400" />
                       <span>Payment Security</span>
                     </span>
-                    <span className="font-bold text-white">Bank-Grade 3D-Secure</span>
+                    <span className="font-bold text-white">Bank-Grade 3D-Secure (Paystack)</span>
                   </div>
                 </div>
               </div>
@@ -946,13 +1060,13 @@ export default function DriverRegistration() {
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                   <p>
-                    <strong>Keep 100% of all trip earnings:</strong> Collect cash or mobile speedpoint card payments directly from riders with zero platform cuts.
+                    <strong>7-Day Free Trial Activated Today:</strong> Complete the R1.00 card test to verify your payment method. You will enjoy 7 full days of zero platform fees and 0% commission. On the 8th day ({trialEndDateString}), your standard R499.00/month subscription will begin.
                   </p>
                 </div>
                 <div className="flex items-start gap-2.5">
                   <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
                   <p>
-                    <strong>PCI-DSS Certified Security:</strong> All card payments are processed securely by Paystack. Supports Visa, Mastercard, debit, and credit cards.
+                    <strong>Cancel Anytime:</strong> You can manage or cancel your subscription before Day 8 with zero monthly fee charged.
                   </p>
                 </div>
               </div>
@@ -969,7 +1083,7 @@ export default function DriverRegistration() {
                 </button>
                 <button 
                   type="button" 
-                  onClick={handleDirectSubscriptionPayment}
+                  onClick={handleTrialCardSetup}
                   disabled={isSubmitting}
                   className="w-2/3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
@@ -981,7 +1095,7 @@ export default function DriverRegistration() {
                   ) : (
                     <>
                       <CreditCard size={18} />
-                      <span>Enter Card Details &amp; Pay R499.00</span>
+                      <span>Pay R1.00 Test &amp; Start 7-Day Trial</span>
                     </>
                   )}
                 </button>
