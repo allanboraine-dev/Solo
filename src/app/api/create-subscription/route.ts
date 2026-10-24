@@ -21,6 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         url: `${siteUrl}/driver?payment=success&driver_id=${encodeURIComponent(driverId)}&owner=true`,
         message: 'Platform owner exempt from driver subscription charges',
+        exempt: true,
         isOwner: true,
       })
     }

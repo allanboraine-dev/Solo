@@ -1,6 +1,7 @@
 import type { DriverDocument, KycDocType, KycDocStatus } from '../types/kyc.ts';
 import { isPlatformOwner } from './owner.ts';
 import { generateUuid } from './session.ts';
+import { checkDriverDuplicatesInMemory, type DuplicateCheckParams, type DuplicateCheckResult } from './driverValidation.ts';
 
 export interface KycDriverProfile {
   id: string;
@@ -146,6 +147,15 @@ export function getKycDriverProfile(id: string): KycDriverProfile | undefined {
  */
 export function getAllKycDriverProfiles(): KycDriverProfile[] {
   return Array.from(memoryDrivers.values());
+}
+
+/**
+ * Checks in-memory store for any conflicting duplicate driver profile
+ * based on email, phone, license plate, or PrDP number.
+ */
+export function checkDuplicateKycDriver(params: DuplicateCheckParams): DuplicateCheckResult {
+  const allDrivers = getAllKycDriverProfiles();
+  return checkDriverDuplicatesInMemory(params, allDrivers);
 }
 
 /**

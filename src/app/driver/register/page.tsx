@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { uploadDriverKycDocument } from '@/utils/kyc'
 import { KycDocType } from '@/types/kyc'
 import { generateUuid, getSafeLocalStorageItem, setSafeLocalStorageItem, removeSafeLocalStorageItem, safeJsonParse } from '@/utils/session'
+import { isValidSAPhone } from '@/utils/driverValidation'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { 
   User, 
@@ -30,6 +31,7 @@ export default function DriverRegistration() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   
@@ -149,9 +151,84 @@ export default function DriverRegistration() {
     }
   }, [router, email])
 
-  const handleNext = (e: React.FormEvent) => {
+  const handleStep1Next = async (e: React.FormEvent) => {
     e.preventDefault()
-    setStep(s => s + 1)
+    setSubmitError(null)
+
+    if (!fullName.trim() || !email.trim() || !password || !phone.trim()) {
+      setSubmitError('Please fill in all personal details.')
+      return
+    }
+
+    if (!isValidSAPhone(phone)) {
+      setSubmitError('Please enter a valid South African phone number (e.g. 082 123 4567 or +27 82 123 4567).')
+      return
+    }
+
+    setIsCheckingDuplicate(true)
+    try {
+      const res = await fetch('/api/driver/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          phone,
+          driverId: createdDriverId,
+        }),
+      })
+      const data = await res.json()
+      if (data.isDuplicate) {
+        setSubmitError(data.message || 'An account with this email or phone number already exists.')
+        setIsCheckingDuplicate(false)
+        return
+      }
+      setStep(2)
+    } catch (err: unknown) {
+      console.warn('Duplicate pre-check warning:', err)
+      setStep(2)
+    } finally {
+      setIsCheckingDuplicate(false)
+    }
+  }
+
+  const handleStep2Next = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitError(null)
+
+    if (!vehicleMake.trim() || !vehicleModel.trim() || !licensePlate.trim() || !prdpNumber.trim()) {
+      setSubmitError('Please fill in all vehicle and permit details.')
+      return
+    }
+
+    if (!hasSpeedpointConfirmed) {
+      setSubmitError('You must confirm that you carry a Speedpoint card machine and accept Cash before continuing.')
+      return
+    }
+
+    setIsCheckingDuplicate(true)
+    try {
+      const res = await fetch('/api/driver/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licensePlate,
+          prdpNumber,
+          driverId: createdDriverId,
+        }),
+      })
+      const data = await res.json()
+      if (data.isDuplicate) {
+        setSubmitError(data.message || 'This vehicle license plate or PrDP permit is already registered.')
+        setIsCheckingDuplicate(false)
+        return
+      }
+      setStep(3)
+    } catch (err: unknown) {
+      console.warn('Duplicate pre-check warning:', err)
+      setStep(3)
+    } finally {
+      setIsCheckingDuplicate(false)
+    }
   }
 
   // Registers the Supabase user, profile, and uploads KYC documents
@@ -160,7 +237,31 @@ export default function DriverRegistration() {
     let driverId: string | null = createdDriverId
     let hasSession = false
 
-    // 1. Sign up the user in Supabase Auth (with automatic recovery)
+    // 0. Strict duplicate pre-check across email, phone, license plate, and PrDP
+    setUploadProgressText('Verifying account uniqueness...')
+    try {
+      const checkRes = await fetch('/api/driver/check-duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          phone,
+          licensePlate,
+          prdpNumber,
+          driverId,
+        }),
+      })
+      const checkData = await checkRes.json()
+      if (checkData.isDuplicate) {
+        throw new Error(checkData.message || 'Duplicate driver registration detected.')
+      }
+    } catch (checkErr: any) {
+      if (checkErr.message && !checkErr.message.includes('fetch')) {
+        throw checkErr
+      }
+    }
+
+    // 1. Sign up the user in Supabase Auth (strict: reject already registered)
     if (!driverId) {
       setUploadProgressText('Creating your driver account...')
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -179,22 +280,14 @@ export default function DriverRegistration() {
         driverId = authData.user.id
         hasSession = !!authData.session
       } else if (authError) {
-        console.warn('Initial signUp notice:', authError.message)
-        const { data: signInData } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (signInData?.user) {
-          driverId = signInData.user.id
-          hasSession = !!signInData.session
-        } else {
-          if (authError.message.toLowerCase().includes('already registered')) {
-            throw new Error('An account with this email already exists. Please sign in on the Driver Login page.')
-          }
-          driverId = generateUuid()
-          hasSession = true
+        if (
+          authError.message.toLowerCase().includes('already registered') ||
+          authError.message.toLowerCase().includes('already exists')
+        ) {
+          throw new Error('An account with this email already exists. Please sign in on the Driver Login page.')
         }
+        driverId = generateUuid()
+        hasSession = true
       }
 
       if (!driverId) {
@@ -207,8 +300,36 @@ export default function DriverRegistration() {
       setSafeLocalStorageItem('pending_driver_email', email)
     }
 
-    // 2. Save Driver Profile linked to Auth/Driver ID
-    setUploadProgressText('Saving driver profile...')
+    // 2. Explicit server registration with duplicate rejection
+    setUploadProgressText('Verifying registration with compliance server...')
+    const regRes = await fetch('/api/driver/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: driverId,
+        fullName,
+        email,
+        phone,
+        vehicleMake,
+        vehicleModel,
+        vehicleYear,
+        vehicleColor,
+        licensePlate,
+        prdpNumber,
+        hasLicense: !!(licenseFrontFile || licenseBackFile),
+        hasPrdp: !!prdpFile,
+        hasRoadworthy: !!roadworthyFile,
+        isVerified: false,
+        subscriptionPlan: 'pending',
+      }),
+    })
+
+    const regData = await regRes.json()
+    if (!regRes.ok || regData.code === 'DUPLICATE_REGISTRATION') {
+      throw new Error(regData.error || 'A driver with this information is already registered.')
+    }
+
+    // Save Driver Profile locally
     await saveDriverProfile({
       id: driverId,
       fullName,
@@ -341,7 +462,7 @@ export default function DriverRegistration() {
       }
 
       // If platform owner is exempt, redirect directly
-      if (initData.isOwner) {
+      if (initData.exempt) {
         alert('🎉 Platform owner verified! Permanent free subscription granted. Welcome to SOLO!')
         router.push(hasSession ? '/driver' : '/driver/login')
         return
@@ -508,7 +629,7 @@ export default function DriverRegistration() {
 
           {/* STEP 1: Personal Info */}
           {step === 1 && (
-            <form onSubmit={handleNext} autoComplete="off" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <form onSubmit={handleStep1Next} autoComplete="off" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
                 <User className="text-blue-500" /> Personal Details
               </div>
@@ -528,15 +649,15 @@ export default function DriverRegistration() {
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number (South Africa)</label>
                 <input required type="tel" name="driver_reg_phone" autoComplete="off" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="+27 82 123 4567" />
               </div>
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
-                Continue to Vehicle &amp; Payment Setup <ChevronRight size={18} />
+              <button type="submit" disabled={isCheckingDuplicate} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
+                {isCheckingDuplicate ? 'Checking Availability...' : 'Continue to Vehicle & Payment Setup'} <ChevronRight size={18} />
               </button>
             </form>
           )}
 
           {/* STEP 2: Vehicle & Speedpoint */}
           {step === 2 && (
-            <form onSubmit={handleNext} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <form onSubmit={handleStep2Next} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
                 <Car className="text-blue-500" /> Vehicle &amp; Payment Equipment
               </div>
@@ -624,8 +745,8 @@ export default function DriverRegistration() {
                 <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition">
                   Back
                 </button>
-                <button type="submit" className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
-                  Continue to KYC Documents <ChevronRight size={18} />
+                <button type="submit" disabled={isCheckingDuplicate} className="w-2/3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
+                  {isCheckingDuplicate ? 'Verifying Details...' : 'Continue to KYC Documents'} <ChevronRight size={18} />
                 </button>
               </div>
             </form>
