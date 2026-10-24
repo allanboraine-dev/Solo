@@ -94,4 +94,18 @@ describe('Location Search Improvements Suite', () => {
     assert.ok(typeof fallback === 'string');
     assert.ok(fallback.length > 0);
   });
+
+  it('correctly parses raw GPS coordinates and Google Maps URLs', () => {
+    const coordPattern = /^([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)$/;
+    const m1 = '-28.7415, 24.7670'.match(coordPattern);
+    assert.ok(m1);
+    assert.strictEqual(parseFloat(m1[1]), -28.7415);
+    assert.strictEqual(parseFloat(m1[2]), 24.767);
+
+    const googleUrl = 'https://www.google.com/maps/place/Kimberley/@-28.7415,24.7670,17z';
+    const m2 = googleUrl.match(/@([-+]?\d{1,2}\.\d+),([-+]?\d{1,3}\.\d+)/);
+    assert.ok(m2);
+    assert.strictEqual(parseFloat(m2[1]), -28.7415);
+    assert.strictEqual(parseFloat(m2[2]), 24.767);
+  });
 });

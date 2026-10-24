@@ -7,6 +7,7 @@ import {
   SearchResultPlace,
   KIMBERLEY_POPULAR_PLACES,
   parseHouseNumberFromQuery,
+  reverseGeocode,
 } from '@/utils/mapService'
 import {
   MapPin,
@@ -69,6 +70,43 @@ function clearStoredRecentSearches() {
   } catch {
     // Ignore errors
   }
+}
+
+function parseCoordinatesOrGoogleUrl(input: string): { lat: number; lng: number } | null {
+  const trimmed = (input || '').trim();
+  if (!trimmed) return null;
+
+  // 1. Google Maps URL with @lat,lng
+  const atMatch = trimmed.match(/@([-+]?\d{1,2}\.\d+),([-+]?\d{1,3}\.\d+)/);
+  if (atMatch) {
+    const lat = parseFloat(atMatch[1]);
+    const lng = parseFloat(atMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // 2. Google Maps URL with ?q=lat,lng or query=lat,lng
+  const qParamMatch = trimmed.match(/[?&](?:q|query|ll)=([-+]?\d{1,2}\.\d+)[,+]([-+]?\d{1,3}\.\d+)/);
+  if (qParamMatch) {
+    const lat = parseFloat(qParamMatch[1]);
+    const lng = parseFloat(qParamMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // 3. Direct decimal coordinates (e.g. -28.7415, 24.7670)
+  const coordMatch = trimmed.match(/^([-+]?\d{1,2}\.\d+)[,\s]+([-+]?\d{1,3}\.\d+)$/);
+  if (coordMatch) {
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
 }
 
 interface CustomSearchInputProps {
@@ -138,6 +176,7 @@ export default function CustomSearchInput({
 
   // Parse house number & street remainder from currently typed input
   const { houseNumber: currentHouseNo, remainder: currentRemainder } = parseHouseNumberFromQuery(value || '')
+  const pastedGoogleCoords = useMemo(() => parseCoordinatesOrGoogleUrl(value || ''), [value])
 
   // 1. Instant, zero-latency local search & category filtering (0ms response as user types)
   useEffect(() => {
@@ -519,6 +558,42 @@ export default function CustomSearchInput({
             </div>
           )}
 
+          {/* Detected Google Maps Pin or GPS Coordinates (Desktop) */}
+          {pastedGoogleCoords && (
+            <div
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={async () => {
+                let resolved = `${pastedGoogleCoords.lat.toFixed(4)}, ${pastedGoogleCoords.lng.toFixed(4)}`;
+                try {
+                  const addr = await reverseGeocode(pastedGoogleCoords.lat, pastedGoogleCoords.lng);
+                  if (addr) resolved = addr;
+                } catch {}
+                handleSelect({
+                  id: `google-paste-${Date.now()}`,
+                  name: `Google Maps Pin (${pastedGoogleCoords.lat.toFixed(4)}, ${pastedGoogleCoords.lng.toFixed(4)})`,
+                  display_name: resolved,
+                  lat: pastedGoogleCoords.lat,
+                  lon: pastedGoogleCoords.lng,
+                  category: 'poi',
+                });
+              }}
+              className="p-3 m-2 bg-gradient-to-r from-red-500/10 to-amber-500/10 border border-red-500/30 rounded-xl flex items-center justify-between cursor-pointer hover:bg-red-500/20 transition shrink-0"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <MapPin size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white">Use Pinned Google Maps Location</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                    {pastedGoogleCoords.lat.toFixed(5)}, {pastedGoogleCoords.lng.toFixed(5)}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-red-600 dark:text-red-400">Select Pin →</span>
+            </div>
+          )}
+
           {/* Smart Auto-fill Banner as user types */}
           {topMatch && (
             <div className="px-3.5 py-2 bg-blue-50/90 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between gap-2 shrink-0">
@@ -798,6 +873,41 @@ export default function CustomSearchInput({
                 </button>
               ))}
             </div>
+
+            {/* Detected Google Maps Pin or GPS Coordinates (Mobile) */}
+            {pastedGoogleCoords && (
+              <div
+                onClick={async () => {
+                  let resolved = `${pastedGoogleCoords.lat.toFixed(4)}, ${pastedGoogleCoords.lng.toFixed(4)}`;
+                  try {
+                    const addr = await reverseGeocode(pastedGoogleCoords.lat, pastedGoogleCoords.lng);
+                    if (addr) resolved = addr;
+                  } catch {}
+                  handleSelect({
+                    id: `mob-google-paste-${Date.now()}`,
+                    name: `Google Maps Pin (${pastedGoogleCoords.lat.toFixed(4)}, ${pastedGoogleCoords.lng.toFixed(4)})`,
+                    display_name: resolved,
+                    lat: pastedGoogleCoords.lat,
+                    lon: pastedGoogleCoords.lng,
+                    category: 'poi',
+                  });
+                }}
+                className="p-3 bg-gradient-to-r from-red-500/10 to-amber-500/10 border border-red-500/30 rounded-xl flex items-center justify-between cursor-pointer active:bg-red-500/20 transition"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <MapPin size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-900 dark:text-white">Use Pinned Google Maps Location</p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                      {pastedGoogleCoords.lat.toFixed(5)}, {pastedGoogleCoords.lng.toFixed(5)}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-red-600 dark:text-red-400">Select Pin →</span>
+              </div>
+            )}
 
             {/* Smart 1-Tap Auto-fill Banner on Mobile */}
             {topMatch && (
