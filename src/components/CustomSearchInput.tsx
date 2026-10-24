@@ -24,9 +24,52 @@ import {
   ChevronRight,
   ArrowUpRight,
   Car,
+  Clock,
+  Trash2,
+  Map as MapIcon,
 } from 'lucide-react'
 
 type CategoryFilter = 'all' | 'streets' | 'malls' | 'hospitals' | 'transport' | 'suburbs';
+
+const RECENT_SEARCHES_KEY = 'solo_recent_searches_v2';
+
+function getStoredRecentSearches(): SearchResultPlace[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredRecentSearch(place: SearchResultPlace) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredRecentSearches();
+    const filtered = current.filter(
+      (p) =>
+        p.id !== place.id &&
+        p.name.toLowerCase() !== place.name.toLowerCase() &&
+        Math.abs(p.lat - place.lat) > 0.0005
+    );
+    const updated = [place, ...filtered].slice(0, 6);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+  } catch {
+    // Ignore localStorage quota errors
+  }
+}
+
+function clearStoredRecentSearches() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  } catch {
+    // Ignore errors
+  }
+}
 
 interface CustomSearchInputProps {
   value: string;
@@ -37,6 +80,7 @@ interface CustomSearchInputProps {
   proximityCoords?: { lat: number; lng: number } | null;
   hasRightAction?: boolean;
   onGetCurrentLocation?: () => void;
+  onSelectOnMap?: () => void;
 }
 
 export default function CustomSearchInput({
@@ -48,8 +92,10 @@ export default function CustomSearchInput({
   proximityCoords,
   hasRightAction = false,
   onGetCurrentLocation,
+  onSelectOnMap,
 }: CustomSearchInputProps) {
   const [results, setResults] = useState<SearchResultPlace[]>([])
+  const [recentSearches, setRecentSearches] = useState<SearchResultPlace[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false)
@@ -75,6 +121,11 @@ export default function CustomSearchInput({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Load recent searches on mount
+  useEffect(() => {
+    setRecentSearches(getStoredRecentSearches())
+  }, [])
+
   // Auto-focus mobile input when modal opens
   useEffect(() => {
     if (isMobileModalOpen) {
@@ -95,7 +146,6 @@ export default function CustomSearchInput({
       return
     }
 
-    // Always keep instant local results populated so the user sees all matching options immediately
     const instantLocal = searchLocalPlaces(value, proximityCoords, activeCategory)
     setResults(instantLocal)
     setHasSearched(Boolean(value && value.trim().length > 0))
@@ -105,7 +155,7 @@ export default function CustomSearchInput({
       return
     }
 
-    // 2. Debounced multi-provider geocoding (internal API, Mapbox, Photon) to enrich with external addresses
+    // 2. Debounced multi-provider geocoding (internal API with Mapbox & Photon) to enrich results
     setIsLoading(true)
     const delayDebounceFn = setTimeout(async () => {
       try {
@@ -114,7 +164,6 @@ export default function CustomSearchInput({
           const seen = new Set(prev.map((p) => `${p.name.toLowerCase()}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}`))
           const merged = [...prev]
           for (const p of remotePlaces) {
-            // Respect active category filter if user selected one
             if (activeCategory === 'streets' && p.category !== 'address') continue
             if (activeCategory === 'malls' && p.category !== 'building') continue
             if (activeCategory === 'suburbs' && p.category !== 'area') continue
@@ -128,11 +177,11 @@ export default function CustomSearchInput({
           return merged
         })
       } catch (err) {
-        console.error('Remote geocoding enrichment error:', err)
+        console.warn('Geocoding search notice:', err)
       } finally {
         setIsLoading(false)
       }
-    }, 250)
+    }, 200)
 
     return () => clearTimeout(delayDebounceFn)
   }, [value, proximityCoords?.lat, proximityCoords?.lng, activeCategory])
@@ -157,10 +206,17 @@ export default function CustomSearchInput({
   const handleSelect = (place: SearchResultPlace) => {
     isUserTypingRef.current = false
     suppressNextSearchRef.current = true
+    saveStoredRecentSearch(place)
+    setRecentSearches(getStoredRecentSearches())
     onSelect(place)
     setIsOpen(false)
     setIsMobileModalOpen(false)
     setActiveIndex(-1)
+  }
+
+  const handleClearHistory = () => {
+    clearStoredRecentSearches()
+    setRecentSearches([])
   }
 
   // Autofill text into the input so the user can easily append house numbers or edit
@@ -226,10 +282,10 @@ export default function CustomSearchInput({
     if (text.includes('airport') || text.includes('aerodrome')) {
       return <Plane size={16} />
     }
-    if (text.includes('mall') || text.includes('shopping') || text.includes('centre') || text.includes('center')) {
+    if (text.includes('mall') || text.includes('shopping') || text.includes('centre') || text.includes('center') || text.includes('spar') || text.includes('shoprite') || text.includes('checkers')) {
       return <ShoppingBag size={16} />
     }
-    if (text.includes('hospital') || text.includes('clinic') || text.includes('mediclinic')) {
+    if (text.includes('hospital') || text.includes('clinic') || text.includes('mediclinic') || text.includes('doctor')) {
       return <HeartPulse size={16} />
     }
     if (text.includes('university') || text.includes('spu') || text.includes('college') || text.includes('school')) {
@@ -241,7 +297,7 @@ export default function CustomSearchInput({
     if (place.category === 'building' || place.buildingName) {
       return <Building2 size={16} />
     }
-    if (place.houseNumber) {
+    if (place.houseNumber || place.category === 'address') {
       return <Home size={16} />
     }
     return <MapPin size={16} />
@@ -265,6 +321,15 @@ export default function CustomSearchInput({
       (p) => p.category === 'address' && (p.name.toLowerCase().includes(qLower) || qLower.includes(p.name.toLowerCase()))
     )
   }, [value, currentHouseNo])
+
+  // Popular Kimberley shortcut destinations
+  const popularHubs = useMemo(() => [
+    { name: 'Diamond Pavilion Mall', query: 'Diamond Pavilion Mall' },
+    { name: 'Sol Plaatje University', query: 'Sol Plaatje University' },
+    { name: 'Robert Sobukwe Hospital', query: 'Robert Sobukwe Hospital' },
+    { name: 'Kimberley Airport', query: 'Kimberley Airport' },
+    { name: 'North Cape Mall', query: 'North Cape Mall' },
+  ], [])
 
   return (
     <div className="relative w-full" ref={wrapperRef}>
@@ -318,7 +383,6 @@ export default function CustomSearchInput({
               const defaultList = searchLocalPlaces('', proximityCoords, activeCategory)
               setResults(defaultList)
               setActiveIndex(-1)
-              setIsOpen(false)
             }}
             className={`absolute ${
               hasRightAction ? 'right-12' : 'right-3.5'
@@ -334,10 +398,44 @@ export default function CustomSearchInput({
       {isOpen && !isMobile && (
         <div
           ref={listRef}
-          className="hidden md:flex absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-96 flex-col animate-in fade-in zoom-in-95 duration-150"
+          className="hidden md:flex absolute top-full mt-1.5 left-0 w-full bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[460px] flex-col animate-in fade-in zoom-in-95 duration-150"
         >
+          {/* Quick Actions Header: Current Location & Choose on Map */}
+          {(!value || value.trim().length === 0) && (
+            <div className="p-2.5 bg-gray-50/90 dark:bg-zinc-800/80 border-b border-gray-200/80 dark:border-zinc-800 flex items-center gap-2 shrink-0">
+              {onGetCurrentLocation && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onGetCurrentLocation()
+                    setIsOpen(false)
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-300 text-xs font-bold transition border border-blue-200/60 dark:border-blue-800/50"
+                >
+                  <LocateFixed size={14} className="shrink-0" />
+                  <span>Use Current GPS</span>
+                </button>
+              )}
+              {onSelectOnMap && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onSelectOnMap()
+                    setIsOpen(false)
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-xs font-bold transition border border-emerald-200/60 dark:border-emerald-800/50"
+                >
+                  <MapIcon size={14} className="shrink-0" />
+                  <span>Choose on Map</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Category Tabs Header */}
-          <div className="px-3 py-2 bg-gray-50/90 dark:bg-zinc-800/80 border-b border-gray-200/80 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-3 py-2 bg-gray-50/60 dark:bg-zinc-800/50 border-b border-gray-200/70 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {CATEGORIES.map((cat) => (
                 <button
@@ -359,11 +457,67 @@ export default function CustomSearchInput({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded hover:bg-gray-200/60 dark:hover:bg-zinc-700 shrink-0"
+              className="text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 px-1.5 py-0.5 rounded shrink-0"
             >
-              Done ✕
+              ✕
             </button>
           </div>
+
+          {/* Recent Searches Section (when input is empty) */}
+          {(!value || value.trim().length === 0) && recentSearches.length > 0 && (
+            <div className="border-b border-gray-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 shrink-0">
+              <div className="px-3 py-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <span className="flex items-center gap-1.5">
+                  <Clock size={12} className="text-blue-500" /> Recent Locations
+                </span>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleClearHistory}
+                  className="text-gray-400 hover:text-red-500 text-[10px] font-semibold lowercase flex items-center gap-1"
+                >
+                  <Trash2 size={10} /> clear
+                </button>
+              </div>
+              <div className="divide-y divide-gray-50 dark:divide-zinc-800/40">
+                {recentSearches.map((item, idx) => (
+                  <div
+                    key={`desk-recent-${item.id}-${idx}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(item)}
+                    className="px-3.5 py-2 cursor-pointer flex items-center justify-between hover:bg-blue-50/50 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Clock size={14} className="text-gray-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
+                        <p className="text-[10px] text-gray-400 truncate">{item.display_name}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-blue-600 font-bold shrink-0">Select</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Popular Hubs Quick Pill Row */}
+          {(!value || value.trim().length === 0) && (
+            <div className="px-3 py-1.5 bg-gray-50/40 dark:bg-zinc-900/50 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Popular:</span>
+              {popularHubs.map((hub) => (
+                <button
+                  key={`desk-hub-${hub.name}`}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleAutofill(hub.query)}
+                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-zinc-800 border border-gray-200/70 dark:border-zinc-700 hover:bg-blue-50 hover:text-blue-600 text-gray-700 dark:text-gray-300 whitespace-nowrap shrink-0 transition"
+                >
+                  {hub.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Smart Auto-fill Banner as user types */}
           {topMatch && (
@@ -385,7 +539,7 @@ export default function CustomSearchInput({
             </div>
           )}
 
-          {/* Quick House Number Chips (e.g. user typed "Memorial Road" or "14") */}
+          {/* Quick House Number Chips (e.g. user typed "Memorial Road") */}
           {isStreetWithoutNumber && (
             <div className="px-3 py-1.5 bg-gray-50/80 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">
@@ -521,7 +675,7 @@ export default function CustomSearchInput({
         </div>
       )}
 
-      {/* Dedicated Full-Screen Mobile Search Overlay (only active on mobile when user taps search) */}
+      {/* Dedicated Full-Screen Mobile Search Overlay */}
       {isMobileModalOpen && (
         <div className="fixed inset-0 z-[100] bg-white dark:bg-zinc-950 flex flex-col md:hidden animate-in fade-in duration-150">
           {/* Mobile Top Navigation Bar */}
@@ -597,27 +751,35 @@ export default function CustomSearchInput({
               ) : null}
             </div>
 
-            {/* Quick Action: Use Current Location (GPS) button */}
-            {onGetCurrentLocation && (
-              <button
-                type="button"
-                onClick={() => {
-                  onGetCurrentLocation()
-                  setIsMobileModalOpen(false)
-                }}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40 active:scale-[0.99] transition"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600 text-white">
-                    <LocateFixed size={15} />
-                  </div>
-                  <span className="text-xs font-bold text-blue-900 dark:text-blue-100">
-                    Use Current GPS Location
-                  </span>
-                </div>
-                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Locate Me →</span>
-              </button>
-            )}
+            {/* Quick Action Buttons on Mobile: Current Location & Set on Map */}
+            <div className="grid grid-cols-2 gap-2">
+              {onGetCurrentLocation && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onGetCurrentLocation()
+                    setIsMobileModalOpen(false)
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40 active:scale-[0.98] transition text-xs font-bold"
+                >
+                  <LocateFixed size={15} className="text-blue-600" />
+                  <span>Use Current GPS</span>
+                </button>
+              )}
+              {onSelectOnMap && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectOnMap()
+                    setIsMobileModalOpen(false)
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900/40 active:scale-[0.98] transition text-xs font-bold"
+                >
+                  <MapIcon size={15} className="text-emerald-600" />
+                  <span>Choose on Map</span>
+                </button>
+              )}
+            </div>
 
             {/* Category Filter Horizontal Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
@@ -695,17 +857,53 @@ export default function CustomSearchInput({
             )}
           </div>
 
-          {/* Mobile Results / Suggestion List with smooth touch scrolling */}
+          {/* Mobile Results / Suggestion List */}
           <div
             className="flex-1 overflow-y-auto overscroll-contain pb-safe divide-y divide-gray-100 dark:divide-zinc-800/60 custom-scrollbar"
             style={{ touchAction: 'pan-y' }}
           >
+            {/* Recent Searches on Mobile (when empty input) */}
+            {(!value || value.trim().length === 0) && recentSearches.length > 0 && (
+              <div className="bg-gray-50/50 dark:bg-zinc-900/60 pb-1">
+                <div className="px-4 py-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={12} className="text-blue-500" /> Recent Searches
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearHistory}
+                    className="text-gray-400 hover:text-red-500 text-[10px] font-semibold lowercase flex items-center gap-1"
+                  >
+                    <Trash2 size={10} /> clear
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-100 dark:divide-zinc-800/60">
+                  {recentSearches.map((item, idx) => (
+                    <div
+                      key={`mob-recent-${item.id}-${idx}`}
+                      onClick={() => handleSelect(item)}
+                      className="px-4 py-2.5 flex items-center justify-between hover:bg-blue-50 dark:hover:bg-zinc-800/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Clock size={14} className="text-gray-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{item.display_name}</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* List Header */}
             <div className="px-4 py-2 bg-gray-50/90 dark:bg-zinc-900/80 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
               <span className="flex items-center gap-1.5">
                 <Sparkles size={12} className="text-amber-500" />
                 {!value || value.trim().length === 0
-                  ? 'All Popular Kimberley Destinations'
+                  ? 'Popular Kimberley Destinations'
                   : currentHouseNo
                   ? `Suggested Addresses for #${currentHouseNo}`
                   : 'Matching Locations'}

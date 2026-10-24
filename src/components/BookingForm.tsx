@@ -16,6 +16,8 @@ interface BookingFormProps {
   availableDrivers?: LiveDriver[]
   onViewAllDrivers?: () => void
   onLocateDriverOnMap?: (driver: LiveDriver) => void
+  onPickOnMapRequest?: (type: 'pickup' | 'dropoff') => void
+  mapPickedLocation?: { type: 'pickup' | 'dropoff'; lat: number; lng: number; address: string } | null
 }
 
 function formatSelectedPlaceLabel(feature: SearchResultPlace): string {
@@ -47,6 +49,8 @@ export default function BookingForm({
   availableDrivers = [],
   onViewAllDrivers,
   onLocateDriverOnMap,
+  onPickOnMapRequest,
+  mapPickedLocation,
 }: BookingFormProps) {
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
@@ -64,6 +68,21 @@ export default function BookingForm({
 
   const [realPickupCoords, setRealPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [realDropoffCoords, setRealDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
+
+  // Listen to coordinates picked directly on the map
+  useEffect(() => {
+    if (!mapPickedLocation) return;
+    const { type, lat, lng, address } = mapPickedLocation;
+    if (type === 'pickup') {
+      setRealPickupCoords({ lat, lng });
+      setPickup(address);
+      onLocationSelect('pickup', lat, lng);
+    } else {
+      setRealDropoffCoords({ lat, lng });
+      setDropoff(address);
+      onLocationSelect('dropoff', lat, lng);
+    }
+  }, [mapPickedLocation]);
 
   const handleGetCurrentLocation = () => {
     if ('geolocation' in navigator) {
@@ -229,6 +248,7 @@ export default function BookingForm({
                 hasRightAction={true}
                 proximityCoords={realPickupCoords}
                 onGetCurrentLocation={handleGetCurrentLocation}
+                onSelectOnMap={onPickOnMapRequest ? () => onPickOnMapRequest('pickup') : undefined}
                 onSelect={(feature) => {
                   const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                   setRealPickupCoords(coords);
@@ -273,6 +293,7 @@ export default function BookingForm({
                 value={dropoff}
                 onChange={setDropoff}
                 proximityCoords={realPickupCoords}
+                onSelectOnMap={onPickOnMapRequest ? () => onPickOnMapRequest('dropoff') : undefined}
                 onSelect={(feature) => {
                   const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
                   setRealDropoffCoords(coords);

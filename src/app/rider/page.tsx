@@ -14,6 +14,7 @@ import RiderSupportModal from '@/components/RiderSupportModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
+import { reverseGeocode } from '@/utils/mapService'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -93,6 +94,37 @@ export default function RiderPage() {
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [pastRiderTrips, setPastRiderTrips] = useState<MockTrip[]>([])
   const [focusedDriverCoords, setFocusedDriverCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [pickingOnMapType, setPickingOnMapType] = useState<'pickup' | 'dropoff' | null>(null)
+  const [mapPickedLocation, setMapPickedLocation] = useState<{
+    type: 'pickup' | 'dropoff';
+    lat: number;
+    lng: number;
+    address: string;
+  } | null>(null)
+
+  const handleMapClickLocation = async (lat: number, lng: number) => {
+    if (!pickingOnMapType) return;
+    const targetType = pickingOnMapType;
+    setPickingOnMapType(null);
+    setIsSheetMinimized(false);
+
+    let address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    try {
+      const resolved = await reverseGeocode(lat, lng);
+      if (resolved) {
+        address = resolved.split(',').map((s: string) => s.trim()).filter(Boolean).slice(0, 3).join(', ') || resolved;
+      }
+    } catch (e) {
+      console.warn('Map reverse geocode notice:', e);
+    }
+
+    setMapPickedLocation({
+      type: targetType,
+      lat,
+      lng,
+      address,
+    });
+  };
 
   const handleOpenSupport = async () => {
     try {
@@ -866,6 +898,8 @@ export default function RiderPage() {
           driverLat={driverCoords?.lat}
           driverLng={driverCoords?.lng}
           tripStatus={activeTrip?.status}
+          isPickingOnMap={pickingOnMapType}
+          onMapClickLocation={handleMapClickLocation}
           onRouteChange={(details) => {
             setLiveTrackingInfo(prev => ({
               distanceKm: details.distanceKm,
@@ -877,6 +911,33 @@ export default function RiderPage() {
           }}
         />
       </div>
+
+      {/* Interactive Map Pin Selection Mode Banner */}
+      {pickingOnMapType && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="bg-blue-600 text-white p-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border border-blue-400/80">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <MapPin size={22} className="text-white shrink-0 animate-bounce" />
+              <div className="min-w-0">
+                <p className="text-xs font-black truncate">
+                  Tap map to set {pickingOnMapType === 'pickup' ? 'Pickup' : 'Dropoff'}
+                </p>
+                <p className="text-[11px] text-blue-100 truncate">Tap any street or gate on the map</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPickingOnMapType(null);
+                setIsSheetMinimized(false);
+              }}
+              className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl shrink-0 transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Real-time Trip GPS Tracking Floating HUD Pill */}
       {activeTrip && (activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
@@ -1064,6 +1125,11 @@ export default function RiderPage() {
                       availableDrivers={availableDrivers}
                       onViewAllDrivers={() => setShowDriversModal(true)}
                       onLocateDriverOnMap={handleLocateDriverOnMap}
+                      onPickOnMapRequest={(type) => {
+                        setPickingOnMapType(type);
+                        setIsSheetMinimized(true);
+                      }}
+                      mapPickedLocation={mapPickedLocation}
                     />
                   </>
                 )}

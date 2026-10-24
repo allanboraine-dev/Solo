@@ -30,18 +30,38 @@ export const MAPBOX_TOKEN =
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 
 /**
- * Extracts a leading house/unit/stand number from a user query if present.
+ * Robust fetch with timeout to prevent hanging network calls on mobile or slow networks
+ */
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+/**
+ * Extracts a leading or trailing house/unit/stand number from a user query if present.
  * Examples:
  *  - "14 Niobe Street" -> { houseNumber: "14", remainder: "Niobe Street" }
  *  - "14B Memorial Road" -> { houseNumber: "14B", remainder: "Memorial Road" }
  *  - "No. 22 Barkley Rd" -> { houseNumber: "22", remainder: "Barkley Rd" }
+ *  - "Stand 104 Galeshewe" -> { houseNumber: "104", remainder: "Galeshewe" }
+ *  - "Memorial Road 14" -> { houseNumber: "14", remainder: "Memorial Road" }
  */
 export function parseHouseNumberFromQuery(query: string): {
   houseNumber?: string;
   remainder: string;
 } {
-  const trimmed = query.trim();
-  // Check leading house number: "14 Niobe Street", "No. 22 Barkley Rd", "#14 Memorial", "12, Carrington Road", "Unit 4 10 Oliver Rd"
+  const trimmed = (query || '').trim();
+  if (!trimmed) return { remainder: '' };
+
+  // Check leading house number: "14 Niobe Street", "No. 22 Barkley Rd", "#14 Memorial", "12, Carrington Road", "Stand 104"
   const leadingMatch = trimmed.match(
     /^(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)\s*[,]?\s+(.{2,})$/i
   );
@@ -51,6 +71,7 @@ export function parseHouseNumberFromQuery(query: string): {
       remainder: leadingMatch[2].trim(),
     };
   }
+
   // Check trailing house number: "Niobe Street 14", "Memorial Road No 22", "Carrington Road, 12"
   const trailingMatch = trimmed.match(
     /^(.{2,})\s*[,]?\s+(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)$/i
@@ -61,6 +82,7 @@ export function parseHouseNumberFromQuery(query: string): {
       remainder: trailingMatch[1].trim(),
     };
   }
+
   // Standalone house number (e.g. "14", "22B", "#108")
   const standaloneMatch = trimmed.match(
     /^(?:no\.?\s*|house\s*|erf\s*|stand\s*|unit\s*|flat\s*|apt\s*|#\s*)?(\d+[a-zA-Z]?|\d+[\w\/-]*)$/i
@@ -71,6 +93,7 @@ export function parseHouseNumberFromQuery(query: string): {
       remainder: '',
     };
   }
+
   return { remainder: trimmed };
 }
 
@@ -101,7 +124,7 @@ function formatNominatimResult(item: any, userHouseNumber?: string): SearchResul
     addr.municipality ||
     addr.county ||
     addr.state_district ||
-    undefined;
+    'Kimberley';
 
   const buildingCandidate =
     item.name ||
@@ -115,7 +138,6 @@ function formatNominatimResult(item: any, userHouseNumber?: string): SearchResul
     addr.leisure ||
     undefined;
 
-  // Determine if buildingCandidate is distinct from the street name
   const buildingName =
     buildingCandidate && (!street || buildingCandidate.toLowerCase() !== street.toLowerCase())
       ? buildingCandidate
@@ -148,7 +170,6 @@ function formatNominatimResult(item: any, userHouseNumber?: string): SearchResul
     addr.postcode,
   ].filter(Boolean);
 
-  // Deduplicate adjacent identical parts
   const uniqueContext: string[] = [];
   for (const part of contextParts) {
     if (
@@ -239,7 +260,7 @@ function formatMapboxFeature(feat: any, userHouseNumber?: string): SearchResultP
     houseNumber,
     street,
     suburb,
-    city,
+    city: city || 'Kimberley',
     buildingName,
     category,
   };
@@ -282,7 +303,7 @@ function formatPhotonFeature(feat: any, userHouseNumber?: string): SearchResultP
 }
 
 export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
-  // Malls & Shopping
+  // --- Malls & Shopping Centers ---
   {
     id: 'poi-diamond-pavilion',
     name: 'Diamond Pavilion Mall',
@@ -376,6 +397,17 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     category: 'building',
   },
   {
+    id: 'poi-checkers-diamond-pavilion',
+    name: 'Checkers Diamond Pavilion',
+    display_name: 'Checkers Hyper, Diamond Pavilion Mall, Memorial Road, Kimberley, 8301',
+    lat: -28.7565,
+    lon: 24.7642,
+    street: 'Memorial Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
     id: 'poi-shoprite-cbd',
     name: 'Shoprite Kimberley CBD',
     display_name: 'Shoprite, Chapel Street / Jones Street, Kimberley CBD, Northern Cape, 8301',
@@ -397,8 +429,30 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'building',
   },
+  {
+    id: 'poi-woolworths-north-cape',
+    name: 'Woolworths North Cape Mall',
+    display_name: 'Woolworths, North Cape Mall, Memorial Road, Royldene, Kimberley, 8301',
+    lat: -28.7615,
+    lon: 24.7625,
+    street: 'Memorial Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-game-diamond-pavilion',
+    name: 'Game Diamond Pavilion',
+    display_name: 'Game Stores, Diamond Pavilion Mall, Memorial Road, Kimberley, 8301',
+    lat: -28.7560,
+    lon: 24.7648,
+    street: 'Memorial Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
 
-  // Hospitals & Medical
+  // --- Hospitals & Medical ---
   {
     id: 'poi-kimberley-hospital',
     name: 'Robert Mangaliso Sobukwe Hospital',
@@ -457,8 +511,19 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'building',
   },
+  {
+    id: 'poi-beaconsfield-clinic',
+    name: 'Beaconsfield Health Clinic',
+    display_name: 'Beaconsfield Community Clinic, Green Street, Beaconsfield, Kimberley, 8301',
+    lat: -28.7682,
+    lon: 24.7718,
+    street: 'Green Street',
+    suburb: 'Beaconsfield',
+    city: 'Kimberley',
+    category: 'building',
+  },
 
-  // Universities & Schools
+  // --- Universities & Schools ---
   {
     id: 'poi-spu-central',
     name: 'Sol Plaatje University (SPU Central Campus)',
@@ -516,6 +581,17 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     category: 'building',
   },
   {
+    id: 'poi-kgirls-high',
+    name: 'Kimberley Girls High School',
+    display_name: 'Kimberley Girls High School, Elsmere Road, Belgravia, Kimberley, 8301',
+    lat: -28.7495,
+    lon: 24.7745,
+    street: 'Elsmere Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
     id: 'poi-nc-high',
     name: 'Northern Cape High School',
     display_name: 'Northern Cape High School, Memorial Road, Monument Heights, Kimberley, Northern Cape, 8301',
@@ -526,8 +602,77 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'building',
   },
+  {
+    id: 'poi-diamantveld-high',
+    name: 'Hoërskool Diamantveld',
+    display_name: 'Hoërskool Diamantveld, Voortrekker Street, Monument Heights, Kimberley, 8301',
+    lat: -28.7538,
+    lon: 24.7668,
+    street: 'Voortrekker Street',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-cbc-st-patricks',
+    name: "St Patrick's CBC Kimberley",
+    display_name: "St Patrick's Christian Brothers' College, Du Toitspan Road, Kimberley, 8301",
+    lat: -28.7488,
+    lon: 24.7695,
+    street: 'Du Toitspan Road',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'building',
+  },
 
-  // Landmarks & Tourism
+  // --- Transport Hubs ---
+  {
+    id: 'poi-kimberley-airport',
+    name: 'Kimberley Airport (KIM)',
+    display_name: 'Kimberley Airport (KIM), Diskobolos Road, Kimberley, Northern Cape, 8301',
+    lat: -28.8028,
+    lon: 24.7656,
+    street: 'Diskobolos Road',
+    suburb: 'Kimberley Airport',
+    city: 'Kimberley',
+    buildingName: 'Kimberley Airport',
+    category: 'poi',
+  },
+  {
+    id: 'poi-kimberley-station',
+    name: 'Kimberley Railway Station',
+    display_name: 'Kimberley Train Station, Florence Road / Transvaal Road, Kimberley CBD, 8301',
+    lat: -28.7342,
+    lon: 24.7682,
+    street: 'Florence Road',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'poi',
+  },
+  {
+    id: 'poi-galeshewe-taxi-rank',
+    name: 'Galeshewe Taxi Rank',
+    display_name: 'Galeshewe Taxi Rank, Nobengula Extension, Galeshewe, Kimberley, 8345',
+    lat: -28.7188,
+    lon: 24.7285,
+    street: 'Nobengula Extension',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'poi',
+  },
+  {
+    id: 'poi-indian-centre-rank',
+    name: 'Indian Centre Taxi Rank',
+    display_name: 'Indian Centre Taxi Rank, Phakamile Mabija Road, Kimberley CBD, 8301',
+    lat: -28.7390,
+    lon: 24.7684,
+    street: 'Phakamile Mabija Road',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'poi',
+  },
+
+  // --- Landmarks & Civic ---
   {
     id: 'poi-big-hole',
     name: 'The Big Hole & Mine Museum',
@@ -596,44 +741,18 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'building',
   },
-
-  // Transport Hubs
   {
-    id: 'poi-kimberley-airport',
-    name: 'Kimberley Airport (KIM)',
-    display_name: 'Kimberley Airport (KIM), Diskobolos Road, Kimberley, Northern Cape, 8301',
-    lat: -28.8028,
-    lon: 24.7656,
-    street: 'Diskobolos Road',
-    suburb: 'Kimberley Airport',
-    city: 'Kimberley',
-    buildingName: 'Kimberley Airport',
-    category: 'poi',
-  },
-  {
-    id: 'poi-kimberley-station',
-    name: 'Kimberley Railway Station',
-    display_name: 'Kimberley Train Station, Florence Road / Transvaal Road, Kimberley CBD, 8301',
-    lat: -28.7342,
-    lon: 24.7682,
-    street: 'Florence Road',
-    suburb: 'Central',
-    city: 'Kimberley',
-    category: 'poi',
-  },
-  {
-    id: 'poi-galeshewe-taxi-rank',
-    name: 'Galeshewe Taxi Rank',
-    display_name: 'Galeshewe Taxi Rank, Nobengula Extension, Galeshewe, Kimberley, 8345',
-    lat: -28.7188,
-    lon: 24.7285,
-    street: 'Nobengula Extension',
-    suburb: 'Galeshewe',
+    id: 'poi-flamingo-casino',
+    name: 'Flamingo Casino & Entertainment Centre',
+    display_name: 'Flamingo Casino, Kimberley-Boshof Road (N12), Kimberley, Northern Cape, 8301',
+    lat: -28.6945,
+    lon: 24.7812,
+    suburb: 'Kimberley North',
     city: 'Kimberley',
     category: 'poi',
   },
 
-  // Major Suburbs & Townships
+  // --- Suburbs & Townships ---
   {
     id: 'suburb-galeshewe',
     name: 'Galeshewe',
@@ -764,8 +883,58 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'area',
   },
+  {
+    id: 'suburb-hillcrest',
+    name: 'Hillcrest',
+    display_name: 'Hillcrest, Kimberley, Northern Cape, 8301, South Africa',
+    lat: -28.7542,
+    lon: 24.7421,
+    suburb: 'Hillcrest',
+    city: 'Kimberley',
+    category: 'area',
+  },
+  {
+    id: 'suburb-cassandra',
+    name: 'Cassandra',
+    display_name: 'Cassandra, Kimberley, Northern Cape, 8301, South Africa',
+    lat: -28.7750,
+    lon: 24.7620,
+    suburb: 'Cassandra',
+    city: 'Kimberley',
+    category: 'area',
+  },
+  {
+    id: 'suburb-gemdene',
+    name: 'Gemdene',
+    display_name: 'Gemdene, Kimberley, Northern Cape, 8301, South Africa',
+    lat: -28.7305,
+    lon: 24.7350,
+    suburb: 'Gemdene',
+    city: 'Kimberley',
+    category: 'area',
+  },
+  {
+    id: 'suburb-floors',
+    name: 'Floors',
+    display_name: 'Floors, Kimberley, Northern Cape, 8301, South Africa',
+    lat: -28.7250,
+    lon: 24.7390,
+    suburb: 'Floors',
+    city: 'Kimberley',
+    category: 'area',
+  },
+  {
+    id: 'suburb-colville',
+    name: 'Colville',
+    display_name: 'Colville, Kimberley, Northern Cape, 8301, South Africa',
+    lat: -28.7210,
+    lon: 24.7340,
+    suburb: 'Colville',
+    city: 'Kimberley',
+    category: 'area',
+  },
 
-  // Major Streets
+  // --- Major Kimberley Streets ---
   {
     id: 'street-du-toitspan',
     name: 'Du Toitspan Road',
@@ -1372,7 +1541,7 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     category: 'address',
   },
 
-  // Major South African Metros (for users travelling or cross-testing)
+  // --- Major National Metros (South Africa) ---
   {
     id: 'poi-sandton-city',
     name: 'Sandton City Mall',
@@ -1423,7 +1592,6 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
 
 /**
  * Converts any string into Title Case (capitalizing the first letter of each word and unit numbers).
- * Ensures case-insensitive searches seamlessly match official map records.
  */
 export function toTitleCase(str: string): string {
   if (!str) return '';
@@ -1440,7 +1608,7 @@ export function toTitleCase(str: string): string {
  * 4. Common local landmarks (e.g. "spu" -> "Sol Plaatje University", "big hole" -> "The Big Hole")
  */
 export function normalizeSearchQuery(raw: string): string {
-  let q = raw.trim();
+  let q = (raw || '').trim();
 
   const compoundReplacements: [RegExp, string][] = [
     [/\b(?:dutoitspan|du\s+toitspan|dutoits\s*pan|dutoit)(?:\s+(?:road|rd))?\b/gi, 'Du Toitspan Road'],
@@ -1480,8 +1648,167 @@ export function normalizeSearchQuery(raw: string): string {
 }
 
 /**
+ * Calculates Levenshtein distance for typo tolerance
+ */
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Computes a smart relevance score for matching places against user query.
+ */
+function scorePlaceRelevance(
+  place: SearchResultPlace,
+  queryLower: string,
+  normalizedLower: string,
+  userTokens: string[],
+  parsedHouseNo?: string,
+  streetRemainder?: string,
+  prox?: { lat: number; lng: number }
+): number {
+  const pName = place.name.toLowerCase();
+  const pStreet = (place.street || '').toLowerCase();
+  const pSuburb = (place.suburb || '').toLowerCase();
+  const pBuilding = (place.buildingName || '').toLowerCase();
+  const pCity = (place.city || '').toLowerCase();
+
+  let score = 0;
+
+  // 1. Exact Match on name / building / street
+  if (pName === queryLower || pBuilding === queryLower || pStreet === queryLower) {
+    score += 350;
+  } else if (pName === normalizedLower || pBuilding === normalizedLower) {
+    score += 320;
+  }
+
+  // 2. Starts with query
+  if (pName.startsWith(queryLower) || pBuilding.startsWith(queryLower)) {
+    score += 200;
+  } else if (pStreet.startsWith(queryLower)) {
+    score += 180;
+  } else if (pName.startsWith(normalizedLower)) {
+    score += 160;
+  }
+
+  // 3. Word boundary prefix match (e.g. "pavilion" in "Diamond Pavilion")
+  const words = `${pName} ${pStreet} ${pBuilding}`.split(/\s+/);
+  for (const w of words) {
+    if (w === queryLower) {
+      score += 140;
+      break;
+    } else if (w.startsWith(queryLower)) {
+      score += 100;
+      break;
+    }
+  }
+
+  // 4. Token Matching
+  if (userTokens.length > 0) {
+    let matchedTokenCount = 0;
+    for (const token of userTokens) {
+      if (token.length < 2) continue;
+      const tokenInName = pName.includes(token);
+      const tokenInBuilding = pBuilding.includes(token);
+      const tokenInStreet = pStreet.includes(token);
+      const tokenInSuburb = pSuburb.includes(token);
+      const tokenInCity = pCity.includes(token);
+
+      if (tokenInName || tokenInBuilding) {
+        score += 60;
+        matchedTokenCount++;
+      } else if (tokenInStreet) {
+        score += 45;
+        matchedTokenCount++;
+      } else if (tokenInSuburb) {
+        score += 35;
+        matchedTokenCount++;
+      } else if (tokenInCity) {
+        score += 15;
+      }
+    }
+
+    if (matchedTokenCount === userTokens.length && userTokens.length > 1) {
+      score += 100; // All tokens matched!
+    }
+  }
+
+  // 5. House number match
+  if (parsedHouseNo) {
+    if (place.houseNumber && place.houseNumber.toLowerCase() === parsedHouseNo.toLowerCase()) {
+      score += 200; // Direct house number match!
+    }
+    // If the query had a street and this place matches the street
+    if (streetRemainder && streetRemainder.length >= 2) {
+      const remLower = streetRemainder.toLowerCase();
+      if (pStreet.includes(remLower) || pName.includes(remLower)) {
+        score += 120;
+      }
+    }
+  }
+
+  // 6. Typo Tolerance / Fuzzy Match (for tokens >= 4 chars)
+  if (score === 0 && queryLower.length >= 4) {
+    for (const w of words) {
+      if (w.length >= 4 && Math.abs(w.length - queryLower.length) <= 2) {
+        const dist = levenshteinDistance(w, queryLower);
+        if (dist === 1) {
+          score += 120;
+          break;
+        } else if (dist === 2 && queryLower.length >= 5) {
+          score += 70;
+          break;
+        }
+      }
+    }
+  }
+
+  // 7. Category Bonuses
+  if (place.category === 'building') {
+    score += 25;
+  } else if (place.category === 'address') {
+    score += 20;
+  } else if (place.category === 'poi') {
+    score += 20;
+  }
+
+  // 8. Proximity Bonus (closer to Kimberley center or user's GPS coords)
+  if (prox && score > 0) {
+    const distKm = calculateDistanceKm(prox.lat, prox.lng, place.lat, place.lon);
+    // Add small proximity weight (e.g. up to +20 for nearby places within Kimberley)
+    score += Math.max(0, 20 - distKm);
+  }
+
+  return score;
+}
+
+/**
  * Instant local search against Kimberley popular places, streets, POIs, malls, and hospitals (0ms response).
- * Automatically applies house number prefixing, title-casing, compound matching, and category filtering.
  */
 export function searchLocalPlaces(
   query: string,
@@ -1547,7 +1874,7 @@ export function searchLocalPlaces(
     }
   };
 
-  // 1. If user typed a standalone house number (e.g. "14"), suggest all Kimberley streets with that house number
+  // 1. If user typed a standalone house number (e.g. "14"), suggest top Kimberley thoroughfares with that number
   if (parsedHouseNo && (!streetOrPlaceQuery || streetOrPlaceQuery.trim().length === 0)) {
     const streets = pool.filter((p) => p.category === 'address');
     for (const streetPlace of streets) {
@@ -1564,134 +1891,70 @@ export function searchLocalPlaces(
     return results;
   }
 
-  const lowerClean = cleanQuery.toLowerCase();
-  const lowerNormalized = normalizedQuery.toLowerCase();
-  const cleanNoSpace = lowerClean.replace(/[\s\-_]+/g, '');
-  const normalizedNoSpace = lowerNormalized.replace(/[\s\-_]+/g, '');
+  const queryLower = cleanQuery.toLowerCase();
+  const normalizedLower = normalizedQuery.toLowerCase();
+  // Exclude common stop words from token matching
+  const stopWords = new Set(['in', 'at', 'near', 'the', 'of', 'and', 'za', 'south', 'africa', 'street', 'st', 'road', 'rd', 'avenue', 'ave']);
+  const userTokens = queryLower
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && !stopWords.has(t));
 
-  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
-  const normalizedRemainder = normalizeSearchQuery(streetOrPlaceQuery || '').toLowerCase();
-  const remainderNoSpace = cleanRemainder.replace(/[\s\-_]+/g, '');
-  const normRemainderNoSpace = normalizedRemainder.replace(/[\s\-_]+/g, '');
+  const scoredPlaces: { place: SearchResultPlace; score: number }[] = [];
 
   for (const popular of pool) {
-    const popularNameLower = popular.name.toLowerCase();
-    const popularStreetLower = (popular.street || '').toLowerCase();
-    const popularBuildingLower = (popular.buildingName || '').toLowerCase();
-    const popularDisplayLower = popular.display_name.toLowerCase();
+    const score = scorePlaceRelevance(
+      popular,
+      queryLower,
+      normalizedLower,
+      userTokens,
+      parsedHouseNo,
+      streetOrPlaceQuery,
+      prox
+    );
 
-    const popularNameNoSpace = popularNameLower.replace(/[\s\-_]+/g, '');
-    const popularStreetNoSpace = popularStreetLower.replace(/[\s\-_]+/g, '');
-    const popularBuildingNoSpace = popularBuildingLower.replace(/[\s\-_]+/g, '');
-    const popularDisplayNoSpace = popularDisplayLower.replace(/[\s\-_]+/g, '');
+    // Also handle single-letter matching: if query is a single letter (e.g. 'm'), match if name or street starts with 'm'
+    const singleLetterMatch = cleanQuery.length === 1 && (
+      popular.name.toLowerCase().startsWith(queryLower) ||
+      (popular.street && popular.street.toLowerCase().startsWith(queryLower)) ||
+      (popular.buildingName && popular.buildingName.toLowerCase().startsWith(queryLower))
+    );
 
-    const isMatch =
-      popularNameLower.includes(lowerClean) ||
-      popularStreetLower.includes(lowerClean) ||
-      popularBuildingLower.includes(lowerClean) ||
-      popularDisplayLower.includes(lowerClean) ||
-      popularNameLower.includes(lowerNormalized) ||
-      popularStreetLower.includes(lowerNormalized) ||
-      popularDisplayLower.includes(lowerNormalized) ||
-      (cleanRemainder.length >= 1 &&
-        (popularNameLower.includes(cleanRemainder) ||
-          popularStreetLower.includes(cleanRemainder) ||
-          popularBuildingLower.includes(cleanRemainder) ||
-          popularDisplayLower.includes(cleanRemainder))) ||
-      (normalizedRemainder.length >= 1 &&
-        (popularNameLower.includes(normalizedRemainder) ||
-          popularStreetLower.includes(normalizedRemainder) ||
-          popularDisplayLower.includes(normalizedRemainder))) ||
-      (cleanNoSpace.length >= 2 &&
-        (popularNameNoSpace.includes(cleanNoSpace) ||
-          popularStreetNoSpace.includes(cleanNoSpace) ||
-          popularBuildingNoSpace.includes(cleanNoSpace) ||
-          popularDisplayNoSpace.includes(cleanNoSpace))) ||
-      (normalizedNoSpace.length >= 2 &&
-        (popularNameNoSpace.includes(normalizedNoSpace) ||
-          popularStreetNoSpace.includes(normalizedNoSpace) ||
-          popularDisplayNoSpace.includes(normalizedNoSpace))) ||
-      (remainderNoSpace.length >= 2 &&
-        (popularNameNoSpace.includes(remainderNoSpace) ||
-          popularStreetNoSpace.includes(remainderNoSpace) ||
-          popularBuildingNoSpace.includes(remainderNoSpace) ||
-          popularDisplayNoSpace.includes(remainderNoSpace))) ||
-      (normRemainderNoSpace.length >= 2 &&
-        (popularNameNoSpace.includes(normRemainderNoSpace) ||
-          popularStreetNoSpace.includes(normRemainderNoSpace) ||
-          popularDisplayNoSpace.includes(normRemainderNoSpace)));
-
-    if (isMatch) {
-      if (popular.category === 'address') {
-        const matchWithHouse = parsedHouseNo
-          ? {
-              ...popular,
-              id: `${popular.id}-${parsedHouseNo}`,
-              name: `${parsedHouseNo} ${popular.name}`,
-              display_name: `${parsedHouseNo} ${popular.display_name}`,
-              houseNumber: parsedHouseNo,
-              street: popular.street || popular.name,
-              category: 'address' as const,
-            }
-          : popular;
-        addUnique(matchWithHouse);
-      } else {
-        const matchWithHouse =
-          parsedHouseNo && (popularNameLower.includes(cleanRemainder) || cleanRemainder.length === 0)
-            ? {
-                ...popular,
-                id: `${popular.id}-${parsedHouseNo}`,
-                name: `${parsedHouseNo} ${popular.name}`,
-                display_name: `${parsedHouseNo} ${popular.display_name}`,
-                houseNumber: parsedHouseNo,
-              }
-            : popular;
-        addUnique(matchWithHouse);
+    if (score > 0 || singleLetterMatch) {
+      let finalPlace = popular;
+      if (parsedHouseNo && popular.category === 'address') {
+        finalPlace = {
+          ...popular,
+          id: `${popular.id}-${parsedHouseNo}`,
+          name: `${parsedHouseNo} ${popular.name}`,
+          display_name: `${parsedHouseNo} ${popular.display_name}`,
+          houseNumber: parsedHouseNo,
+          street: popular.street || popular.name,
+          category: 'address' as const,
+        };
+      } else if (parsedHouseNo) {
+        finalPlace = {
+          ...popular,
+          id: `${popular.id}-${parsedHouseNo}`,
+          name: `${parsedHouseNo} ${popular.name}`,
+          display_name: `${parsedHouseNo} ${popular.display_name}`,
+          houseNumber: parsedHouseNo,
+        };
       }
+
+      scoredPlaces.push({
+        place: finalPlace,
+        score: score + (singleLetterMatch ? 50 : 0),
+      });
     }
   }
 
-  // Sort by relevance then proximity
-  const lowerQ = cleanQuery.toLowerCase();
-  const lowerTokens = lowerQ.split(/\s+/).filter(Boolean);
+  // Sort strictly by relevance score descending
+  scoredPlaces.sort((a, b) => b.score - a.score);
 
-  results.sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
-
-    const getScore = (place: SearchResultPlace, name: string) => {
-      let score = 0;
-      if (parsedHouseNo && place.houseNumber && place.houseNumber.toLowerCase() === parsedHouseNo.toLowerCase()) {
-        score += 150;
-      }
-      if (name === lowerQ) score += 100;
-      else if (name.startsWith(lowerQ)) score += 60;
-      else if (name.includes(lowerQ)) score += 40;
-
-      if (
-        streetOrPlaceQuery &&
-        (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))
-      ) {
-        score += 50;
-      }
-
-      const allTokens = lowerTokens.length > 1 && lowerTokens.every((t) => name.includes(t));
-      if (allTokens) score += 30;
-
-      if (place.category === 'address') score += 35;
-      else if (place.category === 'building' || place.category === 'poi') score += 15;
-
-      return score;
-    };
-
-    const sA = getScore(a, aName);
-    const sB = getScore(b, bName);
-    if (sA !== sB) return sB - sA;
-
-    const dA = calculateDistanceKm(prox.lat, prox.lng, a.lat, a.lon);
-    const dB = calculateDistanceKm(prox.lat, prox.lng, b.lat, b.lon);
-    return dA - dB;
-  });
+  for (const item of scoredPlaces) {
+    addUnique(item.place);
+  }
 
   return results;
 }
@@ -1727,14 +1990,14 @@ export async function searchPlaces(
   const localMatches = searchLocalPlaces(cleanQuery, prox);
   localMatches.forEach((p) => addUniqueResult(p));
 
-  // 2. Client-side: Query our internal API route /api/geocode (which handles multi-provider cascaded search with house numbers)
+  // 2. Client-side: Query internal API route /api/geocode (which handles multi-provider cascaded search with Referer authorization)
   if (typeof window !== 'undefined') {
     try {
       const houseNoParam = parsedHouseNo ? `&houseNumber=${encodeURIComponent(parsedHouseNo)}` : '';
       const streetParam = streetOrPlaceQuery ? `&street=${encodeURIComponent(streetOrPlaceQuery)}` : '';
       const apiEndpoint = `/api/geocode?q=${encodeURIComponent(cleanQuery)}${houseNoParam}${streetParam}&lat=${prox.lat}&lng=${prox.lng}`;
-      const res = await fetch(apiEndpoint);
-      if (res.ok) {
+      const res = await fetchWithTimeout(apiEndpoint, {}, 2500);
+      if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data.places)) {
           data.places.forEach((p: SearchResultPlace) => {
@@ -1743,12 +2006,12 @@ export async function searchPlaces(
         }
       }
     } catch (err) {
-      console.warn('Internal geocode API error, falling back to direct providers:', err);
+      console.warn('Internal geocode API lookup notice:', err);
     }
   }
 
-  // 3. Query Mapbox Geocoding directly if needed
-  if (MAPBOX_TOKEN && combinedResults.length < 25) {
+  // 3. Query Mapbox Geocoding directly if needed (with timeout and Referer)
+  if (MAPBOX_TOKEN && combinedResults.length < 20) {
     const queryVariants = Array.from(
       new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
     ).filter((q): q is string => Boolean(q && q.length >= 2));
@@ -1757,9 +2020,18 @@ export async function searchPlaces(
       try {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           qVar
-        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=10&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetch(endpoint);
-        if (res.ok) {
+        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetchWithTimeout(
+          endpoint,
+          {
+            headers: {
+              'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+              'Accept': 'application/json',
+            },
+          },
+          2500
+        );
+        if (res && res.ok) {
           const data = await res.json();
           if (data.features && Array.isArray(data.features)) {
             data.features.forEach((feat: any) => {
@@ -1768,88 +2040,47 @@ export async function searchPlaces(
           }
         }
       } catch (err) {
-        console.warn('Mapbox geocoding error:', err);
+        console.warn('Mapbox direct geocoding notice:', err);
       }
-      if (combinedResults.length >= 35) break;
+      if (combinedResults.length >= 30) break;
     }
   }
 
-  // 4. Query Photon API (OpenStreetMap-based, high accuracy for South African addresses, CORS-friendly)
-  if (combinedResults.length < 25) {
+  // 4. Query Photon API (OpenStreetMap-based) only if results are still sparse, with strict 2000ms timeout
+  if (combinedResults.length < 10) {
     try {
-      const photonQueries = Array.from(
-        new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
-      ).filter((q): q is string => Boolean(q && q.length >= 2));
-
-      for (const pQuery of photonQueries) {
-        const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
-          pQuery
-        )}&lat=${prox.lat}&lon=${prox.lng}&limit=10`;
-        const pRes = await fetch(photonUrl);
-        if (pRes.ok) {
-          const pData = await pRes.json();
-          if (Array.isArray(pData.features)) {
-            pData.features.forEach((feat: any) => {
-              // Ensure country is South Africa if provided
-              const ccode = feat.properties?.countrycode;
-              if (ccode && ccode.toUpperCase() !== 'ZA') return;
-              addUniqueResult(formatPhotonFeature(feat, parsedHouseNo));
-            });
-          }
+      const pQuery = `${streetOrPlaceQuery || cleanQuery}, Kimberley`;
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
+        pQuery
+      )}&lat=${prox.lat}&lon=${prox.lng}&limit=6`;
+      const pRes = await fetchWithTimeout(photonUrl, {}, 2000);
+      if (pRes && pRes.ok) {
+        const pData = await pRes.json();
+        if (Array.isArray(pData.features)) {
+          pData.features.forEach((feat: any) => {
+            const ccode = feat.properties?.countrycode;
+            if (ccode && ccode.toUpperCase() !== 'ZA') return;
+            addUniqueResult(formatPhotonFeature(feat, parsedHouseNo));
+          });
         }
-        if (combinedResults.length >= 35) break;
       }
     } catch (err) {
-      console.warn('Photon geocoding error:', err);
+      console.warn('Photon geocoding notice:', err);
     }
   }
 
-  // 5. Prioritize by relevance match first, exact house number matches, then proximity
-  const lowerQ = cleanQuery.toLowerCase();
-  const lowerTokens = lowerQ.split(/\s+/).filter(Boolean);
-  const cleanRemainder = (streetOrPlaceQuery || '').toLowerCase();
+  // 5. Re-sort merged results by relevance score so top remote or local matches rank highest
+  const queryLower = cleanQuery.toLowerCase();
+  const normalizedLower = normalizedQuery.toLowerCase();
+  const stopWords = new Set(['in', 'at', 'near', 'the', 'of', 'and', 'za', 'south', 'africa', 'street', 'st', 'road', 'rd', 'avenue', 'ave']);
+  const userTokens = queryLower
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && !stopWords.has(t));
 
   combinedResults.sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
-
-    const getRelevanceScore = (place: SearchResultPlace, name: string) => {
-      let score = 0;
-      const hasMatchingHouse =
-        parsedHouseNo && place.houseNumber && place.houseNumber.toLowerCase() === parsedHouseNo.toLowerCase();
-
-      if (hasMatchingHouse) {
-        score += 150; // Priority to exact house number match
-      }
-
-      if (name === lowerQ) score += 100;
-      else if (name.startsWith(lowerQ)) score += 60;
-      else if (name.includes(lowerQ)) score += 40;
-
-      // If query had a street and this place matches it
-      if (
-        streetOrPlaceQuery &&
-        (name.includes(cleanRemainder) || (place.street && place.street.toLowerCase().includes(cleanRemainder)))
-      ) {
-        score += 50;
-      }
-
-      const allTokensInName = lowerTokens.length > 1 && lowerTokens.every((t) => name.includes(t));
-      if (allTokensInName) score += 30;
-
-      if (place.category === 'address') {
-        score += 35;
-      } else if (place.category === 'building' || place.category === 'poi') {
-        score += 15;
-      } else if (place.category === 'area' && lowerTokens.length > 1) {
-        score -= 20;
-      }
-
-      return score;
-    };
-
-    const scoreA = getRelevanceScore(a, aName);
-    const scoreB = getRelevanceScore(b, bName);
+    const scoreA = scorePlaceRelevance(a, queryLower, normalizedLower, userTokens, parsedHouseNo, streetOrPlaceQuery, prox);
+    const scoreB = scorePlaceRelevance(b, queryLower, normalizedLower, userTokens, parsedHouseNo, streetOrPlaceQuery, prox);
 
     if (scoreA !== scoreB) {
       return scoreB - scoreA;
@@ -1860,35 +2091,43 @@ export async function searchPlaces(
     return distA - distB;
   });
 
-  return combinedResults.slice(0, 50);
+  return combinedResults.slice(0, 40);
 }
-
 
 /**
  * Reverse Geocoding: Converts GPS coordinates into a detailed South African street/building address
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // 1. Try our internal server-side API (handles Mapbox + Nominatim with proper User-Agent)
+  // 1. Try internal server-side API (handles Mapbox + Nominatim with proper Referer & User-Agent)
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch(`/api/geocode?action=reverse&lat=${lat}&lng=${lng}`);
-      if (res.ok) {
+      const res = await fetchWithTimeout(`/api/geocode?action=reverse&lat=${lat}&lng=${lng}`, {}, 2500);
+      if (res && res.ok) {
         const data = await res.json();
         if (data.success && data.address) {
           return data.address;
         }
       }
     } catch (err) {
-      console.warn('Internal reverse geocoding API error, trying client fallbacks:', err);
+      console.warn('Internal reverse geocoding notice:', err);
     }
   }
 
-  // 2. Try Mapbox Reverse Geocoding
+  // 2. Try Mapbox Reverse Geocoding directly with Referer header
   if (MAPBOX_TOKEN) {
     try {
       const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?country=za&types=address,poi,neighborhood,locality,place&limit=1&access_token=${MAPBOX_TOKEN}`;
-      const res = await fetch(endpoint);
-      if (res.ok) {
+      const res = await fetchWithTimeout(
+        endpoint,
+        {
+          headers: {
+            'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+            'Accept': 'application/json',
+          },
+        },
+        2500
+      );
+      if (res && res.ok) {
         const data = await res.json();
         if (data.features && data.features.length > 0) {
           const formatted = formatMapboxFeature(data.features[0]);
@@ -1896,15 +2135,15 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
         }
       }
     } catch (err) {
-      console.warn('Mapbox reverse geocoding failed, attempting Photon:', err);
+      console.warn('Mapbox reverse geocoding notice:', err);
     }
   }
 
-  // 3. Try Photon Reverse Geocoding (CORS friendly)
+  // 3. Try Photon Reverse Geocoding with strict 2000ms timeout
   try {
     const photonRevUrl = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`;
-    const pRes = await fetch(photonRevUrl);
-    if (pRes.ok) {
+    const pRes = await fetchWithTimeout(photonRevUrl, {}, 2000);
+    if (pRes && pRes.ok) {
       const pData = await pRes.json();
       if (Array.isArray(pData.features) && pData.features.length > 0) {
         const formatted = formatPhotonFeature(pData.features[0]);
@@ -1912,7 +2151,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       }
     }
   } catch (err) {
-    console.warn('Photon reverse geocoding failed:', err);
+    console.warn('Photon reverse geocoding notice:', err);
   }
 
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
@@ -1928,16 +2167,23 @@ export async function getRouteDirections(
   destLng: number,
   destLat: number
 ): Promise<RouteDetails | null> {
-  // 1. Try Mapbox Directions with live driving traffic
+  // 1. Try Mapbox Directions with live driving traffic (with Referer header)
   if (MAPBOX_TOKEN) {
     try {
       const endpoint = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${originLng},${originLat};${destLng},${destLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
-      const res = await fetch(endpoint);
-      if (res.ok) {
+      const res = await fetchWithTimeout(
+        endpoint,
+        {
+          headers: {
+            'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+          },
+        },
+        3000
+      );
+      if (res && res.ok) {
         const data = await res.json();
         if (data.routes && data.routes.length > 0) {
           const route = data.routes[0];
-          // GeoJSON coordinates are [lng, lat], Leaflet Polyline needs [lat, lng]
           const coords: [number, number][] = route.geometry.coordinates.map(
             (c: [number, number]) => [c[1], c[0]]
           );
@@ -1953,15 +2199,15 @@ export async function getRouteDirections(
         }
       }
     } catch (err) {
-      console.warn('Mapbox directions failed, falling back to OSRM:', err);
+      console.warn('Mapbox directions notice:', err);
     }
   }
 
   // 2. Fallback to OSRM
   try {
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`;
-    const res = await fetch(osrmUrl);
-    if (res.ok) {
+    const res = await fetchWithTimeout(osrmUrl, {}, 3000);
+    if (res && res.ok) {
       const data = await res.json();
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0];
@@ -1980,7 +2226,7 @@ export async function getRouteDirections(
       }
     }
   } catch (err) {
-    console.error('Both Mapbox and OSRM routing failed:', err);
+    console.error('Both Mapbox and OSRM routing notice:', err);
   }
 
   return null;
@@ -2007,13 +2253,7 @@ export interface FareBreakdown {
 }
 
 /**
- * Returns South African Time-of-Day Tariff tier based on local time:
- *  - Morning Rush (06:30 - 08:30): +15% (1.15x) - peak commuting & school traffic
- *  - Daytime Standard (08:30 - 16:30): 1.0x (Standard Base: R12 + R8/km, min R25)
- *  - Evening Commute (16:30 - 18:30): +15% (1.15x) - peak home-bound traffic
- *  - Evening Standard (18:30 - 22:00): 1.0x (Standard)
- *  - Night Owl & Safety Surcharge (22:00 - 05:00): +25% (1.25x) - driver night safety & availability incentive
- *  - Early Dawn (05:00 - 06:30): 1.0x (Standard)
+ * Returns South African Time-of-Day Tariff tier based on local time
  */
 export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
   const hour = date.getHours();
@@ -2106,7 +2346,6 @@ export function calculateDynamicFare(
 /**
  * Calculates fare in South African Rand (ZAR)
  * Base fare: R12 | Per-km: R8 | Minimum fare: R25
- * Supports optional Date or options object for time-of-day dynamic adjustment.
  */
 export function calculateFare(
   distanceKm: number,
@@ -2125,12 +2364,10 @@ export function calculateFare(
 }
 
 /**
- * Returns configuration for Leaflet TileLayer:
- * Uses high-DPI Mapbox Navigation / Streets tiles when token is available, with OSM fallback
+ * Returns configuration for Leaflet TileLayer
  */
 export function getTileLayerConfig(isDark: boolean = false) {
   if (MAPBOX_TOKEN) {
-    // Style ID: navigation-day-v1 / navigation-night-v1
     const styleId = isDark ? 'navigation-night-v1' : 'navigation-day-v1';
     return {
       url: `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`,

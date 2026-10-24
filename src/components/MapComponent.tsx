@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
@@ -45,6 +45,8 @@ interface MapProps {
     rating?: number;
   };
   onRouteChange?: (details: { distanceKm: number; durationMinutes: number }) => void;
+  isPickingOnMap?: 'pickup' | 'dropoff' | null;
+  onMapClickLocation?: (lat: number, lng: number) => void;
 }
 
 // Create custom DivIcons for location markers
@@ -193,6 +195,23 @@ const MapUpdater = ({
   return null;
 };
 
+const MapClickHandler = ({
+  isPickingOnMap,
+  onMapClickLocation,
+}: {
+  isPickingOnMap?: 'pickup' | 'dropoff' | null;
+  onMapClickLocation?: (lat: number, lng: number) => void;
+}) => {
+  useMapEvents({
+    click(e) {
+      if (isPickingOnMap && onMapClickLocation) {
+        onMapClickLocation(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+  return null;
+};
+
 const MapComponent = (props: MapProps) => {
   const { 
     pickupLat, 
@@ -205,7 +224,9 @@ const MapComponent = (props: MapProps) => {
     availableDrivers = [],
     focusedDriverCoords,
     assignedDriver,
-    onRouteChange
+    onRouteChange,
+    isPickingOnMap,
+    onMapClickLocation,
   } = props;
   
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
@@ -274,7 +295,7 @@ const MapComponent = (props: MapProps) => {
   const polylineColor = tripStatus === 'accepted' ? '#10b981' : '#3b82f6';
 
   return (
-    <div className="w-full h-full relative z-0 select-none touch-pan-x touch-pan-y">
+    <div className={`w-full h-full relative z-0 select-none touch-pan-x touch-pan-y ${isPickingOnMap ? 'cursor-crosshair' : ''}`}>
       <MapContainer 
         center={[centerLat, centerLng]} 
         zoom={14} 
@@ -293,6 +314,11 @@ const MapComponent = (props: MapProps) => {
           zoomOffset={tileConfig.zoomOffset}
         />
         
+        <MapClickHandler 
+          isPickingOnMap={isPickingOnMap} 
+          onMapClickLocation={onMapClickLocation} 
+        />
+
         <MapUpdater 
           pickupLat={pickupLat} 
           pickupLng={pickupLng} 

@@ -24,6 +24,19 @@ const MAPBOX_TOKEN =
 // Default Kimberley CBD coordinates
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return res;
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   // Enforce geocoding rate limits (45 req/min per IP)
   const rateLimit = checkGeocodeRateLimit(req);
@@ -42,6 +55,14 @@ export async function GET(req: NextRequest) {
   const lat = latStr ? parseFloat(latStr) : DEFAULT_PROXIMITY.lat;
   const lng = lngStr ? parseFloat(lngStr) : DEFAULT_PROXIMITY.lng;
 
+  // Domain referer header is essential for URL-restricted Mapbox tokens
+  const referer = req.headers.get('referer') || 'http://localhost:3000';
+  const defaultHeaders = {
+    'Referer': referer,
+    'User-Agent': 'SoloRides/1.0 (https://solo-rides.co.za; contact@solorides.co.za)',
+    'Accept': 'application/json',
+  };
+
   // 1. Handle Reverse Geocoding
   if (action === 'reverse') {
     if (isNaN(lat) || isNaN(lng)) {
@@ -49,11 +70,11 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      // 1.1 Try Mapbox reverse geocoding
+      // 1.1 Try Mapbox reverse geocoding with referer and timeout
       if (MAPBOX_TOKEN) {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?country=za&types=address,poi,neighborhood,locality,place&limit=1&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetch(endpoint, { next: { revalidate: 60 } });
-        if (res.ok) {
+        const res = await fetchWithTimeout(endpoint, { headers: defaultHeaders }, 2500);
+        if (res && res.ok) {
           const data = await res.json();
           if (data.features && data.features.length > 0) {
             const feat = data.features[0];
@@ -68,14 +89,8 @@ export async function GET(req: NextRequest) {
 
       // 1.2 Try OpenStreetMap Nominatim with official User-Agent
       const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&namedetails=1`;
-      const nomRes = await fetch(nomUrl, {
-        headers: {
-          'User-Agent': 'SoloRides/1.0 (https://solo-rides.co.za; contact@solorides.co.za)',
-          Accept: 'application/json',
-        },
-        next: { revalidate: 60 },
-      });
-      if (nomRes.ok) {
+      const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 2500);
+      if (nomRes && nomRes.ok) {
         const nomData = await nomRes.json();
         if (nomData && nomData.display_name) {
           return NextResponse.json({
@@ -86,7 +101,7 @@ export async function GET(req: NextRequest) {
         }
       }
     } catch (err: any) {
-      console.warn('[Geocode API] Reverse lookup error:', err);
+      console.warn('[Geocode API] Reverse lookup error:', err?.message);
     }
 
     return NextResponse.json({
@@ -123,18 +138,23 @@ export async function GET(req: NextRequest) {
   };
 
   const queryVariants = Array.from(
-    new Set([q, targetStreet, `${targetStreet || q}, Kimberley`, `${targetStreet || q}, Northern Cape`])
+    new Set([
+      targetHouseNo && targetStreet ? `${targetHouseNo} ${targetStreet}, Kimberley` : '',
+      q,
+      targetStreet,
+      `${targetStreet || q}, Kimberley`,
+    ])
   ).filter((s): s is string => Boolean(s && s.trim().length >= 2));
 
-  // 2.1 Try Mapbox Geocoding across query variants
+  // 2.1 Try Mapbox Geocoding across query variants (with Referer header to authorize token)
   if (MAPBOX_TOKEN) {
     for (const qVar of queryVariants) {
       try {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           qVar
         )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${lng},${lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetch(endpoint, { next: { revalidate: 30 } });
-        if (res.ok) {
+        const res = await fetchWithTimeout(endpoint, { headers: defaultHeaders }, 2500);
+        if (res && res.ok) {
           const data = await res.json();
           if (Array.isArray(data.features)) {
             data.features.forEach((feat: any) => {
@@ -194,7 +214,7 @@ export async function GET(req: NextRequest) {
                 houseNumber: houseNo,
                 street,
                 suburb,
-                city,
+                city: city || 'Kimberley',
                 buildingName,
                 category,
               });
@@ -208,15 +228,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2.2 Try Photon API (OpenStreetMap-based search, highly reliable for South African addresses)
-  if (results.length < 8) {
-    for (const qVar of queryVariants) {
+  // 2.2 Try Photon API (OpenStreetMap-based search) with strict timeout if results are still needed
+  if (results.length < 6) {
+    for (const qVar of queryVariants.slice(0, 2)) {
       try {
         const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
           qVar
-        )}&lat=${lat}&lon=${lng}&limit=8`;
-        const pRes = await fetch(photonUrl, { next: { revalidate: 30 } });
-        if (pRes.ok) {
+        )}&lat=${lat}&lon=${lng}&limit=6`;
+        const pRes = await fetchWithTimeout(photonUrl, { headers: defaultHeaders }, 2000);
+        if (pRes && pRes.ok) {
           const pData = await pRes.json();
           if (Array.isArray(pData.features)) {
             pData.features.forEach((feat: any) => {
@@ -268,24 +288,18 @@ export async function GET(req: NextRequest) {
   }
 
   // 2.3 Try OpenStreetMap Nominatim with official User-Agent if results are still sparse
-  if (results.length < 4) {
+  if (results.length < 3) {
     try {
       const nomUrl = targetStreet
         ? `https://nominatim.openstreetmap.org/search?format=jsonv2&street=${encodeURIComponent(
             targetStreet
-          )}&city=Kimberley&countrycodes=za&addressdetails=1&limit=6`
+          )}&city=Kimberley&countrycodes=za&addressdetails=1&limit=5`
         : `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
-            q
-          )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=6`;
+            `${q}, Kimberley`
+          )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=5`;
 
-      const nomRes = await fetch(nomUrl, {
-        headers: {
-          'User-Agent': 'SoloRides/1.0 (https://solo-rides.co.za; contact@solorides.co.za)',
-          Accept: 'application/json',
-        },
-        next: { revalidate: 30 },
-      });
-      if (nomRes.ok) {
+      const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 2000);
+      if (nomRes && nomRes.ok) {
         const nomData = await nomRes.json();
         if (Array.isArray(nomData)) {
           nomData.forEach((item: any) => {
@@ -323,7 +337,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Sort results by relevance: exact house number and street matches first
+  // Sort results: exact house number match prioritized
   if (targetHouseNo) {
     results.sort((a, b) => {
       const aMatchesHouse = a.houseNumber && a.houseNumber.toLowerCase() === targetHouseNo.toLowerCase();
