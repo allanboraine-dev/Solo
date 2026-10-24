@@ -297,6 +297,16 @@ export async function GET(req: NextRequest) {
               const pLng = p.location?.longitude;
               if (pLat && pLng) {
                 const name = p.displayName?.text || p.formattedAddress?.split(',')[0] || qVar;
+                const types: string[] = Array.isArray(p.types) ? p.types : [];
+                let category: GeocodePlace['category'] = 'building';
+                if (types.some((t: string) => t.includes('park') || t.includes('stadium') || t.includes('point_of_interest') || t.includes('tourist_attraction'))) {
+                  category = 'poi';
+                } else if (types.some((t: string) => t.includes('street_address') || t.includes('premise') || t.includes('route') || t.includes('intersection'))) {
+                  category = 'address';
+                } else if (types.some((t: string) => t.includes('sublocality') || t.includes('neighborhood') || t.includes('locality'))) {
+                  category = 'area';
+                }
+
                 addPlace({
                   id: `google-${p.id || `${pLat}-${pLng}`}`,
                   name,
@@ -305,7 +315,7 @@ export async function GET(req: NextRequest) {
                   lon: pLng,
                   buildingName: name,
                   city: 'Kimberley',
-                  category: 'building',
+                  category,
                   source: 'google_places',
                 });
               }
@@ -606,6 +616,10 @@ export async function GET(req: NextRequest) {
       if (a.houseNumber && a.houseNumber.toLowerCase() === targetHouseNo.toLowerCase()) scoreA += 150;
       if (b.houseNumber && b.houseNumber.toLowerCase() === targetHouseNo.toLowerCase()) scoreB += 150;
     }
+
+    // Google Places & Verified Official Listings Bonus
+    if (a.source === 'google_places' || a.source === 'google_geocode') scoreA += 60;
+    if (b.source === 'google_places' || b.source === 'google_geocode') scoreB += 60;
 
     // Geographic Proximity Bonus: Places within Kimberley (<40km) get huge priority!
     const distA = haversineDistKm(lat, lng, a.lat, a.lon);
