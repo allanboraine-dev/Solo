@@ -63,7 +63,7 @@ export default function BookingForm({
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [isBooking, setIsBooking] = useState(false)
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'paystack' | 'speedpoint' | 'cash'>('paystack')
+  const [paymentMethod, setPaymentMethod] = useState<'speedpoint' | 'cash'>('speedpoint')
   const [occupantCount, setOccupantCount] = useState<1 | 2>(1)
 
   const [realPickupCoords, setRealPickupCoords] = useState<{lat: number, lng: number} | null>(null)
@@ -401,59 +401,45 @@ export default function BookingForm({
         </div>
       </div>
 
-      {/* Ride Payment Options: Paystack Online Card, Speedpoint Machine, or Cash */}
+      {/* Ride Payment Options: Speedpoint Machine or Cash */}
       <div className="p-2.5 rounded-2xl bg-gray-50/90 dark:bg-zinc-900/60 border border-gray-200/80 dark:border-white/5 space-y-1.5">
         <div className="flex items-center justify-between px-1">
           <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
             Ride Payment Method
           </span>
           <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-            0% Commission • Secure Paystack
+            0% Commission • Pay Driver Directly
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            onClick={() => setPaymentMethod('paystack')}
-            className={`flex items-center justify-center gap-1 py-2 px-1 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
-              paymentMethod === 'paystack'
-                ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <CreditCard size={13} className="shrink-0" />
-            <span className="truncate">Paystack Card</span>
-          </button>
+        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => setPaymentMethod('speedpoint')}
-            className={`flex items-center justify-center gap-1 py-2 px-1 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
               paymentMethod === 'speedpoint'
                 ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
                 : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            <CreditCard size={13} className="shrink-0" />
+            <CreditCard size={14} className="shrink-0" />
             <span className="truncate">Speedpoint POS</span>
           </button>
           <button
             type="button"
             onClick={() => setPaymentMethod('cash')}
-            className={`flex items-center justify-center gap-1 py-2 px-1 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all touch-manipulation border ${
               paymentMethod === 'cash'
                 ? 'bg-purple-600 text-white border-purple-500 shadow-sm'
                 : 'bg-white dark:bg-zinc-950 text-gray-600 dark:text-gray-400 border-gray-200/70 dark:border-white/5 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            <Banknote size={13} className="shrink-0" />
+            <Banknote size={14} className="shrink-0" />
             <span className="truncate">Cash</span>
           </button>
         </div>
         <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1 leading-tight">
-          {paymentMethod === 'paystack'
-            ? 'Pay securely in-app via Paystack using Visa, Mastercard, Apple Pay, Capitec Pay, or Instant EFT.'
-            : paymentMethod === 'speedpoint'
-            ? 'Tap or insert your card on the driver’s in-car Speedpoint machine at drop-off.'
+          {paymentMethod === 'speedpoint'
+            ? 'Tap or insert your debit/credit card on the driver’s in-car Speedpoint machine at drop-off.'
             : 'Pay the driver directly with physical cash upon arrival.'}
         </p>
       </div>
@@ -468,7 +454,7 @@ export default function BookingForm({
           <div className="w-5 h-5 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
         ) : fare !== null ? (
           `Request Ride • R${fare} • ${occupantCount} ${occupantCount === 1 ? 'Rider' : 'Riders'} (${
-            paymentMethod === 'paystack' ? 'Paystack' : paymentMethod === 'speedpoint' ? 'Speedpoint' : 'Cash'
+            paymentMethod === 'speedpoint' ? 'Speedpoint' : 'Cash'
           })`
         ) : (
           'Select Pickup & Dropoff to Book'

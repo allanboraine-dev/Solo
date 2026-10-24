@@ -1,7 +1,6 @@
 "use client"
 
 import dynamic from 'next/dynamic'
-import Script from 'next/script'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
@@ -625,150 +624,6 @@ export default function RiderPage() {
     localStorage.removeItem('mock_trips');
     updateActiveTripState(null);
     setDriverCoords(null);
-  };
-
-  // Detect return from Paystack redirect checkout
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const payment = urlParams.get('payment');
-    const reference = urlParams.get('reference');
-    const tripId = urlParams.get('trip_id');
-
-    if (payment === 'success' && reference) {
-      setIsProcessingPayment(true);
-      fetch(`/api/verify-trip-payment?reference=${encodeURIComponent(reference)}&tripId=${encodeURIComponent(tripId || '')}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            getTrips().then((trips) => {
-              const matched = trips.find((t) => t.id === (tripId || data.tripId)) || {
-                id: tripId || data.tripId || 'completed-trip',
-                status: 'completed',
-                fare_amount: data.amount || 0,
-                pickup_location: 'Trip pickup',
-                dropoff_location: 'Trip dropoff',
-                pickup_lat: 0,
-                pickup_lng: 0,
-                dropoff_lat: 0,
-                dropoff_lng: 0,
-                rider_id: currentUser?.id || '00000000-0000-0000-0000-000000000000',
-              } as MockTrip;
-              const completedTrip: MockTrip = { ...matched, status: 'completed' };
-              markTripCompleted(completedTrip.id);
-              completeTripAtomic(completedTrip.id, 'cash', completedTrip);
-              saveTrip(completedTrip);
-              setRatingTrip(completedTrip);
-              setShowRatingModal(true);
-              updateActiveTripState(null);
-              setDriverCoords(null);
-            });
-            window.history.replaceState({}, '', '/rider');
-          } else {
-            setPaymentError(data.error || 'Payment verification failed');
-          }
-        })
-        .catch((err) => {
-          console.error('Payment verification error upon return:', err);
-          setPaymentError('Could not verify payment status with Paystack');
-        })
-        .finally(() => setIsProcessingPayment(false));
-    }
-  }, [currentUser?.id]);
-
-  const handlePayDriver = async () => {
-    if (!activeTrip) return;
-    setIsProcessingPayment(true);
-    setPaymentError(null);
-
-    try {
-      const riderEmail = currentUser?.phone 
-        ? `${currentUser.phone.replace(/[^0-9]/g, '')}@solorides.co.za` 
-        : `rider-${activeTrip.id.substring(0, 8)}@solorides.co.za`;
-
-      const response = await fetch('/api/initialize-trip-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tripId: activeTrip.id,
-          amount: activeTrip.fare_amount,
-          email: riderEmail,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to initialize payment gateway');
-      }
-
-      // Check if Paystack Inline Pop script is loaded on window
-      const win = window as any;
-      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-      if (typeof window !== 'undefined' && win.PaystackPop && publicKey) {
-        const currentTrip = activeTrip;
-        // NOTE: Paystack Inline v1 validates `Object.prototype.toString.call(callback) === '[object Function]'`.
-        // Passing an `async function` produces `'[object AsyncFunction]'` and throws:
-        // "Attribute callback must be a valid function". Always use a synchronous function here.
-        const verifyCompletedPayment = (reference: string) => {
-          setIsProcessingPayment(true);
-          fetch('/api/verify-trip-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference, tripId: currentTrip.id }),
-          })
-            .then((verifyRes) => verifyRes.json())
-            .then((verifyData) => {
-              if (verifyData.success) {
-                const updated: MockTrip = { ...currentTrip, status: 'completed' };
-                markTripCompleted(updated.id);
-                completeTripAtomic(updated.id, 'cash', updated);
-                saveTrip(updated);
-                setRatingTrip(updated);
-                setShowRatingModal(true);
-                updateActiveTripState(null);
-                setDriverCoords(null);
-              } else {
-                setPaymentError(verifyData.error || 'Could not verify payment');
-              }
-            })
-            .catch((err: any) => {
-              setPaymentError(err?.message || 'Payment verification failed');
-            })
-            .finally(() => {
-              setIsProcessingPayment(false);
-            });
-        };
-
-        const handler = win.PaystackPop.setup({
-          key: publicKey,
-          email: riderEmail,
-          amount: Math.round(Number(currentTrip.fare_amount) * 100),
-          currency: 'ZAR',
-          ref: data.reference,
-          metadata: {
-            trip_id: currentTrip.id,
-            payment_type: 'solo_trip_fare',
-          },
-          callback: function(res: { reference: string }) {
-            verifyCompletedPayment(res.reference);
-          },
-          onClose: function() {
-            setIsProcessingPayment(false);
-          },
-        });
-        handler.openIframe();
-      } else if (data.url) {
-        // Fallback to hosted Paystack checkout page
-        window.location.href = data.url;
-      } else {
-        throw new Error('Payment gateway authorization URL unavailable');
-      }
-    } catch (err: any) {
-      console.error('Payment initiation error:', err);
-      setPaymentError(err.message || 'Payment initialization failed. Please try again.');
-      setIsProcessingPayment(false);
-    }
   };
 
   const handleRatingSubmit = async (data: { stars: number; tags: string[]; comment: string }) => {
@@ -1402,17 +1257,6 @@ export default function RiderPage() {
                         )}
 
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {(activeTrip.status === 'in_progress' || activeTrip.status === 'arrived') && (
-                            <button
-                              type="button"
-                              onClick={handlePayDriver}
-                              disabled={isProcessingPayment}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
-                            >
-                              <CreditCard size={14} />
-                              <span>Pay R{activeTrip.fare_amount} with Paystack</span>
-                            </button>
-                          )}
                           <button
                             type="button"
                             onClick={() => setTripSubTab('chat')}
@@ -1464,10 +1308,7 @@ export default function RiderPage() {
         </div>
       </div>
 
-      {/* Paystack Inline Pop Script */}
-      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
-
-      {/* Rider Paystack PCI-Compliant Fare Settlement Modal */}
+      {/* Rider Direct Fare Settlement Modal */}
       {activeTrip?.status === 'payment_pending' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
@@ -1484,7 +1325,7 @@ export default function RiderPage() {
               <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Settle Fare</h2>
               <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
                 <ShieldCheck size={13} />
-                PCI-DSS Level 1
+                Direct Payment
               </span>
             </div>
             <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
@@ -1501,55 +1342,29 @@ export default function RiderPage() {
               </div>
             </div>
 
-            {paymentError && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
-                <AlertCircle size={16} className="shrink-0" />
-                <span>{paymentError}</span>
-              </div>
-            )}
-
-            {/* PCI-DSS Security & Gateway Info */}
+            {/* Direct In-Vehicle Payment Guidance */}
             <div className="bg-gray-50 dark:bg-zinc-900/70 rounded-2xl p-4 mb-6 border border-gray-200/80 dark:border-white/5 space-y-2.5 text-xs text-gray-600 dark:text-gray-300">
               <div className="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
-                <Lock size={14} className="text-blue-600 dark:text-blue-400" />
-                <span>End-to-End Encrypted Checkout</span>
+                <CreditCard size={14} className="text-emerald-600 dark:text-emerald-400" />
+                <span>Pay Driver Directly</span>
               </div>
               <p className="text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">
-                Processed via <strong>Paystack</strong>. Supports Visa, Mastercard, American Express, Capitec Pay, and Instant EFT. Your sensitive card data is never entered or stored on this platform.
+                Please pay the driver directly using their mobile card machine (Speedpoint POS tap or insert) or with cash.
               </p>
               <div className="flex items-center gap-2 pt-1 text-[10px] text-gray-400 font-medium">
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Visa</span>
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Mastercard</span>
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Capitec Pay</span>
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Instant EFT</span>
+                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Speedpoint POS</span>
+                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Card Tap / Chip</span>
+                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Cash</span>
               </div>
             </div>
 
-            <button 
-              onClick={handlePayDriver}
-              disabled={isProcessingPayment}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex justify-center items-center gap-2 active:scale-95 touch-manipulation"
-            >
-              {isProcessingPayment ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Connecting to Paystack...</span>
-                </>
-              ) : (
-                <>
-                  <CreditCard size={18} />
-                  <span>Pay R{activeTrip.fare_amount} via Paystack</span>
-                </>
-              )}
-            </button>
-
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={handleSettleWithCash}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md flex justify-center items-center gap-2 active:scale-95 text-sm touch-manipulation"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md shadow-emerald-600/20 flex justify-center items-center gap-2 active:scale-95 text-sm touch-manipulation"
               >
-                <span>💵 Paid Directly to Driver (Cash / Card)</span>
+                <span>✓ I Have Paid Driver (Speedpoint / Cash)</span>
               </button>
               <button
                 type="button"

@@ -57,7 +57,7 @@ export default function TripReceiptPage() {
     distanceFareZar: 50,
     commissionZar: 0,
     totalFareZar: 62,
-    paymentMethod: "Paystack Card (3D-Secure)",
+    paymentMethod: "Speedpoint POS (Card)",
     completedAt: new Date().toLocaleDateString("en-ZA", {
       year: "numeric",
       month: "long",
@@ -93,6 +93,7 @@ export default function TripReceiptPage() {
             distanceKm: dist,
             distanceFareZar: distanceCharge,
             totalFareZar: total,
+            paymentMethod: found.payment_method === 'cash' ? 'Cash' : 'Speedpoint POS (Card)',
             receiptNumber: `REC-ZA-${found.id.substring(0, 8).toUpperCase()}`,
           }));
         }

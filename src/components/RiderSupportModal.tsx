@@ -601,7 +601,7 @@ export default function RiderSupportModal({
                   How do payments work?
                 </strong>
                 <p className="text-gray-600 dark:text-zinc-300">
-                  You can pay cash, tap your card on the driver&apos;s in-vehicle mobile card machine, or pay digitally via Paystack with 3D-Secure.
+                  You can pay cash or tap your debit/credit card directly on the driver&apos;s in-vehicle mobile card machine (Speedpoint POS).
                 </p>
               </div>
 

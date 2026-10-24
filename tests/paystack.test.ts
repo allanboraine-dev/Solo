@@ -75,7 +75,7 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
     assert.ok(subscriptionMetadata.driverId);
   });
 
-  it('ensures PaystackPop.setup callback is a standard synchronous [object Function] and never an AsyncFunction', async () => {
+  it('ensures PaystackPop is removed from rider UI and driver register callback is synchronous', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const riderPageSource = fs.readFileSync(
@@ -88,17 +88,14 @@ describe('Paystack PCI-DSS Payment & Webhook Security Suite', () => {
       'utf8'
     );
 
+    // Rider UI must not contain PaystackPop
     assert.strictEqual(
-      /callback:\s*(async\s+function|async\s*\()/.test(riderPageSource),
+      /PaystackPop/.test(riderPageSource),
       false,
-      'Rider PaystackPop.setup callback must not be an async function'
-    );
-    assert.strictEqual(
-      /callback:\s*function\s*\(/.test(riderPageSource),
-      true,
-      'Rider PaystackPop.setup callback must be a standard synchronous function'
+      'Rider UI must have PaystackPop completely removed'
     );
 
+    // Driver register PaystackPop must be standard synchronous function
     assert.strictEqual(
       /callback:\s*(async\s+function|async\s*\()/.test(driverRegisterSource),
       false,
