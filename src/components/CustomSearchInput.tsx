@@ -287,6 +287,8 @@ export default function CustomSearchInput({
                 return true
               })
           setResults(filtered.length > 0 ? filtered : remotePlaces)
+        } else if (value.trim().length >= 2 && instantLocal.length === 0) {
+          setResults([])
         }
       } catch (err) {
         console.warn('Geocoding search notice:', err)
@@ -832,6 +834,36 @@ export default function CustomSearchInput({
                         </p>
                         <p className="text-[11px] text-blue-700 dark:text-blue-300">
                           Direct pin for House #{currentHouseNo}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Select →</span>
+                  </div>
+                ) : value && value.trim().length >= 2 ? (
+                  <div
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() =>
+                      handleSelect({
+                        id: `custom-place-${Date.now()}`,
+                        name: value.trim(),
+                        display_name: `${value.trim()}, South Africa`,
+                        lat: proximityCoords?.lat || -28.7282,
+                        lon: proximityCoords?.lng || 24.7623,
+                        category: 'poi',
+                      })
+                    }
+                    className="w-full text-left p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-900/60 hover:bg-blue-100/70 transition cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
+                        <MapPin size={16} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-blue-900 dark:text-blue-100">
+                          Use &ldquo;{value.trim()}&rdquo;
+                        </p>
+                        <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                          Set as custom location pin
                         </p>
                       </div>
                     </div>

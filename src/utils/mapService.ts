@@ -103,7 +103,7 @@ export function parseHouseNumberFromQuery(query: string): {
 function formatNominatimResult(item: any, userHouseNumber?: string): SearchResultPlace {
   const addr = item.address || {};
   const houseNumber = addr.house_number || userHouseNumber || undefined;
-  const street =
+  let street =
     addr.road ||
     addr.pedestrian ||
     addr.street ||
@@ -1971,6 +1971,97 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     buildingName: 'V&A Waterfront',
     category: 'building',
   },
+  // --- Key Regional Towns & Major National Cities ---
+  {
+    id: 'metro-bloemfontein',
+    name: 'Bloemfontein',
+    display_name: 'Bloemfontein, Mangaung, Free State, 9301, South Africa',
+    lat: -29.0852,
+    lon: 26.1596,
+    city: 'Bloemfontein',
+    category: 'area',
+  },
+  {
+    id: 'metro-upington',
+    name: 'Upington',
+    display_name: 'Upington, Dawid Kruiper, Northern Cape, 8801, South Africa',
+    lat: -28.4478,
+    lon: 21.2561,
+    city: 'Upington',
+    category: 'area',
+  },
+  {
+    id: 'metro-kuruman',
+    name: 'Kuruman',
+    display_name: 'Kuruman, Ga-Segonyana, Northern Cape, 8460, South Africa',
+    lat: -27.4524,
+    lon: 23.4325,
+    city: 'Kuruman',
+    category: 'area',
+  },
+  {
+    id: 'metro-barkly-west',
+    name: 'Barkly West',
+    display_name: 'Barkly West, Dikgatlong, Northern Cape, 8375, South Africa',
+    lat: -28.5358,
+    lon: 24.5228,
+    city: 'Barkly West',
+    category: 'area',
+  },
+  {
+    id: 'metro-warrenton',
+    name: 'Warrenton',
+    display_name: 'Warrenton, Magareng, Northern Cape, 8530, South Africa',
+    lat: -28.1150,
+    lon: 24.8475,
+    city: 'Warrenton',
+    category: 'area',
+  },
+  {
+    id: 'metro-douglas',
+    name: 'Douglas',
+    display_name: 'Douglas, Siyancuma, Northern Cape, 8730, South Africa',
+    lat: -29.0561,
+    lon: 23.8167,
+    city: 'Douglas',
+    category: 'area',
+  },
+  {
+    id: 'metro-johannesburg',
+    name: 'Johannesburg',
+    display_name: 'Johannesburg, City of Johannesburg, Gauteng, 2001, South Africa',
+    lat: -26.2041,
+    lon: 28.0473,
+    city: 'Johannesburg',
+    category: 'area',
+  },
+  {
+    id: 'metro-pretoria',
+    name: 'Pretoria',
+    display_name: 'Pretoria, City of Tshwane, Gauteng, 0002, South Africa',
+    lat: -25.7479,
+    lon: 28.2293,
+    city: 'Pretoria',
+    category: 'area',
+  },
+  {
+    id: 'metro-cape-town',
+    name: 'Cape Town',
+    display_name: 'Cape Town, City of Cape Town, Western Cape, 8001, South Africa',
+    lat: -33.9249,
+    lon: 18.4241,
+    city: 'Cape Town',
+    category: 'area',
+  },
+  {
+    id: 'metro-durban',
+    name: 'Durban',
+    display_name: 'Durban, eThekwini, KwaZulu-Natal, 4001, South Africa',
+    lat: -29.8587,
+    lon: 31.0218,
+    city: 'Durban',
+    category: 'area',
+  },
 ];
 
 /**
@@ -2080,6 +2171,7 @@ function scorePlaceRelevance(
   const pSuburb = (place.suburb || '').toLowerCase();
   const pBuilding = (place.buildingName || '').toLowerCase();
   const pCity = (place.city || '').toLowerCase();
+  const pDisplay = (place.display_name || '').toLowerCase();
 
   let score = 0;
 
@@ -2088,6 +2180,8 @@ function scorePlaceRelevance(
     score += 350;
   } else if (pName === normalizedLower || pBuilding === normalizedLower) {
     score += 320;
+  } else if (pDisplay.startsWith(queryLower)) {
+    score += 280;
   }
 
   // 2. Starts with query
@@ -2121,6 +2215,7 @@ function scorePlaceRelevance(
       const tokenInStreet = pStreet.includes(token);
       const tokenInSuburb = pSuburb.includes(token);
       const tokenInCity = pCity.includes(token);
+      const tokenInDisplay = pDisplay.includes(token);
 
       if (tokenInName || tokenInBuilding) {
         score += 60;
@@ -2131,7 +2226,7 @@ function scorePlaceRelevance(
       } else if (tokenInSuburb) {
         score += 35;
         matchedTokenCount++;
-      } else if (tokenInCity) {
+      } else if (tokenInCity || tokenInDisplay) {
         score += 25;
         matchedTokenCount++;
       }
@@ -2151,7 +2246,7 @@ function scorePlaceRelevance(
     if (streetRemainder && streetRemainder.length >= 2) {
       const remLower = streetRemainder.toLowerCase();
       if (pStreet.includes(remLower) || pName.includes(remLower)) {
-        score += 120;
+        score += 150;
       }
     }
   }
@@ -2172,22 +2267,33 @@ function scorePlaceRelevance(
     }
   }
 
-  // 7. Category Bonuses (only if query actually matched the place!)
+  // 7. Category Bonuses (Prioritize address when house number is specified)
   if (score > 0) {
-    if (place.category === 'building') {
-      score += 25;
-    } else if (place.category === 'address') {
-      score += 20;
-    } else if (place.category === 'poi') {
-      score += 20;
+    if (parsedHouseNo) {
+      if (place.category === 'address') {
+        score += 80;
+      } else if (place.category === 'building') {
+        score += 25;
+      } else if (place.category === 'poi') {
+        score += 10;
+      }
+    } else {
+      if (place.category === 'building') {
+        score += 25;
+      } else if (place.category === 'address') {
+        score += 20;
+      } else if (place.category === 'poi') {
+        score += 20;
+      }
     }
   }
 
   // 8. Proximity Bonus (closer to Kimberley center or user's GPS coords)
   if (prox && score > 0) {
     const distKm = calculateDistanceKm(prox.lat, prox.lng, place.lat, place.lon);
-    // Add small proximity weight (e.g. up to +20 for nearby places within Kimberley)
-    score += Math.max(0, 20 - distKm);
+    // Add proximity weight for nearby places
+    if (distKm <= 25) score += 40;
+    else if (distKm <= 60) score += 20;
   }
 
   return score;
@@ -2407,18 +2513,26 @@ export async function searchPlaces(
   const localMatches = searchLocalPlaces(cleanQuery, prox);
   localMatches.forEach((p) => addUniqueResult(p));
 
-  // 2. Client-side: Query internal API route /api/geocode (which handles multi-provider cascaded search with Referer authorization)
+  // 2. Client-side: Query internal API route /api/geocode (which handles multi-provider cascaded search)
   if (typeof window !== 'undefined') {
     try {
       const houseNoParam = parsedHouseNo ? `&houseNumber=${encodeURIComponent(parsedHouseNo)}` : '';
       const streetParam = streetOrPlaceQuery ? `&street=${encodeURIComponent(streetOrPlaceQuery)}` : '';
       const apiEndpoint = `/api/geocode?q=${encodeURIComponent(cleanQuery)}${houseNoParam}${streetParam}&lat=${prox.lat}&lng=${prox.lng}`;
-      const res = await fetchWithTimeout(apiEndpoint, {}, 2500);
+      const res = await fetchWithTimeout(apiEndpoint, {}, 4500);
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data.places)) {
           data.places.forEach((p: SearchResultPlace) => {
-            addUniqueResult(p);
+            let item = p;
+            if (parsedHouseNo && !item.houseNumber && (item.category === 'address' || !item.name.startsWith(parsedHouseNo))) {
+              item = {
+                ...item,
+                houseNumber: parsedHouseNo,
+                name: item.name.toLowerCase().startsWith(parsedHouseNo.toLowerCase()) ? item.name : `${parsedHouseNo} ${item.name}`,
+              };
+            }
+            addUniqueResult(item);
           });
         }
       }
@@ -2427,26 +2541,25 @@ export async function searchPlaces(
     }
   }
 
-  // 3. Query Mapbox Geocoding directly if needed (with timeout and Referer)
-  if (MAPBOX_TOKEN && combinedResults.length < 20) {
+  // 3. Query Mapbox Geocoding directly if needed (e.g. offline or API fallback)
+  if (MAPBOX_TOKEN && combinedResults.length < 15) {
     const queryVariants = Array.from(
-      new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery, `${streetOrPlaceQuery || cleanQuery}, Kimberley`])
+      new Set([cleanQuery, normalizedQuery, streetOrPlaceQuery])
     ).filter((q): q is string => Boolean(q && q.length >= 2));
 
     for (const qVar of queryVariants) {
       try {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
           qVar
-        )}.json?country=za&types=address,poi,neighborhood,locality,place&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
+        )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${prox.lng},${prox.lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
         const res = await fetchWithTimeout(
           endpoint,
           {
             headers: {
-              'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
               'Accept': 'application/json',
             },
           },
-          2500
+          3000
         );
         if (res && res.ok) {
           const data = await res.json();
@@ -2459,18 +2572,18 @@ export async function searchPlaces(
       } catch (err) {
         console.warn('Mapbox direct geocoding notice:', err);
       }
-      if (combinedResults.length >= 30) break;
+      if (combinedResults.length >= 25) break;
     }
   }
 
-  // 4. Query Photon API (OpenStreetMap-based) only if results are still sparse, with strict 2000ms timeout
-  if (combinedResults.length < 10) {
+  // 4. Query Photon API (OpenStreetMap-based) only if results are still sparse
+  if (combinedResults.length < 8) {
     try {
-      const pQuery = `${streetOrPlaceQuery || cleanQuery}, Kimberley`;
+      const pQuery = streetOrPlaceQuery || cleanQuery;
       const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
         pQuery
       )}&lat=${prox.lat}&lon=${prox.lng}&limit=6`;
-      const pRes = await fetchWithTimeout(photonUrl, {}, 2000);
+      const pRes = await fetchWithTimeout(photonUrl, {}, 2500);
       if (pRes && pRes.ok) {
         const pData = await pRes.json();
         if (Array.isArray(pData.features)) {
@@ -2538,7 +2651,6 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
         endpoint,
         {
           headers: {
-            'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
             'Accept': 'application/json',
           },
         },
@@ -2590,11 +2702,7 @@ export async function getRouteDirections(
       const endpoint = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${originLng},${originLat};${destLng},${destLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
       const res = await fetchWithTimeout(
         endpoint,
-        {
-          headers: {
-            'Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
-          },
-        },
+        {},
         3000
       );
       if (res && res.ok) {

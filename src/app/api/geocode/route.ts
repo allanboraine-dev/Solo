@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { parseHouseNumberFromQuery, searchLocalPlaces } from '@/utils/mapService';
-import { checkGeocodeRateLimit } from '@/utils/rateLimit';
+import type { NextRequest } from 'next/server';
+import { parseHouseNumberFromQuery, searchLocalPlaces } from '../../../utils/mapService.ts';
+import { checkGeocodeRateLimit } from '../../../utils/rateLimit.ts';
 
-interface GeocodePlace {
+export interface GeocodePlace {
   id: string | number;
   name: string;
   display_name: string;
@@ -30,7 +30,21 @@ const GOOGLE_KEY =
 // Default Kimberley CBD coordinates
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response | null> {
+/**
+ * Calculates Haversine distance in kilometers between two GPS coordinates
+ */
+export function haversineDistKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 3000): Promise<Response | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -100,9 +114,7 @@ export async function GET(req: NextRequest) {
   const lat = latStr ? parseFloat(latStr) : DEFAULT_PROXIMITY.lat;
   const lng = lngStr ? parseFloat(lngStr) : DEFAULT_PROXIMITY.lng;
 
-  const referer = req.headers.get('referer') || 'http://localhost:3000';
   const defaultHeaders = {
-    'Referer': referer,
     'User-Agent': 'SoloRides/1.0 (https://solo-rides.co.za; contact@solorides.co.za)',
     'Accept': 'application/json',
   };
@@ -110,35 +122,19 @@ export async function GET(req: NextRequest) {
   // 1. Handle Reverse Geocoding
   if (action === 'reverse') {
     if (isNaN(lat) || isNaN(lng)) {
-      return NextResponse.json({ success: false, error: 'Invalid coordinates' }, { status: 400 });
+      return Response.json({ success: false, error: 'Invalid coordinates' }, { status: 400 });
     }
 
     try {
-      // 1.1 Try Google Maps Reverse Geocoding if API key is present
-      if (GOOGLE_KEY) {
-        const googleRevUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_KEY}`;
-        const gRes = await fetchWithTimeout(googleRevUrl, {}, 2500);
-        if (gRes && gRes.ok) {
-          const gData = await gRes.json();
-          if (gData.results && gData.results.length > 0) {
-            return NextResponse.json({
-              success: true,
-              address: gData.results[0].formatted_address,
-              source: 'google',
-            });
-          }
-        }
-      }
-
-      // 1.2 Try Mapbox reverse geocoding
+      // 1.1 Try Mapbox reverse geocoding (fast, accurate for street numbers & suburbs)
       if (MAPBOX_TOKEN) {
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?country=za&types=address,poi,neighborhood,locality,place&limit=1&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetchWithTimeout(endpoint, { headers: defaultHeaders }, 2500);
+        const res = await fetchWithTimeout(endpoint, {}, 2500);
         if (res && res.ok) {
           const data = await res.json();
-          if (data.features && data.features.length > 0) {
+          if (Array.isArray(data.features) && data.features.length > 0) {
             const feat = data.features[0];
-            return NextResponse.json({
+            return Response.json({
               success: true,
               address: feat.place_name || feat.text,
               source: 'mapbox',
@@ -147,13 +143,13 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // 1.3 Try OpenStreetMap Nominatim
+      // 1.2 Try OpenStreetMap Nominatim reverse geocoding
       const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&namedetails=1`;
       const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 2500);
       if (nomRes && nomRes.ok) {
         const nomData = await nomRes.json();
         if (nomData && nomData.display_name) {
-          return NextResponse.json({
+          return Response.json({
             success: true,
             address: nomData.display_name,
             source: 'nominatim',
@@ -164,7 +160,7 @@ export async function GET(req: NextRequest) {
       console.warn('[Geocode API] Reverse lookup error:', err?.message);
     }
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
       source: 'coords_fallback',
@@ -173,7 +169,7 @@ export async function GET(req: NextRequest) {
 
   // 2. Handle Forward Geocoding / Search
   if (!q || q.length < 2) {
-    return NextResponse.json({ success: true, places: [] });
+    return Response.json({ success: true, places: [] });
   }
 
   // 2.0 Check if user pasted exact coordinates or a Google Maps URL
@@ -181,12 +177,14 @@ export async function GET(req: NextRequest) {
   if (parsedCoords) {
     let resolvedAddress = `${parsedCoords.lat.toFixed(4)}, ${parsedCoords.lng.toFixed(4)}`;
     try {
-      const nomRevUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${parsedCoords.lat}&lon=${parsedCoords.lng}&addressdetails=1`;
-      const nRes = await fetchWithTimeout(nomRevUrl, { headers: defaultHeaders }, 2000);
-      if (nRes && nRes.ok) {
-        const nData = await nRes.json();
-        if (nData?.display_name) {
-          resolvedAddress = nData.display_name;
+      if (MAPBOX_TOKEN) {
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${parsedCoords.lng},${parsedCoords.lat}.json?country=za&limit=1&access_token=${MAPBOX_TOKEN}`;
+        const mRes = await fetchWithTimeout(endpoint, {}, 2000);
+        if (mRes && mRes.ok) {
+          const mData = await mRes.json();
+          if (mData?.features?.[0]?.place_name) {
+            resolvedAddress = mData.features[0].place_name;
+          }
         }
       }
     } catch {}
@@ -201,7 +199,7 @@ export async function GET(req: NextRequest) {
       source: 'google_pin',
     };
 
-    return NextResponse.json({
+    return Response.json({
       success: true,
       places: [directPlace],
     });
@@ -221,26 +219,17 @@ export async function GET(req: NextRequest) {
 
   const addPlace = (place: GeocodePlace) => {
     if (isNaN(place.lat) || isNaN(place.lon)) return;
-    const key = `${place.name.toLowerCase()}|${place.lat.toFixed(3)}|${place.lon.toFixed(3)}`;
+    const key = `${place.name.toLowerCase().trim()}|${place.lat.toFixed(3)}|${place.lon.toFixed(3)}`;
     if (!seenKeys.has(key)) {
       seenKeys.add(key);
       results.push(place);
     }
   };
 
-  const queryVariants = Array.from(
-    new Set([
-      targetHouseNo && targetStreet ? `${targetHouseNo} ${targetStreet}, Kimberley` : '',
-      q,
-      `${q}, Kimberley`,
-      targetStreet ? `${targetStreet}, Kimberley` : '',
-    ])
-  ).filter((s): s is string => Boolean(s && s.trim().length >= 2));
-
-  // --- 2.0 Check Instant Curated Local Kimberley Places (Parks, Stadiums, Schools, POIs) ---
+  // --- 2.1 Check Instant Curated Local Kimberley Places First ---
   try {
     const localMatches = searchLocalPlaces(q, { lat, lng });
-    for (const p of localMatches.slice(0, 5)) {
+    for (const p of localMatches.slice(0, 8)) {
       addPlace({
         id: `local-${p.id}`,
         name: p.name,
@@ -260,11 +249,18 @@ export async function GET(req: NextRequest) {
     console.warn('[Geocode API] Local search notice:', err?.message);
   }
 
-  // --- 2.1 Google Maps Places (New) and Geocoding APIs (Highest accuracy when key configured) ---
+  // Build search queries: full query, with house number, and with South Africa anchor
+  const queryWithCountry = q.toLowerCase().includes('south africa') ? q : `${q}, South Africa`;
+  const houseQueryWithCountry = targetHouseNo && targetStreet ? `${targetHouseNo} ${targetStreet}, South Africa` : '';
+
+  // --- 2.2 Parallel Multi-Provider Search: Google Places (New), Mapbox & OpenStreetMap Nominatim ---
+  // Run all providers concurrently with Promise.allSettled to guarantee rapid, rich responses!
+  const parallelSearches: Promise<void>[] = [];
+
+  // Provider A: Google Places API (New) Text Search
   if (GOOGLE_KEY) {
-    for (const qVar of queryVariants.slice(0, 2)) {
+    const googlePromise = (async () => {
       try {
-        // Google Places API (New) Text Search
         const placesUrl = `https://places.googleapis.com/v1/places:searchText`;
         const pRes = await fetchWithTimeout(
           placesUrl,
@@ -277,16 +273,16 @@ export async function GET(req: NextRequest) {
                 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
             },
             body: JSON.stringify({
-              textQuery: qVar,
+              textQuery: houseQueryWithCountry || queryWithCountry,
               locationBias: {
                 circle: {
                   center: { latitude: lat, longitude: lng },
-                  radius: 35000.0,
+                  radius: 50000.0,
                 },
               },
             }),
           },
-          2500
+          3000
         );
 
         if (pRes && pRes.ok) {
@@ -296,7 +292,7 @@ export async function GET(req: NextRequest) {
               const pLat = p.location?.latitude;
               const pLng = p.location?.longitude;
               if (pLat && pLng) {
-                const name = p.displayName?.text || p.formattedAddress?.split(',')[0] || qVar;
+                const name = p.displayName?.text || p.formattedAddress?.split(',')[0] || q;
                 const types: string[] = Array.isArray(p.types) ? p.types : [];
                 let category: GeocodePlace['category'] = 'building';
                 if (types.some((t: string) => t.includes('park') || t.includes('stadium') || t.includes('point_of_interest') || t.includes('tourist_attraction'))) {
@@ -307,14 +303,19 @@ export async function GET(req: NextRequest) {
                   category = 'area';
                 }
 
+                let finalName = name;
+                if (targetHouseNo && category === 'address' && !finalName.startsWith(targetHouseNo)) {
+                  finalName = `${targetHouseNo} ${finalName}`;
+                }
+
                 addPlace({
                   id: `google-${p.id || `${pLat}-${pLng}`}`,
-                  name,
-                  display_name: p.formattedAddress || name,
+                  name: finalName,
+                  display_name: p.formattedAddress || finalName,
                   lat: pLat,
                   lon: pLng,
                   buildingName: name,
-                  city: 'Kimberley',
+                  houseNumber: targetHouseNo || undefined,
                   category,
                   source: 'google_places',
                 });
@@ -322,53 +323,22 @@ export async function GET(req: NextRequest) {
             });
           }
         }
-
-        // Google Geocoding API
-        const gGeoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          qVar
-        )}&components=country:ZA&key=${GOOGLE_KEY}`;
-        const gRes = await fetchWithTimeout(gGeoUrl, {}, 2500);
-        if (gRes && gRes.ok) {
-          const gData = await gRes.json();
-          if (Array.isArray(gData.results)) {
-            gData.results.forEach((item: any) => {
-              const loc = item.geometry?.location;
-              if (loc && loc.lat && loc.lng) {
-                const primaryName = item.formatted_address.split(',')[0];
-                addPlace({
-                  id: `google-geo-${item.place_id || `${loc.lat}-${loc.lng}`}`,
-                  name: primaryName,
-                  display_name: item.formatted_address,
-                  lat: loc.lat,
-                  lon: loc.lng,
-                  city: 'Kimberley',
-                  category: 'address',
-                  source: 'google_geocode',
-                });
-              }
-            });
-          }
-        }
       } catch (err: any) {
-        console.warn('[Geocode API] Google lookup notice:', err?.message);
+        console.warn('[Geocode API] Google Places notice:', err?.message);
       }
-      if (results.length >= 8) break;
-    }
+    })();
+    parallelSearches.push(googlePromise);
   }
 
-  // --- 2.2 Parallel Multi-Provider Search: Mapbox & OpenStreetMap Nominatim ---
-  // Run Mapbox and Nominatim in parallel so Mapbox doesn't block Nominatim from finding local POIs!
-  const parallelSearches = [];
-
-  // Provider A: Mapbox Geocoding
+  // Provider B: Mapbox Geocoding (Outstanding for street names, house numbers, and South African cities)
   if (MAPBOX_TOKEN) {
-    const qVar = queryVariants[0] || q;
     const mbxPromise = (async () => {
       try {
+        const queryToSearch = targetHouseNo && targetStreet ? `${targetHouseNo} ${targetStreet}` : q;
         const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          qVar
-        )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${lng},${lat}&limit=8&access_token=${MAPBOX_TOKEN}`;
-        const res = await fetchWithTimeout(endpoint, { headers: defaultHeaders }, 2500);
+          queryToSearch
+        )}.json?country=za&autocomplete=true&fuzzyMatch=true&proximity=${lng},${lat}&limit=10&access_token=${MAPBOX_TOKEN}`;
+        const res = await fetchWithTimeout(endpoint, {}, 3000);
         if (res && res.ok) {
           const data = await res.json();
           if (Array.isArray(data.features)) {
@@ -422,8 +392,6 @@ export async function GET(req: NextRequest) {
 
               const featLat = feat.center[1];
               const featLon = feat.center[0];
-              const distFromUser = haversineDistKm(lat, lng, featLat, featLon);
-              if (distFromUser > 80 && results.length > 0) return;
 
               addPlace({
                 id: `mbx-${feat.id}-${houseNo || ''}`,
@@ -434,7 +402,7 @@ export async function GET(req: NextRequest) {
                 houseNumber: houseNo,
                 street,
                 suburb,
-                city: city || 'Kimberley',
+                city,
                 buildingName,
                 category,
                 source: 'mapbox',
@@ -449,61 +417,50 @@ export async function GET(req: NextRequest) {
     parallelSearches.push(mbxPromise);
   }
 
-  // Provider B: OpenStreetMap Nominatim (Superb for South African landmarks, schools, clinics, and hospitals)
+  // Provider C: OpenStreetMap Nominatim (Superb for South African landmarks, schools, clinics, hospitals, and suburbs)
   const nomPromise = (async () => {
     try {
-      const nomQueries = q.toLowerCase().includes('kimberley') ? [q] : [q, `${q}, Kimberley`];
-      const minLng = (lng - 0.25).toFixed(4);
-      const maxLng = (lng + 0.25).toFixed(4);
-      const minLat = (lat - 0.20).toFixed(4);
-      const maxLat = (lat + 0.20).toFixed(4);
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
+        queryWithCountry
+      )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=8`;
 
-      for (const nomQ of nomQueries) {
-        const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
-          nomQ
-        )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=8&viewbox=${minLng},${maxLat},${maxLng},${minLat}&bounded=0`;
+      const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 3000);
+      if (nomRes && nomRes.ok) {
+        const nomData = await nomRes.json();
+        if (Array.isArray(nomData)) {
+          nomData.forEach((item: any) => {
+            const itemLat = parseFloat(item.lat);
+            const itemLon = parseFloat(item.lon);
+            if (isNaN(itemLat) || isNaN(itemLon)) return;
 
-        const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 2500);
-        if (nomRes && nomRes.ok) {
-          const nomData = await nomRes.json();
-          if (Array.isArray(nomData)) {
-            nomData.forEach((item: any) => {
-              const itemLat = parseFloat(item.lat);
-              const itemLon = parseFloat(item.lon);
-              if (isNaN(itemLat) || isNaN(itemLon)) return;
+            const addr = item.address || {};
+            const houseNo = addr.house_number || targetHouseNo || undefined;
+            const street = addr.road || addr.pedestrian || addr.street || undefined;
+            const suburb = addr.suburb || addr.neighbourhood || addr.quarter || undefined;
+            const city = addr.city || addr.town || addr.municipality || undefined;
+            const buildingName = item.name && (!street || item.name !== street) ? item.name : undefined;
 
-              const distFromUser = haversineDistKm(lat, lng, itemLat, itemLon);
-              if (distFromUser > 150) return;
+            const streetWithNumber = [houseNo, street].filter(Boolean).join(' ').trim();
+            let primaryName = buildingName || streetWithNumber || (item.display_name || '').split(',')[0];
+            if (houseNo && street && !primaryName.startsWith(houseNo)) {
+              primaryName = `${houseNo} ${street}`;
+            }
 
-              const addr = item.address || {};
-              const houseNo = addr.house_number || targetHouseNo || undefined;
-              const street = addr.road || addr.pedestrian || addr.street || undefined;
-              const suburb = addr.suburb || addr.neighbourhood || addr.quarter || undefined;
-              const city = addr.city || addr.town || addr.municipality || 'Kimberley';
-              const buildingName = item.name && (!street || item.name !== street) ? item.name : undefined;
-
-              const streetWithNumber = [houseNo, street].filter(Boolean).join(' ').trim();
-              let primaryName = buildingName || streetWithNumber || (item.display_name || '').split(',')[0];
-              if (houseNo && street && !primaryName.startsWith(houseNo)) {
-                primaryName = `${houseNo} ${street}`;
-              }
-
-              addPlace({
-                id: `nom-${item.place_id || `${itemLat}-${itemLon}`}-${houseNo || ''}`,
-                name: primaryName,
-                display_name: item.display_name ? `${primaryName}, ${item.display_name}` : primaryName,
-                lat: itemLat,
-                lon: itemLon,
-                houseNumber: houseNo,
-                street,
-                suburb,
-                city,
-                buildingName,
-                category: buildingName ? 'building' : streetWithNumber ? 'address' : 'area',
-                source: 'nominatim',
-              });
+            addPlace({
+              id: `nom-${item.place_id || `${itemLat}-${itemLon}`}-${houseNo || ''}`,
+              name: primaryName,
+              display_name: item.display_name || primaryName,
+              lat: itemLat,
+              lon: itemLon,
+              houseNumber: houseNo,
+              street,
+              suburb,
+              city,
+              buildingName,
+              category: buildingName ? 'building' : streetWithNumber ? 'address' : 'area',
+              source: 'nominatim',
             });
-          }
+          });
         }
       }
     } catch (err: any) {
@@ -512,13 +469,11 @@ export async function GET(req: NextRequest) {
   })();
   parallelSearches.push(nomPromise);
 
-  // Provider C: Photon (OpenStreetMap)
+  // Provider D: Photon (Komoot OpenStreetMap index)
   const photonPromise = (async () => {
     try {
-      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
-        `${q}, Kimberley`
-      )}&lat=${lat}&lon=${lng}&limit=8`;
-      const pRes = await fetchWithTimeout(photonUrl, { headers: defaultHeaders }, 2000);
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${lat}&lon=${lng}&limit=8`;
+      const pRes = await fetchWithTimeout(photonUrl, { headers: defaultHeaders }, 2500);
       if (pRes && pRes.ok) {
         const pData = await pRes.json();
         if (Array.isArray(pData.features)) {
@@ -530,15 +485,13 @@ export async function GET(req: NextRequest) {
             const featLon = coords[0];
 
             if (props.countrycode && props.countrycode.toUpperCase() !== 'ZA') return;
-            const distFromUser = haversineDistKm(lat, lng, featLat, featLon);
-            if (distFromUser > 150) return; // Discard distant foreign or out-of-province results
 
             const houseNo = props.housenumber || targetHouseNo || undefined;
             const isPropStreet =
               props.name && /\b(street|road|avenue|ave|crescent|drive|dr|way|lane|place|boulevard|blvd|str)\b/i.test(props.name);
             const street = props.street || (isPropStreet ? props.name : undefined);
             const suburb = props.district || props.suburb || undefined;
-            const city = props.city || props.town || props.state || 'Kimberley';
+            const city = props.city || props.town || props.state || undefined;
             const buildingName = props.name && !isPropStreet && (!street || props.name !== street) ? props.name : undefined;
 
             const streetWithNumber = [houseNo, street].filter(Boolean).join(' ').trim();
@@ -548,7 +501,7 @@ export async function GET(req: NextRequest) {
             }
 
             const contextParts = [suburb, city, props.state, props.postcode].filter(Boolean);
-            const displayName = `${primaryName}, ${contextParts.join(', ')}`;
+            const displayName = contextParts.length > 0 ? `${primaryName}, ${contextParts.join(', ')}` : primaryName;
 
             addPlace({
               id: `pho-${props.osm_id || `${coords[1]}-${coords[0]}`}-${houseNo || ''}`,
@@ -576,18 +529,6 @@ export async function GET(req: NextRequest) {
   await Promise.allSettled(parallelSearches);
 
   // --- 2.3 Intelligent Geographic Distance & Relevance Sorting ---
-  // Calculates Haversine distance in km
-  const haversineDistKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
   const qLower = q.toLowerCase();
   const qTokens = qLower.split(/[\s,]+/).filter((t) => t.length >= 2);
 
@@ -600,17 +541,33 @@ export async function GET(req: NextRequest) {
     const aDisplay = a.display_name.toLowerCase();
     const bDisplay = b.display_name.toLowerCase();
 
-    // Exact or prefix match bonuses
-    if (aName === qLower) scoreA += 200;
-    if (bName === qLower) scoreB += 200;
+    // Exact match bonuses
+    if (aName === qLower) scoreA += 300;
+    if (bName === qLower) scoreB += 300;
 
-    if (aName.startsWith(qLower)) scoreA += 100;
-    if (bName.startsWith(qLower)) scoreB += 100;
+    // Starts with match
+    if (aName.startsWith(qLower)) scoreA += 150;
+    if (bName.startsWith(qLower)) scoreB += 150;
+
+    // Word boundary match
+    const aWords = `${aName} ${aDisplay}`.split(/\s+/);
+    const bWords = `${bName} ${bDisplay}`.split(/\s+/);
+    for (const w of aWords) {
+      if (w === qLower) { scoreA += 100; break; }
+      else if (w.startsWith(qLower)) { scoreA += 60; break; }
+    }
+    for (const w of bWords) {
+      if (w === qLower) { scoreB += 100; break; }
+      else if (w.startsWith(qLower)) { scoreB += 60; break; }
+    }
 
     // Token coverage
     for (const t of qTokens) {
-      if (aName.includes(t) || aDisplay.includes(t)) scoreA += 30;
-      if (bName.includes(t) || bDisplay.includes(t)) scoreB += 30;
+      if (aName.includes(t)) scoreA += 40;
+      else if (aDisplay.includes(t)) scoreA += 20;
+
+      if (bName.includes(t)) scoreB += 40;
+      else if (bDisplay.includes(t)) scoreB += 20;
     }
 
     // House number matches
@@ -619,21 +576,17 @@ export async function GET(req: NextRequest) {
       if (b.houseNumber && b.houseNumber.toLowerCase() === targetHouseNo.toLowerCase()) scoreB += 150;
     }
 
-    // Google Places & Verified Official Listings Bonus
-    if (a.source === 'google_places' || a.source === 'google_geocode') scoreA += 60;
-    if (b.source === 'google_places' || b.source === 'google_geocode') scoreB += 60;
-
-    // Geographic Proximity Bonus: Places within Kimberley (<40km) get huge priority!
+    // Geographic Proximity Bonus: Places near the user/city get proximity priority
     const distA = haversineDistKm(lat, lng, a.lat, a.lon);
     const distB = haversineDistKm(lat, lng, b.lat, b.lon);
 
-    if (distA <= 40) scoreA += 100;
-    else if (distA <= 120) scoreA += 40;
-    else scoreA -= 50; // Penalize distant places like Soweto/Durban when user is in Kimberley
+    if (distA <= 25) scoreA += 150;
+    else if (distA <= 60) scoreA += 80;
+    else if (distA <= 150) scoreA += 40;
 
-    if (distB <= 40) scoreB += 100;
-    else if (distB <= 120) scoreB += 40;
-    else scoreB -= 50;
+    if (distB <= 25) scoreB += 150;
+    else if (distB <= 60) scoreB += 80;
+    else if (distB <= 150) scoreB += 40;
 
     if (scoreA !== scoreB) {
       return scoreB - scoreA;
@@ -642,7 +595,7 @@ export async function GET(req: NextRequest) {
     return distA - distB;
   });
 
-  return NextResponse.json({
+  return Response.json({
     success: true,
     places: results.slice(0, 40),
   });
