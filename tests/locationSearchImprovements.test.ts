@@ -108,4 +108,22 @@ describe('Location Search Improvements Suite', () => {
     assert.strictEqual(parseFloat(m2[1]), -28.7415);
     assert.strictEqual(parseFloat(m2[2]), 24.767);
   });
+
+  it('successfully searches and finds Keeley Memorial Park and Kimberley sports grounds', () => {
+    // 1. "keeley memorial park in kimberley"
+    const results1 = searchLocalPlaces('keeley memorial park in kimberley');
+    assert.ok(results1.length > 0, 'Should find Keeley Memorial Park for full query');
+    assert.strictEqual(results1[0].name, 'Keeley Memorial Park');
+    assert.strictEqual(results1[0].street, 'Solomon Street');
+
+    // 2. "keeley park"
+    const results2 = searchLocalPlaces('keeley park');
+    assert.ok(results2.length > 0, 'Should find Keeley Park');
+    assert.ok(results2.some(p => p.name.toLowerCase().includes('keeley')));
+
+    // 3. "st patrick cbc"
+    const results3 = searchLocalPlaces('st patrick');
+    assert.ok(results3.length > 0, 'Should find St Patrick CBC grounds');
+    assert.ok(results3.some(p => p.name.toLowerCase().includes('patrick')));
+  });
 });

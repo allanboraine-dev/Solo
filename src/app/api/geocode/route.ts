@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseHouseNumberFromQuery } from '@/utils/mapService';
+import { parseHouseNumberFromQuery, searchLocalPlaces } from '@/utils/mapService';
 import { checkGeocodeRateLimit } from '@/utils/rateLimit';
 
 interface GeocodePlace {
@@ -236,6 +236,29 @@ export async function GET(req: NextRequest) {
       targetStreet ? `${targetStreet}, Kimberley` : '',
     ])
   ).filter((s): s is string => Boolean(s && s.trim().length >= 2));
+
+  // --- 2.0 Check Instant Curated Local Kimberley Places (Parks, Stadiums, Schools, POIs) ---
+  try {
+    const localMatches = searchLocalPlaces(q, { lat, lng });
+    for (const p of localMatches.slice(0, 5)) {
+      addPlace({
+        id: `local-${p.id}`,
+        name: p.name,
+        display_name: p.display_name,
+        lat: p.lat,
+        lon: p.lon,
+        houseNumber: p.houseNumber,
+        street: p.street,
+        suburb: p.suburb,
+        city: p.city,
+        buildingName: p.buildingName,
+        category: p.category,
+        source: 'local',
+      });
+    }
+  } catch (err: any) {
+    console.warn('[Geocode API] Local search notice:', err?.message);
+  }
 
   // --- 2.1 Google Maps Places (New) and Geocoding APIs (Highest accuracy when key configured) ---
   if (GOOGLE_KEY) {
