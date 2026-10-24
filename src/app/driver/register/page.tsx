@@ -113,39 +113,34 @@ export default function DriverRegistration() {
     if (typeof window === 'undefined') return
     try {
       const params = new URLSearchParams(window.location.search)
-      const cardSetup = params.get('card_setup')
+      const isPaymentSuccess = params.get('payment') === 'success' || params.get('card_setup') === 'success'
       const reference = params.get('reference')
       const driverId = params.get('driver_id') || getSafeLocalStorageItem('driver_id')
-      const pendingEmail = getSafeLocalStorageItem('pending_driver_email') || email
 
-      if (cardSetup === 'success' && reference && driverId) {
+      if (isPaymentSuccess && reference && driverId) {
         setIsSubmitting(true)
-        setUploadProgressText('Verifying card & activating your 7-day free trial...')
+        setUploadProgressText('Verifying payment & activating your SOLO Driver Pro membership...')
 
-        fetch('/api/driver/setup-trial', {
+        fetch('/api/verify-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             driverId,
-            email: pendingEmail,
             reference,
           }),
         })
           .then((res) => res.json())
           .then((data) => {
             if (data.success) {
-              const billingDateStr = data.nextBillingDate 
-                ? new Date(data.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
-                : '7 days from now'
-              alert(`🎉 Card linked successfully! Your 7-day free trial has begun. Your first R499.00 monthly subscription is scheduled for ${billingDateStr}. Welcome to SOLO!`)
+              alert('🎉 Payment of R499.00 successful! Your SOLO Driver Pro membership is now active. Welcome to SOLO!')
               router.push('/driver')
             } else {
-              setSubmitError(data.error || 'Failed to complete card verification.')
+              setSubmitError(data.error || 'Failed to complete payment verification.')
               setIsSubmitting(false)
             }
           })
           .catch((err) => {
-            setSubmitError(err.message || 'Error completing trial setup.')
+            setSubmitError(err.message || 'Error completing payment verification.')
             setIsSubmitting(false)
           })
       }
@@ -229,10 +224,8 @@ export default function DriverRegistration() {
       hasPrdp: !!prdpFile,
       hasRoadworthy: !!roadworthyFile,
       isVerified: false,
-      subscriptionActive: true,
-      subscriptionPlan: 'trial',
-      trialStartedAt: Date.now(),
-      trialEndsAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      subscriptionActive: false,
+      subscriptionPlan: 'pending',
     })
 
     // Store in all_registered_drivers collection for multi-driver local testing
@@ -321,8 +314,8 @@ export default function DriverRegistration() {
     return { driverId, hasSession }
   }
 
-  // Handle Step 4 Card Capture & Trial Activation
-  const handleCardSetupAndTrialStart = async () => {
+  // Handle Step 4 Real Direct Paystack Card Payment (R499.00)
+  const handleDirectSubscriptionPayment = async () => {
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -330,80 +323,79 @@ export default function DriverRegistration() {
       // 1. Register account & upload documents if not done yet
       const { driverId, hasSession } = await performAccountRegistration()
 
-      // 2. Initialize Paystack card tokenization transaction
-      setUploadProgressText('Connecting to Paystack secure card vault...')
-      const initRes = await fetch('/api/driver/init-trial-card', {
+      // 2. Initialize real Paystack R499.00 monthly subscription checkout
+      setUploadProgressText('Connecting to Paystack secure card gateway...')
+      const initRes = await fetch('/api/create-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           driverId,
           email,
-          fullName,
-          phone,
         }),
       })
 
       const initData = await initRes.json()
 
-      if (!initData.success) {
-        throw new Error(initData.error || 'Failed to initialize Paystack card capture.')
+      if (!initData.success && !initData.url) {
+        throw new Error(initData.error || 'Failed to initialize Paystack subscription checkout.')
       }
 
-      // 4. Try opening Paystack Inline Modal popup
+      // If platform owner is exempt, redirect directly
+      if (initData.isOwner) {
+        alert('🎉 Platform owner verified! Permanent free subscription granted. Welcome to SOLO!')
+        router.push(hasSession ? '/driver' : '/driver/login')
+        return
+      }
+
+      // 3. Open Paystack Inline Modal popup
       const paystackPop = (window as any).PaystackPop
       const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
-      if (paystackPop && publicKey) {
+      if (paystackPop && publicKey && initData.reference) {
         setUploadProgressText('Waiting for card details entry...')
 
-        const completeTrialSetup = (reference: string) => {
-          setUploadProgressText('Authorizing card & scheduling 7-day trial renewal...')
-          fetch('/api/driver/setup-trial', {
+        const completeSubscriptionVerification = (reference: string) => {
+          setUploadProgressText('Verifying R499.00 payment & activating subscription...')
+          fetch('/api/verify-subscription', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               driverId,
-              email,
               reference,
             }),
           })
             .then((res) => res.json())
-            .then((setupData) => {
-              if (setupData.success) {
-                const billingDate = setupData.nextBillingDate
-                  ? new Date(setupData.nextBillingDate).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '7 days from now'
-                alert(`🎉 Card verified and securely linked! Your 7-day free trial is active. Your first R499.00 monthly subscription will be debited on ${billingDate}. You keep 100% of all fares. Welcome to SOLO!`)
+            .then((subData) => {
+              if (subData.success) {
+                alert(`🎉 Payment of R499.00 successful! Your SOLO Driver Pro membership is now active. You keep 100% of all fares. Welcome to SOLO!`)
                 router.push(hasSession ? '/driver' : '/driver/login')
               } else {
-                setSubmitError(setupData.error || 'Failed to complete trial subscription schedule.')
+                setSubmitError(subData.error || 'Failed to verify subscription payment with Paystack.')
                 setIsSubmitting(false)
                 setUploadProgressText('')
               }
             })
             .catch((err: unknown) => {
-              setSubmitError((err as Error).message || 'Error completing trial setup.')
+              setSubmitError((err as Error).message || 'Error completing subscription verification.')
               setIsSubmitting(false)
               setUploadProgressText('')
             })
         }
 
-        // NOTE: Paystack Inline v1 strictly checks `Object.prototype.toString.call(callback) === '[object Function]'`.
-        // Passing an `async function` produces `'[object AsyncFunction]'` and throws "Attribute callback must be a valid function".
-        // We MUST pass a standard synchronous function here.
         const handler = paystackPop.setup({
           key: publicKey,
           email,
-          amount: 100, // R1.00 nominal tokenization verification in cents
+          amount: 49900, // R499.00 in ZAR cents
           currency: 'ZAR',
           ref: initData.reference,
+          plan: initData.plan,
           metadata: {
             driverId,
             email,
-            purpose: 'driver_trial_card_capture',
+            payment_type: 'solo_saas_subscription',
           },
           callback: function (response: { reference: string }) {
-            completeTrialSetup(response.reference)
+            completeSubscriptionVerification(response.reference)
           },
           onClose: function () {
             setIsSubmitting(false)
@@ -412,16 +404,16 @@ export default function DriverRegistration() {
         })
 
         handler.openIframe()
-      } else if (initData.authorization_url) {
+      } else if (initData.url) {
         // Fallback: Redirect to hosted checkout if inline popup script is unavailable
         setUploadProgressText('Redirecting to Paystack secure checkout...')
-        window.location.href = initData.authorization_url
+        window.location.href = initData.url
       } else {
         throw new Error('Unable to launch Paystack card gateway. Please try again.')
       }
     } catch (err: unknown) {
-      console.error('Registration/Trial error:', err)
-      setSubmitError((err as Error).message || 'An error occurred during registration. Please try again.')
+      console.error('Registration/Subscription error:', err)
+      setSubmitError((err as Error).message || 'An error occurred during payment. Please try again.')
       setIsSubmitting(false)
       setUploadProgressText('')
     }
@@ -759,128 +751,122 @@ export default function DriverRegistration() {
                   disabled={!hasRequiredDocs || isSubmitting}
                   className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-blue-500/20 active:scale-95"
                 >
-                  <span>Continue to 7-Day Trial Setup ({readyDocsCount}/7)</span>
+                  <span>Continue to Payment &amp; Subscription ({readyDocsCount}/7)</span>
                   <ChevronRight size={18} />
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 4: 7-Day Free Trial & Card Capture */}
+          {/* STEP 4: Direct R499.00 Card Payment & Subscription */}
           {step === 4 && (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 mb-2">
                 <div className="flex items-center gap-3 text-xl font-bold">
-                  <CreditCard className="text-emerald-500" /> Subscription &amp; 7-Day Trial
+                  <CreditCard className="text-emerald-500" /> Driver Pro Subscription
                 </div>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 rounded-full flex items-center gap-1">
-                  <Sparkles size={13} /> 7 Days Free
+                  <Sparkles size={13} /> 0% Commission
                 </span>
               </div>
 
-              {/* Standard Driver: Transparent 7-Day Trial & Card Capture */}
+              {/* Direct R499.00 Subscription Card */}
               <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white p-5 rounded-2xl shadow-xl border border-zinc-800 space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
-                          SOLO Driver Pro SaaS
-                        </span>
-                        <h3 className="text-xl font-black mt-1">7-Day Free Trial</h3>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-black text-emerald-400">R0.00</span>
-                        <span className="block text-[11px] text-zinc-400">Due Today</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5 pt-2 border-t border-zinc-800 text-xs">
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="flex items-center gap-2">
-                          <Zap size={14} className="text-emerald-400" />
-                          <span>Full Driver Access</span>
-                        </span>
-                        <span className="font-bold text-white">Instant Activation</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="flex items-center gap-2">
-                          <CheckCircle2 size={14} className="text-emerald-400" />
-                          <span>Rider Fares Kept</span>
-                        </span>
-                        <span className="font-bold text-emerald-400">100% Direct (0% Cut)</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="flex items-center gap-2">
-                          <Calendar size={14} className="text-blue-400" />
-                          <span>First Billing Date</span>
-                        </span>
-                        <span className="font-bold text-white">{trialEndDateString}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-zinc-300">
-                        <span className="flex items-center gap-2">
-                          <CreditCard size={14} className="text-blue-400" />
-                          <span>Subsequent Fee</span>
-                        </span>
-                        <span className="font-bold text-white">R499.00 / month</span>
-                      </div>
-                    </div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
+                      SOLO Driver Pro Monthly
+                    </span>
+                    <h3 className="text-xl font-black mt-1">Platform Membership</h3>
                   </div>
-
-                  {/* Policy & Protection Guarantee */}
-                  <div className="p-4 bg-gray-50 dark:bg-zinc-900/50 rounded-2xl border border-gray-100 dark:border-zinc-800/60 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                      <p>
-                        <strong>R0.00 charged today:</strong> Your card is securely tokenized with a nominal R1.00 verification that is immediately refunded back to your account.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                      <p>
-                        <strong>Cancel anytime:</strong> If you cancel within your 7-day trial via your Driver Portal, your card will never be billed the R499 fee.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2.5">
-                      <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
-                      <p>
-                        <strong>PCI-DSS Certified Security:</strong> All card processing is encrypted and powered by Paystack. Supports Visa, Mastercard, and Debit/Credit cards.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-4 mt-6">
-                    <button 
-                      type="button" 
-                      onClick={() => setStep(3)} 
-                      disabled={isSubmitting}
-                      className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition disabled:opacity-50"
-                    >
-                      Back
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={handleCardSetupAndTrialStart}
-                      disabled={isSubmitting}
-                      className="w-2/3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95"
-                    >
-                      {isSubmitting ? (
-                        <div className="flex items-center gap-2 text-xs">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span>{uploadProgressText || 'Connecting to Paystack...'}</span>
-                        </div>
-                      ) : (
-                        <>
-                          <CreditCard size={18} />
-                          <span>Link Card &amp; Start 7-Day Free Trial</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-emerald-400">R499.00</span>
+                    <span className="block text-[11px] text-zinc-400">Due Today</span>
                   </div>
                 </div>
-              )}
+
+                <div className="space-y-2.5 pt-2 border-t border-zinc-800 text-xs">
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <Zap size={14} className="text-emerald-400" />
+                      <span>Full Driver Dispatch Access</span>
+                    </span>
+                    <span className="font-bold text-white">Instant Activation</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2 size={14} className="text-emerald-400" />
+                      <span>Rider Fares Kept</span>
+                    </span>
+                    <span className="font-bold text-emerald-400">100% Direct (0.0% Cut)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <Calendar size={14} className="text-blue-400" />
+                      <span>Billing Frequency</span>
+                    </span>
+                    <span className="font-bold text-white">Monthly (R499.00 / mo)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck size={14} className="text-emerald-400" />
+                      <span>Payment Security</span>
+                    </span>
+                    <span className="font-bold text-white">Bank-Grade 3D-Secure</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Policy & Protection Guarantee */}
+              <div className="p-4 bg-gray-50 dark:bg-zinc-900/50 rounded-2xl border border-gray-100 dark:border-zinc-800/60 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+                <div className="flex items-start gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Keep 100% of all trip earnings:</strong> Collect cash or mobile speedpoint card payments directly from riders with zero platform cuts.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                  <p>
+                    <strong>PCI-DSS Certified Security:</strong> All card payments are processed securely by Paystack. Supports Visa, Mastercard, debit, and credit cards.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setStep(3)} 
+                  disabled={isSubmitting}
+                  className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleDirectSubscriptionPayment}
+                  disabled={isSubmitting}
+                  className="w-2/3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>{uploadProgressText || 'Connecting to Paystack...'}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <CreditCard size={18} />
+                      <span>Enter Card Details &amp; Pay R499.00</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="text-center p-4 text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800">
