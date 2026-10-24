@@ -126,4 +126,29 @@ describe('Location Search Improvements Suite', () => {
     assert.ok(results3.length > 0, 'Should find St Patrick CBC grounds');
     assert.ok(results3.some(p => p.name.toLowerCase().includes('patrick')));
   });
+
+  it('supports specialized Google Maps category filters and newly indexed local landmarks', () => {
+    // 1. Parks category filter
+    const parks = searchLocalPlaces('', null, 'parks');
+    assert.ok(parks.length >= 5, 'Should return multiple parks and sports grounds');
+    assert.ok(parks.some(p => p.name.includes('Keeley')));
+    assert.ok(parks.some(p => p.name.includes('Tafel Lager')));
+
+    // 2. Schools category filter
+    const schools = searchLocalPlaces('', null, 'schools');
+    assert.ok(schools.length >= 8, 'Should return multiple schools and universities');
+    assert.ok(schools.some(p => p.name.includes('Noord-Kaap')));
+    assert.ok(schools.some(p => p.name.includes('Diamantveld')));
+    assert.ok(schools.some(p => p.name.includes('Boys High')));
+
+    // 3. Virgin Active Kimberley
+    const virginResults = searchLocalPlaces('virgin active');
+    assert.ok(virginResults.length > 0);
+    assert.strictEqual(virginResults[0].name, 'Virgin Active Health Club Kimberley');
+
+    // 4. The Solomon Guest House
+    const solomonResults = searchLocalPlaces('the solomon');
+    assert.ok(solomonResults.length > 0);
+    assert.ok(solomonResults[0].name.includes('The Solomon'));
+  });
 });

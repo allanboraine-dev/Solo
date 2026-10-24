@@ -444,10 +444,76 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     id: 'poi-game-diamond-pavilion',
     name: 'Game Diamond Pavilion',
     display_name: 'Game Stores, Diamond Pavilion Mall, Memorial Road, Kimberley, 8301',
-    lat: -28.7560,
+    lat: -28.756,
     lon: 24.7648,
     street: 'Memorial Road',
     suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-food-lovers-kimberley',
+    name: "Food Lover's Market Kimberley",
+    display_name: "Food Lover's Market, Memorial Road, Royldene, Kimberley, 8301",
+    lat: -28.7622,
+    lon: 24.7618,
+    street: 'Memorial Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-choppies-galeshewe',
+    name: 'Choppies Supermarket Galeshewe',
+    display_name: 'Choppies Supermarket, Nobengula Extension, Galeshewe, Kimberley, 8345',
+    lat: -28.7198,
+    lon: 24.7265,
+    street: 'Nobengula Extension',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-phakamile-mabija-plaza',
+    name: 'Phakamile Mabija Plaza',
+    display_name: 'Phakamile Mabija Plaza, Phakamile Mabija Road, Galeshewe, Kimberley, 8345',
+    lat: -28.7145,
+    lon: 24.7328,
+    street: 'Phakamile Mabija Road',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-kimberley-square',
+    name: 'Kimberley Square Shopping Centre',
+    display_name: 'Kimberley Square, Chapel Street & Jones Street, CBD, Kimberley, 8301',
+    lat: -28.7415,
+    lon: 24.7678,
+    street: 'Chapel Street',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-virgin-active-kimberley',
+    name: 'Virgin Active Health Club Kimberley',
+    display_name: 'Virgin Active, Duvenhage Road, Royldene, Kimberley, Northern Cape, 8301',
+    lat: -28.7635,
+    lon: 24.7592,
+    street: 'Duvenhage Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-planet-fitness-kimberley',
+    name: 'Planet Fitness JustGym Kimberley',
+    display_name: 'Planet Fitness, North Cape Mall, Memorial Road, Royldene, Kimberley, 8301',
+    lat: -28.7608,
+    lon: 24.7628,
+    street: 'Memorial Road',
+    suburb: 'Royldene',
     city: 'Kimberley',
     category: 'building',
   },
@@ -624,6 +690,82 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     city: 'Kimberley',
     category: 'building',
   },
+  {
+    id: 'poi-noord-kaap-high',
+    name: 'Hoërskool Noord-Kaap',
+    display_name: 'Hoërskool Noord-Kaap, Hayston Road, Royldene, Kimberley, 8301',
+    lat: -28.7618,
+    lon: 24.7575,
+    street: 'Hayston Road',
+    suburb: 'Royldene',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-hts-kimberley',
+    name: 'Technical High School Kimberley (HTS)',
+    display_name: 'HTS Kimberley, Schmidtsdrift Road, Monument Heights, Kimberley, 8301',
+    lat: -28.7508,
+    lon: 24.7522,
+    street: 'Schmidtsdrift Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-newton-primary',
+    name: 'Newton Primary School',
+    display_name: 'Newton Primary School, Halsbrouck Road, Newton, Kimberley, 8301',
+    lat: -28.7515,
+    lon: 24.7605,
+    street: 'Halsbrouck Road',
+    suburb: 'Newton',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-kimberley-junior',
+    name: 'Kimberley Junior School',
+    display_name: 'Kimberley Junior School, Lennox Street, Belgravia, Kimberley, 8301',
+    lat: -28.7468,
+    lon: 24.7702,
+    street: 'Lennox Street',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-st-boniface-high',
+    name: 'St Boniface High School',
+    display_name: 'St Boniface High School, Tshwene Street, Galeshewe, Kimberley, 8345',
+    lat: -28.7245,
+    lon: 24.7242,
+    street: 'Tshwene Street',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-beacon-primary',
+    name: 'Beacon Primary School',
+    display_name: 'Beacon Primary School, Cassandra, Kimberley, 8301',
+    lat: -28.7592,
+    lon: 24.7678,
+    suburb: 'Cassandra',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-eureka-primary',
+    name: 'Eureka Primary School',
+    display_name: 'Eureka Primary School, Memorial Road, Monument Heights, Kimberley, 8301',
+    lat: -28.7578,
+    lon: 24.7635,
+    street: 'Memorial Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
 
   // --- Transport Hubs ---
   {
@@ -747,6 +889,118 @@ export const KIMBERLEY_POPULAR_PLACES: SearchResultPlace[] = [
     display_name: 'Flamingo Casino, Kimberley-Boshof Road (N12), Kimberley, Northern Cape, 8301',
     lat: -28.6945,
     lon: 24.7812,
+    suburb: 'Kimberley North',
+    city: 'Kimberley',
+    category: 'poi',
+  },
+  {
+    id: 'poi-the-solomon',
+    name: 'The Solomon Edwardian Guest House',
+    display_name: 'The Solomon Guest House, 1 Solomon Street, Herlear / Beaconsfield, Kimberley, 8301',
+    lat: -28.7523,
+    lon: 24.7791,
+    street: 'Solomon Street',
+    houseNumber: '1',
+    suburb: 'Herlear',
+    city: 'Kimberley',
+    buildingName: 'The Solomon Edwardian Guest House',
+    category: 'building',
+  },
+  {
+    id: 'poi-protea-hotel',
+    name: 'Protea Hotel by Marriott Kimberley',
+    display_name: 'Protea Hotel Kimberley, West Circular Road, Kimberley Big Hole, 8301',
+    lat: -28.7388,
+    lon: 24.7572,
+    street: 'West Circular Road',
+    suburb: 'West End',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-halfway-house-hotel',
+    name: 'The Halfway House Hotel',
+    display_name: 'The Halfway House Hotel, 229 Du Toitspan Road, Belgravia, Kimberley, 8301',
+    lat: -28.7528,
+    lon: 24.7712,
+    street: 'Du Toitspan Road',
+    houseNumber: '229',
+    suburb: 'Belgravia',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-horseshoe-motel',
+    name: 'Horseshoe Motel & Conference Centre',
+    display_name: 'Horseshoe Motel, Memorial Road, Monument Heights, Kimberley, 8301',
+    lat: -28.7612,
+    lon: 24.7615,
+    street: 'Memorial Road',
+    suburb: 'Monument Heights',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-high-court',
+    name: 'Northern Cape High Court',
+    display_name: 'High Court of South Africa Northern Cape Division, Sol Plaatje Drive, Kimberley, 8301',
+    lat: -28.7408,
+    lon: 24.7642,
+    street: 'Sol Plaatje Drive',
+    suburb: 'Civic Centre',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-home-affairs',
+    name: 'Department of Home Affairs (Kimberley)',
+    display_name: 'Department of Home Affairs, Old Post Office, Market Square, Kimberley CBD, 8301',
+    lat: -28.7425,
+    lon: 24.7692,
+    street: 'Market Square',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-saps-kimberley',
+    name: 'SAPS Kimberley Police Station (Central)',
+    display_name: 'Kimberley Police Station, Transvaal Road & Phakamile Mabija St, Kimberley CBD, 8301',
+    lat: -28.7385,
+    lon: 24.7665,
+    street: 'Transvaal Road',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-saps-galeshewe',
+    name: 'SAPS Galeshewe Police Station',
+    display_name: 'Galeshewe Police Station, Mampe Road, Galeshewe, Kimberley, 8345',
+    lat: -28.7188,
+    lon: 24.7312,
+    street: 'Mampe Road',
+    suburb: 'Galeshewe',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-kimberley-city-hall',
+    name: 'Kimberley City Hall',
+    display_name: 'Kimberley City Hall, Old Market Square, Kimberley CBD, 8301',
+    lat: -28.7422,
+    lon: 24.7688,
+    street: 'Market Square',
+    suburb: 'Central',
+    city: 'Kimberley',
+    category: 'building',
+  },
+  {
+    id: 'poi-kamfers-dam',
+    name: 'Kamfers Dam (Lesser Flamingo Sanctuary)',
+    display_name: 'Kamfers Dam Flamingo Viewpoint, N12 North, Kimberley, Northern Cape',
+    lat: -28.6752,
+    lon: 24.7615,
     suburb: 'Kimberley North',
     city: 'Kimberley',
     category: 'poi',
@@ -1970,6 +2224,33 @@ export function searchLocalPlaces(
           pName.includes('rank')
         );
       }
+      if (categoryFilter === 'parks') {
+        return (
+          (p.category === 'poi' || p.category === 'building') &&
+          (pName.includes('park') ||
+            pName.includes('stadium') ||
+            pName.includes('oval') ||
+            pName.includes('ground') ||
+            pName.includes('field') ||
+            pName.includes('club') ||
+            pName.includes('garden') ||
+            pName.includes('pool'))
+        );
+      }
+      if (categoryFilter === 'schools') {
+        return (
+          (p.category === 'building' || p.category === 'poi') &&
+          (pName.includes('school') ||
+            pName.includes('skool') ||
+            pName.includes('college') ||
+            pName.includes('high') ||
+            pName.includes('primary') ||
+            pName.includes('university') ||
+            pName.includes('spu') ||
+            pName.includes('campus') ||
+            pName.includes('academy'))
+        );
+      }
       if (categoryFilter === 'suburbs') return p.category === 'area';
       return true;
     });
@@ -2016,7 +2297,11 @@ export function searchLocalPlaces(
   const queryLower = cleanQuery.toLowerCase();
   const normalizedLower = normalizedQuery.toLowerCase();
   // Exclude common stop words from token matching
-  const stopWords = new Set(['in', 'at', 'near', 'the', 'of', 'and', 'za', 'south', 'africa', 'street', 'st', 'road', 'rd', 'avenue', 'ave']);
+  const stopWords = new Set([
+    'in', 'at', 'near', 'the', 'of', 'and', 'za', 'south', 'africa', 'street',
+    'st', 'road', 'rd', 'avenue', 'ave', 'close', 'to', 'from', 'around', 'by',
+    'opposite', 'corner', 'crn', 'next'
+  ]);
   const userTokens = queryLower
     .split(/[\s,]+/)
     .map((t) => t.trim())

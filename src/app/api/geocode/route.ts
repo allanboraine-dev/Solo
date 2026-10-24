@@ -410,12 +410,17 @@ export async function GET(req: NextRequest) {
                   ? `${primaryName}, ${rawPlaceName.split(',').slice(1).join(',').trim() || rawPlaceName}`
                   : rawPlaceName;
 
+              const featLat = feat.center[1];
+              const featLon = feat.center[0];
+              const distFromUser = haversineDistKm(lat, lng, featLat, featLon);
+              if (distFromUser > 80 && results.length > 0) return;
+
               addPlace({
                 id: `mbx-${feat.id}-${houseNo || ''}`,
                 name: primaryName,
                 display_name: displayName,
-                lat: feat.center[1],
-                lon: feat.center[0],
+                lat: featLat,
+                lon: featLon,
                 houseNumber: houseNo,
                 street,
                 suburb,
@@ -437,17 +442,29 @@ export async function GET(req: NextRequest) {
   // Provider B: OpenStreetMap Nominatim (Superb for South African landmarks, schools, clinics, and hospitals)
   const nomPromise = (async () => {
     try {
-      const nomQueries = [q, `${q}, Kimberley`];
-      for (const nomQ of nomQueries.slice(0, 1)) {
+      const nomQueries = q.toLowerCase().includes('kimberley') ? [q] : [q, `${q}, Kimberley`];
+      const minLng = (lng - 0.25).toFixed(4);
+      const maxLng = (lng + 0.25).toFixed(4);
+      const minLat = (lat - 0.20).toFixed(4);
+      const maxLat = (lat + 0.20).toFixed(4);
+
+      for (const nomQ of nomQueries) {
         const nomUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
           nomQ
-        )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=8`;
+        )}&countrycodes=za&addressdetails=1&namedetails=1&extratags=1&limit=8&viewbox=${minLng},${maxLat},${maxLng},${minLat}&bounded=0`;
 
         const nomRes = await fetchWithTimeout(nomUrl, { headers: defaultHeaders }, 2500);
         if (nomRes && nomRes.ok) {
           const nomData = await nomRes.json();
           if (Array.isArray(nomData)) {
             nomData.forEach((item: any) => {
+              const itemLat = parseFloat(item.lat);
+              const itemLon = parseFloat(item.lon);
+              if (isNaN(itemLat) || isNaN(itemLon)) return;
+
+              const distFromUser = haversineDistKm(lat, lng, itemLat, itemLon);
+              if (distFromUser > 150) return;
+
               const addr = item.address || {};
               const houseNo = addr.house_number || targetHouseNo || undefined;
               const street = addr.road || addr.pedestrian || addr.street || undefined;
@@ -462,11 +479,11 @@ export async function GET(req: NextRequest) {
               }
 
               addPlace({
-                id: `nom-${item.place_id || `${item.lat}-${item.lon}`}-${houseNo || ''}`,
+                id: `nom-${item.place_id || `${itemLat}-${itemLon}`}-${houseNo || ''}`,
                 name: primaryName,
                 display_name: item.display_name ? `${primaryName}, ${item.display_name}` : primaryName,
-                lat: parseFloat(item.lat),
-                lon: parseFloat(item.lon),
+                lat: itemLat,
+                lon: itemLon,
                 houseNumber: houseNo,
                 street,
                 suburb,
@@ -490,7 +507,7 @@ export async function GET(req: NextRequest) {
     try {
       const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
         `${q}, Kimberley`
-      )}&lat=${lat}&lon=${lng}&limit=6`;
+      )}&lat=${lat}&lon=${lng}&limit=8`;
       const pRes = await fetchWithTimeout(photonUrl, { headers: defaultHeaders }, 2000);
       if (pRes && pRes.ok) {
         const pData = await pRes.json();
@@ -499,8 +516,12 @@ export async function GET(req: NextRequest) {
             const props = feat.properties || {};
             const coords = feat.geometry?.coordinates;
             if (!coords || coords.length < 2) return;
+            const featLat = coords[1];
+            const featLon = coords[0];
 
             if (props.countrycode && props.countrycode.toUpperCase() !== 'ZA') return;
+            const distFromUser = haversineDistKm(lat, lng, featLat, featLon);
+            if (distFromUser > 150) return; // Discard distant foreign or out-of-province results
 
             const houseNo = props.housenumber || targetHouseNo || undefined;
             const street = props.street || undefined;

@@ -9,6 +9,7 @@ import {
   parseHouseNumberFromQuery,
   reverseGeocode,
 } from '@/utils/mapService'
+import { calculateDistanceKm } from '@/utils/geo'
 import {
   MapPin,
   Building2,
@@ -28,11 +29,46 @@ import {
   Clock,
   Trash2,
   Map as MapIcon,
+  Trees,
 } from 'lucide-react'
 
-type CategoryFilter = 'all' | 'streets' | 'malls' | 'hospitals' | 'transport' | 'suburbs';
+type CategoryFilter = 'all' | 'malls' | 'hospitals' | 'schools' | 'parks' | 'transport' | 'streets' | 'suburbs';
 
 const RECENT_SEARCHES_KEY = 'solo_recent_searches_v2';
+
+function highlightMatch(text: string, query: string) {
+  if (!query || query.trim().length === 0) return <span>{text}</span>;
+  const qClean = query.trim().toLowerCase();
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(qClean);
+  if (idx === -1) {
+    const firstToken = qClean.split(/[\s,]+/)[0];
+    if (firstToken && firstToken.length >= 2) {
+      const tokenIdx = lower.indexOf(firstToken);
+      if (tokenIdx !== -1) {
+        return (
+          <span>
+            {text.slice(0, tokenIdx)}
+            <span className="font-extrabold text-blue-600 dark:text-blue-400 underline decoration-blue-400/40">
+              {text.slice(tokenIdx, tokenIdx + firstToken.length)}
+            </span>
+            {text.slice(tokenIdx + firstToken.length)}
+          </span>
+        );
+      }
+    }
+    return <span>{text}</span>;
+  }
+  return (
+    <span>
+      {text.slice(0, idx)}
+      <span className="font-extrabold text-blue-600 dark:text-blue-400 underline decoration-blue-400/40">
+        {text.slice(idx, idx + qClean.length)}
+      </span>
+      {text.slice(idx + qClean.length)}
+    </span>
+  );
+}
 
 function getStoredRecentSearches(): SearchResultPlace[] {
   if (typeof window === 'undefined') return [];
@@ -318,38 +354,72 @@ export default function CustomSearchInput({
 
   const getCategoryIcon = (place: SearchResultPlace) => {
     const text = `${place.name} ${place.buildingName || ''} ${place.display_name}`.toLowerCase()
+    if (
+      text.includes('park') ||
+      text.includes('stadium') ||
+      text.includes('oval') ||
+      text.includes('field') ||
+      text.includes('ground') ||
+      text.includes('garden') ||
+      text.includes('pool')
+    ) {
+      return <Trees size={16} className="text-emerald-600 dark:text-emerald-400" />
+    }
     if (text.includes('airport') || text.includes('aerodrome')) {
-      return <Plane size={16} />
+      return <Plane size={16} className="text-sky-600 dark:text-sky-400" />
     }
-    if (text.includes('mall') || text.includes('shopping') || text.includes('centre') || text.includes('center') || text.includes('spar') || text.includes('shoprite') || text.includes('checkers')) {
-      return <ShoppingBag size={16} />
+    if (
+      text.includes('mall') ||
+      text.includes('shopping') ||
+      text.includes('centre') ||
+      text.includes('center') ||
+      text.includes('spar') ||
+      text.includes('shoprite') ||
+      text.includes('checkers') ||
+      text.includes('food')
+    ) {
+      return <ShoppingBag size={16} className="text-amber-600 dark:text-amber-400" />
     }
-    if (text.includes('hospital') || text.includes('clinic') || text.includes('mediclinic') || text.includes('doctor')) {
-      return <HeartPulse size={16} />
+    if (
+      text.includes('hospital') ||
+      text.includes('clinic') ||
+      text.includes('mediclinic') ||
+      text.includes('doctor')
+    ) {
+      return <HeartPulse size={16} className="text-rose-600 dark:text-rose-400" />
     }
-    if (text.includes('university') || text.includes('spu') || text.includes('college') || text.includes('school')) {
-      return <GraduationCap size={16} />
+    if (
+      text.includes('university') ||
+      text.includes('spu') ||
+      text.includes('college') ||
+      text.includes('school') ||
+      text.includes('high') ||
+      text.includes('primary')
+    ) {
+      return <GraduationCap size={16} className="text-indigo-600 dark:text-indigo-400" />
     }
     if (text.includes('taxi') || text.includes('rank') || text.includes('station')) {
-      return <Car size={16} />
+      return <Car size={16} className="text-orange-600 dark:text-orange-400" />
     }
     if (place.category === 'building' || place.buildingName) {
-      return <Building2 size={16} />
+      return <Building2 size={16} className="text-blue-600 dark:text-blue-400" />
     }
     if (place.houseNumber || place.category === 'address') {
-      return <Home size={16} />
+      return <Home size={16} className="text-teal-600 dark:text-teal-400" />
     }
-    return <MapPin size={16} />
+    return <MapPin size={16} className="text-gray-500 dark:text-gray-400" />
   }
 
   // Category filter tabs data
   const CATEGORIES: { id: CategoryFilter; label: string }[] = [
     { id: 'all', label: 'All Places' },
-    { id: 'streets', label: 'Streets' },
-    { id: 'malls', label: 'Malls & Shops' },
-    { id: 'hospitals', label: 'Hospitals' },
-    { id: 'transport', label: 'Taxi & Airport' },
-    { id: 'suburbs', label: 'Suburbs' },
+    { id: 'malls', label: '🛍️ Malls & Shops' },
+    { id: 'hospitals', label: '🏥 Hospitals' },
+    { id: 'schools', label: '🎓 Schools & Uni' },
+    { id: 'parks', label: '🌳 Parks & Sports' },
+    { id: 'transport', label: '🚖 Transport' },
+    { id: 'streets', label: '📍 Streets & Erfs' },
+    { id: 'suburbs', label: '🏘️ Suburbs' },
   ]
 
   // Detect whether current query looks like a street without a house number
@@ -640,6 +710,10 @@ export default function CustomSearchInput({
               results.map((place, index) => {
                 const isSelected = index === activeIndex
                 const subLabel = [place.street, place.suburb, place.city].filter(Boolean).join(', ')
+                const distKm = proximityCoords
+                  ? calculateDistanceKm(proximityCoords.lat, proximityCoords.lng, place.lat, place.lon)
+                  : calculateDistanceKm(-28.7282, 24.7623, place.lat, place.lon)
+                const distLabel = distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`
 
                 return (
                   <div
@@ -656,13 +730,13 @@ export default function CustomSearchInput({
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                      <div className="p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 shadow-2xs">
                         {getCategoryIcon(place)}
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                           <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-snug">
-                            {place.name}
+                            {highlightMatch(place.name, value)}
                           </span>
                           {place.houseNumber && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
@@ -674,6 +748,9 @@ export default function CustomSearchInput({
                               Street Address
                             </span>
                           )}
+                          <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded ml-auto">
+                            {distLabel}
+                          </span>
                         </div>
                         <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-1 leading-relaxed">
                           {place.display_name || subLabel}
@@ -1026,6 +1103,10 @@ export default function CustomSearchInput({
             {results.length > 0 ? (
               results.map((place, index) => {
                 const subLabel = [place.street, place.suburb, place.city].filter(Boolean).join(', ')
+                const distKm = proximityCoords
+                  ? calculateDistanceKm(proximityCoords.lat, proximityCoords.lng, place.lat, place.lon)
+                  : calculateDistanceKm(-28.7282, 24.7623, place.lat, place.lon)
+                const distLabel = distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(1)} km`
 
                 return (
                   <div
@@ -1034,13 +1115,13 @@ export default function CustomSearchInput({
                     className="p-4 flex items-center justify-between gap-3 active:bg-blue-50 dark:active:bg-zinc-800/80 transition cursor-pointer select-none"
                   >
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                      <div className="p-2.5 rounded-2xl bg-blue-50/80 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 shadow-2xs">
                         {getCategoryIcon(place)}
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                           <span className="font-bold text-sm text-gray-900 dark:text-gray-100 leading-snug">
-                            {place.name}
+                            {highlightMatch(place.name, value)}
                           </span>
                           {place.houseNumber && (
                             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
@@ -1052,6 +1133,9 @@ export default function CustomSearchInput({
                               Street Address
                             </span>
                           )}
+                          <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded ml-auto">
+                            {distLabel}
+                          </span>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
                           {place.display_name || subLabel}
