@@ -246,6 +246,13 @@ export default function DriverPage() {
           prof.subscriptionPlan = 'owner';
           prof.subscriptionActive = true;
           prof.isVerified = true;
+          if (!prof.vehicleMake || prof.vehicleMake === 'BMW' || prof.licensePlate === 'SOLO-01-GP') {
+            prof.vehicleMake = 'Kia';
+            prof.vehicleModel = 'Sportage';
+            prof.vehicleColor = 'Blue';
+            prof.licensePlate = 'CWT 143 NC';
+            await saveDriverProfile(prof);
+          }
           setIsDriverVerified(true);
           setIsTrialExpired(false);
           setShowSubModal(false);

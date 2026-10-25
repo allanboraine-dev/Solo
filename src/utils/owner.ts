@@ -34,18 +34,26 @@ export function isOwnerPassword(password?: string | null): boolean {
 }
 
 /**
- * Normalizes a driver profile to grant lifetime exemption if the email belongs to the platform owner.
+ * Normalizes a driver profile to grant lifetime exemption if the email belongs to the platform owner,
+ * and maintains verified owner fleet vehicle defaults (Kia Sportage, Blue, CWT 143 NC).
  */
-export function applyOwnerPrivileges<T extends { email?: string; subscriptionPlan?: string; subscriptionActive?: boolean; isVerified?: boolean }>(profile: T): T {
+export function applyOwnerPrivileges<T extends { email?: string; subscriptionPlan?: string; subscriptionActive?: boolean; isVerified?: boolean; vehicleMake?: string; vehicleModel?: string; licensePlate?: string; vehicleColor?: string }>(profile: T): T {
   if (!profile || typeof profile !== 'object') {
     return profile;
   }
   if (isPlatformOwner(profile.email) || profile.subscriptionPlan === 'owner') {
+    const isBmwOrUnset = !profile.vehicleMake || profile.vehicleMake === 'BMW' || profile.licensePlate === 'SOLO-01-GP';
     return {
       ...profile,
       subscriptionPlan: 'owner',
       subscriptionActive: true,
       isVerified: true,
+      ...(isBmwOrUnset ? {
+        vehicleMake: 'Kia',
+        vehicleModel: 'Sportage',
+        vehicleColor: 'Blue',
+        licensePlate: 'CWT 143 NC',
+      } : {}),
     };
   }
   return profile;
