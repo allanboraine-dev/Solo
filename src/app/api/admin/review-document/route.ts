@@ -19,7 +19,7 @@ const isValidUuid = (val?: unknown): boolean =>
 export async function POST(req: NextRequest) {
   try {
     // Enforce administrative authorization
-    const auth = validateAdminRequest(req);
+    const auth = await validateAdminRequest(req);
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },

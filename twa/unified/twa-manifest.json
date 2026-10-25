@@ -1,0 +1,51 @@
+{
+  "packageId": "za.co.soloride.app",
+  "host": "soloride.co.za",
+  "name": "SOLO | Zero-Commission E-Hailing",
+  "launcherName": "SOLO",
+  "themeColor": "#09090b",
+  "navigationColor": "#09090b",
+  "backgroundColor": "#09090b",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://soloride.co.za/icon-512.png",
+  "maskableIconUrl": "https://soloride.co.za/icon-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android-unified.keystore",
+    "alias": "solo-unified-key"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Book a Ride",
+      "short_name": "Rider",
+      "url": "/rider",
+      "chosenIconUrl": "https://soloride.co.za/rider-icon-192.png"
+    },
+    {
+      "name": "Driver Portal",
+      "short_name": "Driver",
+      "url": "/driver",
+      "chosenIconUrl": "https://soloride.co.za/driver-icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://soloride.co.za/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "orientation": "portrait"
+}

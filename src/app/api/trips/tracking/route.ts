@@ -64,7 +64,7 @@ export async function GET(req: Request) {
 
     const sanitizedTrip: any = { ...trip };
     const authUser = await getAuthenticatedUser(req);
-    const adminCheck = validateAdminRequest(req);
+    const adminCheck = await validateAdminRequest(req);
     const isMock =
       !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('mock') ||

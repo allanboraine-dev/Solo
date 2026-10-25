@@ -1,6 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { GET, haversineDistKm } from '../src/app/api/geocode/route.ts';
+import { GET } from '../src/app/api/geocode/route.ts';
+import { haversineDistKm } from '../src/utils/geo.ts';
 
 function createMockRequest(url: string, headers: Record<string, string> = {}): any {
   return {

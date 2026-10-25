@@ -253,12 +253,12 @@ describe('SOLO Comprehensive High-Concurreny Stress & Resilience Suite', () => {
       const driverTakeHome = fare - (fare * platformCommission);
 
       assert.strictEqual(driverTakeHome, fare, 'Driver must retain 100% of fare');
-      assert.ok(fare >= 25, 'Fare must never be less than base R25');
+      assert.ok(fare >= 22, 'Fare must never be less than base R22');
 
       // Paystack exact integer cents conversion
       const cents = Math.round(fare * 100);
       assert.strictEqual(Number.isInteger(cents), true, 'Paystack cents must be exact integer');
-      assert.ok(cents >= 2500, 'Cents must be >= 2500');
+      assert.ok(cents >= 2200, 'Cents must be >= 2200');
 
       totalCalculations++;
     }

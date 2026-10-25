@@ -2767,54 +2767,78 @@ export interface TariffTier {
   description: string;
 }
 
+export interface CompetitorFareComparison {
+  boltEstimateZar: number;
+  uberEstimateZar: number;
+  lowestCompetitorZar: number;
+  highestCompetitorZar: number;
+  guaranteedCeilingZar: number;
+  riderSavingsVsBoltZar: number;
+  riderSavingsVsUberZar: number;
+  riderSavingsMaxZar: number;
+  savingsPercentVsLowest: number;
+  savingsPercentVsHighest: number;
+}
+
 export interface FareBreakdown {
   distanceKm: number;
   baseFareZar: number;
   distanceFareZar: number;
+  occupantSupplementZar: number;
   subtotalZar: number;
   multiplier: number;
   totalFare: number;
   tariff: TariffTier;
+  comparison: CompetitorFareComparison;
+  undercutGuaranteed: boolean;
+}
+
+export interface DynamicFareOptions {
+  durationMinutes?: number;
+  occupantCount?: 1 | 2;
+  enforceStandard?: boolean;
 }
 
 /**
- * Returns South African Time-of-Day Tariff tier based on local time
+ * Returns South African Time-of-Day Tariff tier based on local time.
+ * Peak multipliers are kept ultra-low (+5% rush, +15% late night) so SOLO
+ * decisively beats competitor surge pricing (1.3x - 2.0x) at all hours.
  */
 export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
   const hour = date.getHours();
   const minute = date.getMinutes();
   const timeVal = hour + minute / 60;
 
-  // Night Owl: 22:00 to 05:00
+  // Night Owl: 22:00 to 05:00 (+15% vs legacy +25%)
   if (timeVal >= 22.0 || timeVal < 5.0) {
     return {
       code: 'night_owl',
       name: 'Night Owl & Safety',
-      multiplier: 1.25,
-      badge: '🦉 Night Owl (+25%)',
-      description: 'Late-night driver availability & safety incentive',
+      multiplier: 1.15,
+      badge: '🦉 Night Owl (+15%)',
+      description: 'Late-night driver availability & safety incentive (no surge gouging)',
     };
   }
 
-  // Morning Rush: 06:30 to 08:30
+  // Morning Rush: 06:30 to 08:30 (+5% vs legacy +15%)
   if (timeVal >= 6.5 && timeVal < 8.5) {
     return {
       code: 'morning_peak',
       name: 'Morning Rush',
-      multiplier: 1.15,
-      badge: '🌅 Morning Peak (+15%)',
-      description: 'Peak morning commuting and school traffic tariff',
+      multiplier: 1.05,
+      badge: '🌅 Morning Peak (+5%)',
+      description: 'Low-rate morning commuter tariff (beats competitor 1.4x surge)',
     };
   }
 
-  // Evening Commute Peak: 16:30 to 18:30
+  // Evening Commute Peak: 16:30 to 18:30 (+5% vs legacy +15%)
   if (timeVal >= 16.5 && timeVal < 18.5) {
     return {
       code: 'evening_peak',
       name: 'Evening Commute',
-      multiplier: 1.15,
-      badge: '🌆 Evening Peak (+15%)',
-      description: 'Peak evening home-bound commuting traffic tariff',
+      multiplier: 1.05,
+      badge: '🌆 Evening Peak (+5%)',
+      description: 'Low-rate evening commuter tariff (beats competitor 1.4x surge)',
     };
   }
 
@@ -2824,7 +2848,7 @@ export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
       code: 'early_dawn',
       name: 'Early Dawn',
       multiplier: 1.0,
-      badge: '☕ Early Dawn Standard',
+      badge: '☕ Early Dawn Saver',
       description: 'Standard early morning transfer rate',
     };
   }
@@ -2834,58 +2858,175 @@ export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
     code: 'standard',
     name: 'Standard Daytime',
     multiplier: 1.0,
-    badge: '☀️ Standard Daytime',
-    description: 'Standard distance tariff (R12 base + R8/km, min R25)',
+    badge: '☀️ Lowest Rate Guarantee',
+    description: 'Tapered distance tariff (R10 base + R6.50/km first 5km, R5.50/km after, min R22)',
   };
 }
 
 /**
- * Computes full fare breakdown with South African Time-of-Day Tariff
+ * Estimates South African competitor fares (Bolt & UberX) for the same route and time window.
+ * Competitors charge: Base + (Distance * Per-Km) + (Duration * Per-Minute) + Platform Booking Fee + Peak Surge.
+ */
+export function estimateCompetitorFares(
+  distanceKm: number,
+  durationMinutes?: number,
+  atTime?: Date
+): Omit<CompetitorFareComparison, 'riderSavingsVsBoltZar' | 'riderSavingsVsUberZar' | 'riderSavingsMaxZar' | 'savingsPercentVsLowest' | 'savingsPercentVsHighest'> {
+  const validDist = Math.max(0, Number(distanceKm) || 0);
+  // Estimate driving duration at ~2 min/km (30 km/h urban average) if live duration is not provided
+  const estMinutes =
+    durationMinutes && durationMinutes > 0
+      ? durationMinutes
+      : Math.max(3, Math.round(validDist * 2.0));
+
+  let boltSurge = 1.0;
+  let uberSurge = 1.0;
+
+  if (atTime) {
+    const tariff = getTimeOfDayTariff(atTime);
+    if (tariff.code === 'morning_peak' || tariff.code === 'evening_peak') {
+      boltSurge = 1.25;
+      uberSurge = 1.35;
+    } else if (tariff.code === 'night_owl') {
+      boltSurge = 1.30;
+      uberSurge = 1.40;
+    }
+  }
+
+  // Bolt SA baseline: R13 base + R7.80/km + R0.85/min + R3.50 booking fee (min R32)
+  const rawBolt = (13 + validDist * 7.8 + estMinutes * 0.85 + 3.5) * boltSurge;
+  const boltEstimateZar = Math.max(32, Math.round(rawBolt));
+
+  // UberX SA baseline: R15 base + R9.20/km + R1.05/min + R4.50 booking fee (min R38)
+  const rawUber = (15 + validDist * 9.2 + estMinutes * 1.05 + 4.5) * uberSurge;
+  const uberEstimateZar = Math.max(38, Math.round(rawUber));
+
+  const lowestCompetitorZar = Math.min(boltEstimateZar, uberEstimateZar);
+  const highestCompetitorZar = Math.max(boltEstimateZar, uberEstimateZar);
+  // Hard ceiling: SOLO is guaranteed at least 20% cheaper than the lowest competitor
+  const guaranteedCeilingZar = Math.max(22, Math.floor(lowestCompetitorZar * 0.80));
+
+  return {
+    boltEstimateZar,
+    uberEstimateZar,
+    lowestCompetitorZar,
+    highestCompetitorZar,
+    guaranteedCeilingZar,
+  };
+}
+
+/**
+ * Computes raw tapered distance charge:
+ * - First 5 km: R6.50 / km
+ * - Beyond 5 km: R5.50 / km (long-trip discount)
+ */
+function calculateTaperedDistanceCharge(distanceKm: number): number {
+  const validDist = Math.max(0, Number(distanceKm) || 0);
+  if (validDist <= 5) {
+    return Math.round(validDist * 6.5);
+  }
+  const firstFiveKm = 5 * 6.5; // R32.50
+  const remainingKm = (validDist - 5) * 5.5;
+  return Math.round(firstFiveKm + remainingKm);
+}
+
+/**
+ * Computes full fare breakdown with:
+ * 1. Lower Base + Tapered Per-Km Rate (R10 base + R6.50/km ≤5km, R5.50/km >5km, min R22)
+ * 2. 1-Rider Solo Discount vs 2-Rider Shared Supplement (+R4 for 2 riders)
+ * 3. Softened Time-of-Day Tariff
+ * 4. Automatic 20% Competitor Undercut Ceiling (Always cheaper than Bolt & Uber)
  */
 export function calculateDynamicFare(
   distanceKm: number,
-  atTime: Date = new Date()
+  atTime: Date = new Date(),
+  options: DynamicFareOptions = {}
 ): FareBreakdown {
   const validDist = Math.max(0, Number(distanceKm) || 0);
-  const tariff = getTimeOfDayTariff(atTime);
-  const baseFareZar = 12;
-  const distanceFareZar = Math.round(validDist * 8);
-  const subtotalZar = baseFareZar + distanceFareZar;
+  const tariff = options.enforceStandard
+    ? {
+        code: 'standard' as const,
+        name: 'Standard Daytime',
+        multiplier: 1.0,
+        badge: '☀️ Lowest Rate Guarantee',
+        description: 'Tapered distance tariff (R10 base + R6.50/km first 5km, R5.50/km after, min R22)',
+      }
+    : getTimeOfDayTariff(atTime);
 
-  // Apply time-of-day multiplier with minimum fare floor (R25 * multiplier)
-  const minimumFareZar = Math.max(25, Math.round(25 * tariff.multiplier));
+  const baseFareZar = 10;
+  const distanceFareZar = calculateTaperedDistanceCharge(validDist);
+  const occupantSupplementZar = options.occupantCount === 2 ? 4 : 0;
+  const subtotalZar = baseFareZar + distanceFareZar + occupantSupplementZar;
+
+  // Apply time-of-day multiplier with minimum fare floor (R22 * multiplier)
+  const minimumFareZar = Math.max(22, Math.round(22 * tariff.multiplier));
   const scaledFare = Math.round(subtotalZar * tariff.multiplier);
-  const totalFare = Math.max(minimumFareZar, scaledFare);
+  const uncappedSoloFare = Math.max(minimumFareZar, scaledFare);
+
+  // Competitor comparison & 20% undercut guarantee
+  const compBase = estimateCompetitorFares(
+    validDist,
+    options.durationMinutes,
+    options.enforceStandard ? undefined : atTime
+  );
+
+  // Guarantee SOLO is always <= 80% of the lowest competitor (at least 20% cheaper), with a R22 floor
+  const totalFare = Math.max(22, Math.min(uncappedSoloFare, compBase.guaranteedCeilingZar));
+
+  const riderSavingsVsBoltZar = Math.max(1, compBase.boltEstimateZar - totalFare);
+  const riderSavingsVsUberZar = Math.max(1, compBase.uberEstimateZar - totalFare);
+  const riderSavingsMaxZar = Math.max(riderSavingsVsBoltZar, riderSavingsVsUberZar);
+
+  const savingsPercentVsLowest = Math.max(
+    1,
+    Math.round(((compBase.lowestCompetitorZar - totalFare) / compBase.lowestCompetitorZar) * 100)
+  );
+  const savingsPercentVsHighest = Math.max(
+    1,
+    Math.round(((compBase.highestCompetitorZar - totalFare) / compBase.highestCompetitorZar) * 100)
+  );
 
   return {
     distanceKm: validDist,
     baseFareZar,
     distanceFareZar,
+    occupantSupplementZar,
     subtotalZar,
     multiplier: tariff.multiplier,
     totalFare,
     tariff,
+    comparison: {
+      ...compBase,
+      riderSavingsVsBoltZar,
+      riderSavingsVsUberZar,
+      riderSavingsMaxZar,
+      savingsPercentVsLowest,
+      savingsPercentVsHighest,
+    },
+    undercutGuaranteed: totalFare < compBase.lowestCompetitorZar,
   };
 }
 
 /**
  * Calculates fare in South African Rand (ZAR)
- * Base fare: R12 | Per-km: R8 | Minimum fare: R25
+ * Base fare: R10 | Tapered Per-km: R6.50 (≤5km), R5.50 (>5km) | Minimum fare: R22
+ * Always guaranteed at least 20% cheaper than competitors.
  */
 export function calculateFare(
   distanceKm: number,
-  dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean }
+  dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean; durationMinutes?: number; occupantCount?: 1 | 2 }
 ): number {
   if (!dateOrOptions) {
-    return Math.max(25, Math.round(12 + distanceKm * 8));
+    return calculateDynamicFare(distanceKm, new Date(), { enforceStandard: true }).totalFare;
   }
   if (dateOrOptions instanceof Date) {
     return calculateDynamicFare(distanceKm, dateOrOptions).totalFare;
   }
-  if (dateOrOptions.enforceStandard) {
-    return Math.max(25, Math.round(12 + distanceKm * 8));
-  }
-  return calculateDynamicFare(distanceKm, dateOrOptions.atTime || new Date()).totalFare;
+  return calculateDynamicFare(distanceKm, dateOrOptions.atTime || new Date(), {
+    enforceStandard: dateOrOptions.enforceStandard,
+    durationMinutes: dateOrOptions.durationMinutes,
+    occupantCount: dateOrOptions.occupantCount,
+  }).totalFare;
 }
 
 /**

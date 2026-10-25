@@ -22,6 +22,8 @@ export type MockTrip = {
   payment_method?: 'paystack' | 'speedpoint' | 'cash';
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   verification_pin?: string;
+  driver_name?: string;
+  vehicle_plate?: string;
   scheduled_time?: string;
   created_at?: string;
 };
@@ -1563,7 +1565,7 @@ export const getDriverRatingSummary = (driverId?: string): { average: number; co
 // ----------------------------------------
 // REAL-TIME BROADCASTS & SUBSCRIPTIONS
 // ----------------------------------------
-export type EventType = 'trip_updated' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'sos_emergency_alert' | 'lost_item_alert' | 'INSERT' | 'UPDATE';
+export type EventType = 'trip_updated' | 'trip_completed' | 'new_message' | 'driver_location' | 'new_rating' | 'driver_session_preempted' | 'sos_emergency_alert' | 'lost_item_alert' | 'INSERT' | 'UPDATE';
 
 let globalTripsChannel: any = null;
 let globalMessagesChannel: any = null;
@@ -1765,7 +1767,10 @@ const initGlobalChannels = () => {
               dropoff_lng: 0,
             };
         const synced = syncTripToLocalStorage(completedTrip);
-        listeners.forEach(cb => cb('trip_updated', synced));
+        listeners.forEach(cb => {
+          cb('trip_completed', synced);
+          cb('trip_updated', synced);
+        });
       }
     })
     .on('broadcast', { event: 'new_rating' }, (payload: any) => {

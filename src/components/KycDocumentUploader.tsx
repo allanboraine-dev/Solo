@@ -123,7 +123,7 @@ export default function KycDocumentUploader({
 
   // Open interactive camera modal or fall back to native device camera
   const handleOpenPhotoCapture = () => {
-    if (typeof window !== 'undefined' && navigator?.mediaDevices?.getUserMedia) {
+    if (typeof window !== 'undefined' && typeof navigator?.mediaDevices?.getUserMedia === 'function') {
       setIsCameraOpen(true)
     } else if (cameraInputRef.current) {
       cameraInputRef.current.click()

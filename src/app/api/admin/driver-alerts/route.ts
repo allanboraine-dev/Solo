@@ -12,7 +12,7 @@ const supabase = createClient(
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = validateAdminRequest(req);
+    const auth = await validateAdminRequest(req);
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = validateAdminRequest(req);
+    const auth = await validateAdminRequest(req);
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },

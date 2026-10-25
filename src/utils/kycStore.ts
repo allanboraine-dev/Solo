@@ -303,13 +303,13 @@ export function approveAllKycDocuments(
   }
 
   // Also approve all other uploaded documents (driver_selfie, license_disc, vehicle_photo)
-  for (const [, doc] of driverMap.entries()) {
+  driverMap.forEach((doc) => {
     doc.status = 'approved';
     doc.rejection_reason = null;
     doc.reviewed_at = now;
     doc.reviewed_by = reviewedBy || null;
     doc.updated_at = now;
-  }
+  });
 
   // Mark driver verified
   const driver = memoryDrivers.get(driverId) || saveKycDriverProfile({ id: driverId });

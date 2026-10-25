@@ -53,10 +53,10 @@ export default function TripReceiptPage() {
     pickupLocation: "Camps Bay Beach, Victoria Rd, Cape Town",
     dropoffLocation: "V&A Waterfront, Dock Rd, Cape Town",
     distanceKm: 6.2,
-    baseFareZar: 12,
-    distanceFareZar: 50,
+    baseFareZar: 10,
+    distanceFareZar: 39,
     commissionZar: 0,
-    totalFareZar: 62,
+    totalFareZar: 49,
     paymentMethod: "Speedpoint POS (Card)",
     completedAt: new Date().toLocaleDateString("en-ZA", {
       year: "numeric",
@@ -83,7 +83,7 @@ export default function TripReceiptPage() {
             found.dropoff_lng
           );
           const total = found.fare_amount || calculateFare(dist);
-          const distanceCharge = Math.max(0, total - 12);
+          const distanceCharge = Math.max(0, total - 10);
 
           setReceipt((prev) => ({
             ...prev,

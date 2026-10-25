@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
 
   // 1. Guard /api/admin/* endpoints: Reject unauthorized callers with 401
   if (pathname.startsWith('/api/admin/')) {
-    const auth = validateAdminRequest(request)
+    const auth = await validateAdminRequest(request)
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
 
   // 2. Guard /admin/* pages: Redirect unauthenticated public visitors to /admin/login
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-    const auth = validateAdminRequest(request)
+    const auth = await validateAdminRequest(request)
     if (!auth.authorized) {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)

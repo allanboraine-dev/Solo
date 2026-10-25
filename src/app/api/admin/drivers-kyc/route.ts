@@ -43,7 +43,7 @@ export interface DriverKycSummary {
 export async function GET(req: NextRequest) {
   try {
     // Enforce administrative authorization
-    const auth = validateAdminRequest(req);
+    const auth = await validateAdminRequest(req);
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },
@@ -320,7 +320,7 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     // 1. Enforce manager/admin credentials
-    const auth = validateAdminRequest(req);
+    const auth = await validateAdminRequest(req);
     if (!auth.authorized) {
       return NextResponse.json(
         { error: 'Unauthorized: Administrative credentials required', reason: auth.reason },

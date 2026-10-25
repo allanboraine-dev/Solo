@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import { generateUuid } from '@/utils/session'
-import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, type SearchResultPlace, type TariffTier } from '@/utils/mapService'
+import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, type SearchResultPlace, type TariffTier, type CompetitorFareComparison } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
 import CustomSearchInput from './CustomSearchInput'
 
@@ -59,6 +59,7 @@ export default function BookingForm({
   const [pickupTime, setPickupTime] = useState('')
   const [fare, setFare] = useState<number | null>(null)
   const [appliedTariff, setAppliedTariff] = useState<TariffTier | null>(null)
+  const [fareComparison, setFareComparison] = useState<CompetitorFareComparison | null>(null)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [isBooking, setIsBooking] = useState(false)
@@ -146,16 +147,22 @@ export default function BookingForm({
         );
 
         if (details) {
-          const dynamicFare = calculateDynamicFare(details.distanceKm, new Date());
+          const targetDate = pickupTime ? new Date(pickupTime) : new Date();
+          const dynamicFare = calculateDynamicFare(details.distanceKm, targetDate, {
+            durationMinutes: details.durationMinutes,
+            occupantCount,
+          });
           setDistanceKm(details.distanceKm);
           setDurationMinutes(details.durationMinutes);
           setFare(dynamicFare.totalFare);
           setAppliedTariff(dynamicFare.tariff);
+          setFareComparison(dynamicFare.comparison);
         }
       } catch (err) {
         console.error("Commercial directions error:", err);
         setFare(null);
         setAppliedTariff(null);
+        setFareComparison(null);
         setDistanceKm(null);
         setDurationMinutes(null);
       }
@@ -163,6 +170,19 @@ export default function BookingForm({
 
     getDirections();
   }, [realPickupCoords, realDropoffCoords]);
+
+  // Recalculate fare & competitor savings instantly when occupantCount (1 vs 2 riders) or pickupTime changes
+  useEffect(() => {
+    if (distanceKm === null) return;
+    const targetDate = pickupTime ? new Date(pickupTime) : new Date();
+    const dynamicFare = calculateDynamicFare(distanceKm, targetDate, {
+      durationMinutes: durationMinutes ?? undefined,
+      occupantCount,
+    });
+    setFare(dynamicFare.totalFare);
+    setAppliedTariff(dynamicFare.tariff);
+    setFareComparison(dynamicFare.comparison);
+  }, [distanceKm, durationMinutes, occupantCount, pickupTime]);
 
   const handleBook = async () => {
     if (fare === null || !realPickupCoords || !realDropoffCoords) return
@@ -333,33 +353,64 @@ export default function BookingForm({
       </div>
       
       {fare !== null && distanceKm !== null && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-3 md:p-4 border border-blue-100 dark:border-blue-900/40 flex justify-between items-center animate-in fade-in zoom-in-95">
-          <div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <p className="text-xs md:text-sm font-bold text-blue-900 dark:text-blue-100">Estimated Fare</p>
-              {durationMinutes && (
-                <span className="text-[10px] font-bold text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/60 px-1.5 py-0.5 rounded">
-                  Live Traffic
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-3 md:p-4 border border-blue-100 dark:border-blue-900/40 space-y-2.5 animate-in fade-in zoom-in-95">
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                <p className="text-xs md:text-sm font-bold text-blue-900 dark:text-blue-100">SOLO Lowest Fare</p>
+                <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded border border-emerald-200/80 dark:border-emerald-800/60">
+                  Price-Beat Guaranteed
                 </span>
+                {durationMinutes && (
+                  <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
+                    Live Traffic
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] md:text-xs text-blue-600 dark:text-blue-300 font-medium">
+                {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''} • {occupantCount === 1 ? 'Solo Saver Rate' : '2 Riders (+R4)'}
+              </p>
+              {appliedTariff && (
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60 shadow-2xs">
+                    {appliedTariff.badge}
+                  </span>
+                  <span className="text-[10px] text-gray-500 dark:text-zinc-400">
+                    {appliedTariff.multiplier > 1.0 ? `+${Math.round((appliedTariff.multiplier - 1) * 100)}% Time-of-Day` : '0% Surge • 0% Commission'}
+                  </span>
+                </div>
               )}
             </div>
-            <p className="text-[11px] md:text-xs text-blue-600 dark:text-blue-300 font-medium">
-              {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''}
-            </p>
-            {appliedTariff && (
-              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60 shadow-2xs">
-                  {appliedTariff.badge}
+            <div className="text-right shrink-0">
+              <div className="text-2xl md:text-3xl font-black text-blue-600 dark:text-blue-400 leading-none">
+                R{fare}
+              </div>
+              {fareComparison && (
+                <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                  Save up to R{fareComparison.riderSavingsMaxZar}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Live Competitor Price Comparison Bar */}
+          {fareComparison && (
+            <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/40 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                <span className="font-semibold text-gray-600 dark:text-gray-300">Compare:</span>
+                <span>
+                  Bolt <span className="line-through text-red-500/80 dark:text-red-400/80 font-bold">~R{fareComparison.boltEstimateZar}</span>
                 </span>
-                <span className="text-[10px] text-gray-500 dark:text-zinc-400">
-                  {appliedTariff.multiplier > 1.0 ? `+${Math.round((appliedTariff.multiplier - 1) * 100)}% Time-of-Day` : 'Standard Rate'}
+                <span>•</span>
+                <span>
+                  Uber <span className="line-through text-red-500/80 dark:text-red-400/80 font-bold">~R{fareComparison.uberEstimateZar}</span>
                 </span>
               </div>
-            )}
-          </div>
-          <div className="text-xl md:text-2xl font-black text-blue-600 dark:text-blue-400">
-            R{fare}
-          </div>
+              <span className="font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300/60 dark:border-emerald-700/50">
+                {fareComparison.savingsPercentVsLowest}%–{fareComparison.savingsPercentVsHighest}% Cheaper
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -369,8 +420,8 @@ export default function BookingForm({
           <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
             Number of Occupants
           </span>
-          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-            Max 2 Riders Per Trip
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            1 Rider = Extra Solo Discount
           </span>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -384,7 +435,7 @@ export default function BookingForm({
             }`}
           >
             <User size={14} className="shrink-0" />
-            <span className="truncate">1 Rider (Solo)</span>
+            <span className="truncate">1 Rider (Lowest)</span>
           </button>
           <button
             type="button"
@@ -396,7 +447,7 @@ export default function BookingForm({
             }`}
           >
             <Users size={14} className="shrink-0" />
-            <span className="truncate">2 Riders (Max)</span>
+            <span className="truncate">2 Riders (+R4)</span>
           </button>
         </div>
       </div>

@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = validateAdminRequest(req);
+  const auth = await validateAdminRequest(req);
   if (!auth.authorized) {
     return NextResponse.json(
       { error: 'Unauthorized: Administrative credentials required to view emergency dispatch logs', reason: auth.reason },

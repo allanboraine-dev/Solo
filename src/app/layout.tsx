@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/Navbar";
 import { PWAProvider } from "@/lib/PWAContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = localFont({
+  src: "./fonts/GeistVF.woff",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "SOLO | Zero-Commission E-Hailing",

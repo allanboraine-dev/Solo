@@ -80,7 +80,7 @@ export async function validateDriverAuthorization(
   targetDriverId: string
 ): Promise<AuthValidationResult> {
   // 1. Allow administrative and founder sessions (Verification Portal, operations review)
-  const adminCheck = validateAdminRequest(req);
+  const adminCheck = await validateAdminRequest(req);
   if (adminCheck.authorized) {
     return {
       authorized: true,

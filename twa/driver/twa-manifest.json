@@ -1,0 +1,45 @@
+{
+  "packageId": "za.co.soloride.driver",
+  "host": "soloride.co.za",
+  "name": "SOLO Driver | Partner Portal",
+  "launcherName": "SOLO Driver",
+  "themeColor": "#09090b",
+  "navigationColor": "#09090b",
+  "backgroundColor": "#09090b",
+  "enableNotifications": true,
+  "startUrl": "/driver",
+  "iconUrl": "https://soloride.co.za/driver-icon-512.png",
+  "maskableIconUrl": "https://soloride.co.za/driver-icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android-driver.keystore",
+    "alias": "solo-driver-key"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Driver Console",
+      "short_name": "Driver",
+      "url": "/driver",
+      "chosenIconUrl": "https://soloride.co.za/driver-icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://soloride.co.za/manifest-driver.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "orientation": "portrait"
+}

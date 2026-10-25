@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { parseHouseNumberFromQuery, searchLocalPlaces } from '../../../utils/mapService.ts';
 import { checkGeocodeRateLimit } from '../../../utils/rateLimit.ts';
+import { haversineDistKm } from '../../../utils/geo.ts';
 
 export interface GeocodePlace {
   id: string | number;
@@ -30,19 +31,6 @@ const GOOGLE_KEY =
 // Default Kimberley CBD coordinates
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };
 
-/**
- * Calculates Haversine distance in kilometers between two GPS coordinates
- */
-function haversineDistKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 3000): Promise<Response | null> {
   const controller = new AbortController();
