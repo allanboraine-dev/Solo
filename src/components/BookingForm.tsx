@@ -254,7 +254,7 @@ export default function BookingForm({
   }
 
   return (
-    <div className="space-y-3.5 md:space-y-4 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-2">
+    <div className="space-y-3.5 md:space-y-4 relative animate-in fade-in slide-in-from-bottom-8 duration-700 w-full pb-6 md:pb-8">
       <div className="space-y-3 relative z-20">
         {/* Pickup Location Search + House/Building Detail (z-30 so dropdown sits above Dropoff) */}
         <div className="space-y-2 relative z-30">
@@ -495,11 +495,11 @@ export default function BookingForm({
         </p>
       </div>
 
-      {/* Primary Request Ride Button Placed Immediately Below Inputs/Fare for 0-Scroll Mobile Access */}
+      {/* Primary Request Ride Button Placed Immediately Below Inputs/Fare */}
       <button 
         onClick={handleBook}
         disabled={isBooking || fare === null}
-        className="w-full bg-blue-600 hover:bg-blue-500 dark:bg-white dark:text-black text-white font-black py-4 px-5 min-h-[56px] rounded-2xl hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-45 disabled:hover:scale-100 shadow-xl shadow-blue-600/25 dark:shadow-white/5 flex justify-center items-center gap-2.5 text-base md:text-lg sticky bottom-0 z-10 text-center leading-snug"
+        className="w-full bg-blue-600 hover:bg-blue-500 dark:bg-white dark:text-black text-white font-black py-4 px-5 min-h-[56px] rounded-2xl hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-45 disabled:hover:scale-100 shadow-xl shadow-blue-600/25 dark:shadow-white/5 flex justify-center items-center gap-2.5 text-base md:text-lg md:relative sticky bottom-0 z-10 text-center leading-snug"
       >
         {isBooking ? (
           <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />

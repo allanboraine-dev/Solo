@@ -1080,11 +1080,11 @@ export default function AdminComplianceDashboard() {
       {/* Driver Document Inspection Modal */}
       {selectedDriver && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setSelectedDriver(null)}
         >
           <div
-            className="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-white space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-white space-y-6 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1357,11 +1357,11 @@ export default function AdminComplianceDashboard() {
       {/* Rejection Reason Modal */}
       {rejectingDoc && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => setRejectingDoc(null)}
         >
           <div
-            className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-white space-y-5 shadow-2xl"
+            className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-6 text-white space-y-5 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
             <div>

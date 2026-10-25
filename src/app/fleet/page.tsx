@@ -1833,8 +1833,8 @@ export default function FleetPage() {
       {/* MODAL: ADD VEHICLE */}
       {/* --------------------------------------------------------------------- */}
       {isAddVehicleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
                 <Car className="text-emerald-500" size={18} />
@@ -1993,8 +1993,8 @@ export default function FleetPage() {
       {/* MODAL: ASSIGN DRIVER */}
       {/* --------------------------------------------------------------------- */}
       {isAssignDriverOpen && selectedVehicleForDriver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
               <div>
                 <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
@@ -2089,8 +2089,8 @@ export default function FleetPage() {
       {/* MODAL: RECORD SHIFT AUDIT */}
       {/* --------------------------------------------------------------------- */}
       {isRecordAuditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
                 <DollarSign className="text-emerald-500" size={18} />

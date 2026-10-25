@@ -272,8 +272,8 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
   }
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-zinc-950 w-full max-w-md rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[10000] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-zinc-950 w-full max-w-md rounded-3xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden relative animate-in zoom-in-95 duration-200 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar">
         
         {/* Close Button */}
         <button

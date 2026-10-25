@@ -68,8 +68,8 @@ export default function RatingModal({
   const activeRating = hoveredStars !== null ? hoveredStars : stars
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[5000] p-4 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-zinc-950 p-6 md:p-8 rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-300 relative">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[5000] p-4 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
+      <div className="bg-white dark:bg-zinc-950 p-6 md:p-8 rounded-3xl max-w-md w-full shadow-2xl border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-300 relative max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
         {isSubmitted ? (
           <div className="text-center py-10 animate-in fade-in duration-300">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto mb-4">

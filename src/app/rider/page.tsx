@@ -910,13 +910,13 @@ export default function RiderPage() {
       </div>
 
       {/* Floating UI Panel / Tablet Dock & Mobile Bottom Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto w-full md:bottom-auto md:right-auto md:top-4 md:left-4 lg:left-6 md:w-[400px] lg:w-[440px] md:max-w-none md:mx-0 flex flex-col z-20 md:max-h-[calc(100vh-104px)] md:max-h-[calc(100dvh-104px)] gpu-composited">
+      <div className="absolute bottom-0 left-0 right-0 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto w-full md:bottom-auto md:right-auto md:top-4 md:left-4 lg:left-6 md:w-[400px] lg:w-[440px] md:max-w-none md:mx-0 flex flex-col z-20 md:max-h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)] gpu-composited">
         <div
           onFocusCapture={() => {
             if (isSheetMinimized) setIsSheetMinimized(false)
           }}
-          className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
-            isSheetMinimized ? 'max-h-[86px] md:max-h-[94px] overflow-hidden' : 'max-h-[78vh] max-h-[78dvh] md:max-h-full'
+          className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col min-h-0 transition-all duration-300 overflow-hidden ${
+            isSheetMinimized ? 'max-h-[86px] md:max-h-[94px]' : 'max-h-[78vh] max-h-[78dvh] md:max-h-[calc(100vh-2rem)] md:max-h-[calc(100dvh-2rem)]'
           }`}
         >
           {/* Sheet Handle / Minimize Toggle */}
@@ -929,7 +929,7 @@ export default function RiderPage() {
             <div className="w-14 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
           </button>
 
-          <div className="p-4 pt-1 pb-5 sm:p-5 md:p-5 lg:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
+          <div className="p-4 pt-1 pb-6 sm:p-5 md:p-5 lg:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                 {/* Row 1: Unobstructed "Where to?" Heading + Utility Controls */}
@@ -1360,8 +1360,8 @@ export default function RiderPage() {
 
       {/* Rider Direct Fare Settlement Modal */}
       {activeTrip?.status === 'payment_pending' && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border-2 border-gray-200 dark:border-white/15 relative animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border-2 border-gray-200 dark:border-white/15 relative animate-in zoom-in-95 duration-300 max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
             {/* Top Close Button */}
             <button
               type="button"
