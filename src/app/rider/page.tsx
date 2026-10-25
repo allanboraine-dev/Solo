@@ -16,7 +16,6 @@ import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { reverseGeocode } from '@/utils/mapService'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
 
 // Dynamically import Map component to disable SSR
@@ -956,7 +955,6 @@ export default function RiderPage() {
                       <HelpCircle size={16} className="shrink-0" />
                       <span>Help</span>
                     </button>
-                    <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800" />
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}

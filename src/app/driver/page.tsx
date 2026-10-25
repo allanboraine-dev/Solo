@@ -17,7 +17,6 @@ import { NotificationPermissionBanner } from '@/components/NotificationPermissio
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { isPlatformOwner, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner'
 import { checkVehicleFleetCoverage } from '@/utils/fleetStore'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
 import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
 import SafetyShieldModal from '@/components/SafetyShieldModal'
@@ -1054,7 +1053,6 @@ export default function DriverPage() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <ThemeToggle className="bg-gray-100 dark:bg-zinc-800/80 border border-gray-200/80 dark:border-white/10 flex items-center justify-center touch-manipulation" />
             <button 
               onClick={async () => {
                 const nextOnline = !isOnline;
