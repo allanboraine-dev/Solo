@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { isPlatformOwner, isOwnerPassword } from '@/utils/owner'
+import { isPlatformOwner, isOwnerPassword, FOUNDER_DRIVER_UUID } from '@/utils/owner'
 import { setSafeLocalStorageItem } from '@/utils/session'
 import Link from 'next/link'
 
@@ -39,9 +39,9 @@ export default function DriverLogin() {
           // Fall through to local profile
         }
 
-        // Cache founder profile locally so Driver Portal recognizes Allan Boraine immediately
+        // Cache founder profile locally with canonical RFC-4122 UUID so PostgreSQL RPCs (accept_trip) succeed
         const founderProfile = {
-          id: 'owner-allan-boraine',
+          id: FOUNDER_DRIVER_UUID,
           fullName: 'Allan Boraine (Founder)',
           email: cleanEmail,
           phone: '0829245136',

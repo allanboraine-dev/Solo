@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { isWithinRadiusKm } from '../src/utils/geo.ts';
 import { calculateFare } from '../src/utils/mapService.ts';
-import { isPlatformOwner, applyOwnerPrivileges } from '../src/utils/owner.ts';
+import { isPlatformOwner, applyOwnerPrivileges, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '../src/utils/owner.ts';
 
 describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
   it('simulates the complete trip state machine from booking to Paystack completion', () => {
@@ -157,6 +157,15 @@ describe('End-to-End E-Hailing Trip & SaaS Subscription Lifecycle', () => {
     assert.strictEqual(elevatedProfile.subscriptionPlan, 'owner', 'Owner plan must be set to owner');
     assert.strictEqual(elevatedProfile.subscriptionActive, true, 'Owner subscription must be permanently active');
     assert.strictEqual(elevatedProfile.isVerified, true, 'Owner driver must be automatically KYC-verified');
+
+    // Legacy 'owner-allan-boraine' string ID must be normalized to a valid RFC-4122 UUID so accept_trip RPC succeeds
+    const legacyIdOwner = applyOwnerPrivileges({
+      id: 'owner-allan-boraine',
+      fullName: 'Allan Boraine (Founder)',
+      email: ownerEmail,
+    });
+    assert.strictEqual(legacyIdOwner.id, FOUNDER_DRIVER_UUID, 'Legacy owner ID must normalize to FOUNDER_DRIVER_UUID');
+    assert.strictEqual(resolveDriverUuid('owner-allan-boraine'), FOUNDER_DRIVER_UUID, 'resolveDriverUuid must map owner-allan-boraine to FOUNDER_DRIVER_UUID');
 
     // Regular driver profile must remain untouched
     const regularProfile = {

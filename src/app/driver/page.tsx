@@ -15,7 +15,7 @@ import { fetchDriverKycDocuments } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
-import { isPlatformOwner } from '@/utils/owner'
+import { isPlatformOwner, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner'
 import { checkVehicleFleetCoverage } from '@/utils/fleetStore'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { audioAlert } from '@/utils/audioAlert'
@@ -301,7 +301,8 @@ export default function DriverPage() {
     
     // Check pending/active trips on mount and via polling
     const loadTrips = async () => {
-      const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
+      const rawDriverId = profile?.id || getSafeLocalStorageItem('driver_id');
+      const driverId = rawDriverId ? resolveDriverUuid(rawDriverId) : null;
       if (driverId && isDriverSessionPreempted(driverId, deviceIdRef.current)) {
         setIsOnline(false);
         setRequest(null);
@@ -345,7 +346,10 @@ export default function DriverPage() {
       const active = trips.find(
         t =>
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
-          (driverId ? t.driver_id === driverId : false) &&
+          (driverId
+            ? t.driver_id === driverId ||
+              (driverId === FOUNDER_DRIVER_UUID && t.driver_id === 'owner-allan-boraine')
+            : false) &&
           !declinedIds.has(t.id) &&
           !completedIds.has(t.id) &&
           !isTripDismissed(t.id)
@@ -771,12 +775,19 @@ export default function DriverPage() {
   const handleAccept = async () => {
     if (request) {
       const tripToAccept = request;
-      const driverId =
+      const rawDriverId =
         profile?.id ||
         getSafeLocalStorageItem('driver_id') ||
         generateUuid();
+      const driverId = resolveDriverUuid(rawDriverId);
 
-      const updated: MockTrip = { ...tripToAccept, status: 'accepted', driver_id: driverId };
+      const updated: MockTrip = {
+        ...tripToAccept,
+        status: 'accepted',
+        driver_id: driverId,
+        driver_name: profile?.fullName || tripToAccept.driver_name,
+        vehicle_plate: profile?.licensePlate || tripToAccept.vehicle_plate,
+      };
       recordTripStatusOverride(updated.id, 'accepted', driverId);
       updateActiveTripState(updated);
       setRequest(null);
@@ -809,9 +820,10 @@ export default function DriverPage() {
   const handleDecline = async () => {
     if (!request) return;
     const tripToDecline = request;
-    const driverId =
+    const rawDriverId =
       profile?.id ||
       getSafeLocalStorageItem('driver_id');
+    const driverId = rawDriverId ? resolveDriverUuid(rawDriverId) : null;
     setRequest(null);
     lastAlertedTripIdRef.current = null;
     await declineTrip(tripToDecline, driverId);

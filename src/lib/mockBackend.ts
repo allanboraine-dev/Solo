@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { isPlatformOwner, applyOwnerPrivileges } from '@/utils/owner';
+import { isPlatformOwner, applyOwnerPrivileges, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner';
 import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession, generateUuid, safeJsonParse, getSafeLocalStorageItem, setSafeLocalStorageItem } from '@/utils/session';
 import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
 import { recordCompletedTripToFleetAudit } from '@/utils/fleetStore';
@@ -73,9 +73,15 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
   
   // Get active session from Supabase
   const { data: { session } } = await supabase.auth.getSession();
-  const driverId = session?.user?.id || localStorage.getItem('driver_id');
+  let driverId = session?.user?.id || localStorage.getItem('driver_id');
+  if (driverId === 'owner-allan-boraine') {
+    driverId = FOUNDER_DRIVER_UUID;
+    try {
+      setSafeLocalStorageItem('driver_id', FOUNDER_DRIVER_UUID);
+    } catch {}
+  }
   
-  if (driverId) {
+  if (driverId && UUID_REGEX.test(driverId)) {
     try {
       const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', driverId).single();
       if (data && !error) {
@@ -119,14 +125,15 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
     if (localData) {
       const parsed = safeJsonParse<any>(localData, null);
       if (parsed && typeof parsed === 'object') {
-        if (!parsed.id) {
-          parsed.id = driverId || generateUuid();
-          try {
-            setSafeLocalStorageItem('driver_id', parsed.id);
-            setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(parsed));
-          } catch {}
+        const normalized = applyOwnerPrivileges(parsed);
+        if (!normalized.id || !UUID_REGEX.test(normalized.id)) {
+          normalized.id = driverId && UUID_REGEX.test(driverId) ? driverId : resolveDriverUuid(normalized.id || driverId);
         }
-        return applyOwnerPrivileges(parsed);
+        try {
+          setSafeLocalStorageItem('driver_id', normalized.id);
+          setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(normalized));
+        } catch {}
+        return normalized;
       }
     }
   } catch {
@@ -137,8 +144,9 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
 
 export const getDriverProfileById = async (driverId: string): Promise<MockDriverProfile | null> => {
   if (!driverId) return null;
+  const normalizedDriverId = driverId === 'owner-allan-boraine' ? FOUNDER_DRIVER_UUID : driverId;
   try {
-    const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', driverId).maybeSingle();
+    const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', normalizedDriverId).maybeSingle();
     if (data && !error) {
       const mappedProfile: MockDriverProfile = {
         id: data.id,
@@ -261,6 +269,9 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ensureValidUuid = (value?: string | null): string => {
+  if (value === 'owner-allan-boraine') {
+    return FOUNDER_DRIVER_UUID;
+  }
   if (value && UUID_REGEX.test(value)) {
     return value;
   }
@@ -632,7 +643,7 @@ export const saveTrip = async (trip: MockTrip) => {
         : currentUserId
     );
     const resolvedDriverId =
-      enrichedTrip.driver_id && UUID_REGEX.test(enrichedTrip.driver_id) ? enrichedTrip.driver_id : null;
+      enrichedTrip.driver_id ? resolveDriverUuid(enrichedTrip.driver_id) : null;
 
     // For status updates on existing trips, use UPDATE + SECURITY DEFINER RPCs (never fall through to INSERT/UPSERT which triggers rider-only RLS)
     if (enrichedTrip.status !== 'requested') {
@@ -661,14 +672,20 @@ export const saveTrip = async (trip: MockTrip) => {
 
       // Fallback to SECURITY DEFINER RPCs when RLS blocks direct table UPDATE
       if (enrichedTrip.status === 'accepted') {
-        await supabase.rpc('accept_trip', { p_trip_id: enrichedTrip.id });
+        await supabase.rpc('accept_trip', {
+          p_trip_id: enrichedTrip.id,
+          ...(resolvedDriverId ? { p_driver_id: resolvedDriverId } : {}),
+        });
       } else if (enrichedTrip.status === 'in_progress') {
         const { error: startErr } = await supabase.rpc('start_trip', {
           p_trip_id: enrichedTrip.id,
           p_pin: enrichedTrip.verification_pin || '',
         });
         if (startErr) {
-          await supabase.rpc('accept_trip', { p_trip_id: enrichedTrip.id });
+          await supabase.rpc('accept_trip', {
+            p_trip_id: enrichedTrip.id,
+            ...(resolvedDriverId ? { p_driver_id: resolvedDriverId } : {}),
+          });
           await supabase.rpc('start_trip', {
             p_trip_id: enrichedTrip.id,
             p_pin: enrichedTrip.verification_pin || '',
@@ -731,8 +748,9 @@ export const acceptTripAtomic = async (
   tripId: string,
   driverIdOverride?: string | null
 ): Promise<{ success: boolean; error?: string }> => {
-  const localDriverId =
+  const rawDriverId =
     driverIdOverride || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+  const localDriverId = resolveDriverUuid(rawDriverId);
 
   const result = await soloDispatchService.acceptRideAtomic(tripId, localDriverId);
   if (result.success) {

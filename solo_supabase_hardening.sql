@@ -210,16 +210,17 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error_code', 'RIDE_ALREADY_TAKEN', 'error', 'Trip is no longer available (claimed by another driver).');
     END IF;
 
+    INSERT INTO public.driver_profiles (id, full_name, is_online, is_available, updated_at)
+    VALUES (v_driver_id, 'Registered Driver', true, false, NOW())
+    ON CONFLICT (id) DO UPDATE
+    SET is_available = false,
+        updated_at = NOW();
+
     UPDATE public.trips
     SET driver_id = v_driver_id,
         status = 'accepted',
         updated_at = NOW()
     WHERE id = p_trip_id;
-
-    UPDATE public.driver_profiles
-    SET is_available = false,
-        updated_at = NOW()
-    WHERE id = v_driver_id;
 
     RETURN jsonb_build_object('success', true, 'trip_id', p_trip_id, 'driver_id', v_driver_id, 'fare_amount', v_trip.fare_amount, 'status', 'accepted');
 END;

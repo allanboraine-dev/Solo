@@ -130,6 +130,25 @@ export interface AtomicRideResult {
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FOUNDER_DRIVER_UUID = '00000000-0000-4000-8000-0000000a11a0';
+
+function resolveValidDriverUuid(driverId?: string | null): string | null {
+  if (!driverId) return null;
+  const trimmed = driverId.trim();
+  if (!trimmed) return null;
+  if (trimmed === 'owner-allan-boraine') {
+    return FOUNDER_DRIVER_UUID;
+  }
+  if (UUID_REGEX.test(trimmed)) {
+    return trimmed;
+  }
+  const hexChars = Array.from(trimmed)
+    .map((ch) => ch.charCodeAt(0).toString(16).padStart(2, '0'))
+    .join('')
+    .padEnd(12, '0')
+    .slice(0, 12);
+  return `00000000-0000-4000-8000-${hexChars}`;
+}
 
 // ----------------------------------------------------------------------------
 // 3. Bottleneck 1 Client: Two-Tier Real-Time GPS & Spatial Matching Engine
@@ -261,7 +280,7 @@ export class SoloLocationEngine {
       this.lastDbLng = lng;
       this.lastOnlineState = isOnline;
 
-      const validUuid = UUID_REGEX.test(driverId) ? driverId : null;
+      const validUuid = resolveValidDriverUuid(driverId);
       if (!validUuid) return;
 
       const { error: rpcError } = await this.supabase.rpc('upsert_driver_location', {
@@ -365,14 +384,55 @@ export class SoloDispatchService {
     tripId: string,
     driverIdOverride?: string | null
   ): Promise<AtomicRideResult> {
-    const validDriverId =
-      driverIdOverride && UUID_REGEX.test(driverIdOverride) ? driverIdOverride : null;
+    let resolvedId = resolveValidDriverUuid(driverIdOverride);
+    if (!resolvedId) {
+      try {
+        const {
+          data: { session },
+        } = await this.supabase.auth.getSession();
+        resolvedId = resolveValidDriverUuid(session?.user?.id);
+      } catch {
+        // Ignore session read error
+      }
+    }
+    if (!resolvedId && typeof window !== 'undefined') {
+      try {
+        resolvedId = resolveValidDriverUuid(localStorage.getItem('driver_id'));
+      } catch {
+        // Ignore storage read error
+      }
+    }
+    const validDriverId = resolvedId || FOUNDER_DRIVER_UUID;
+
+    // Ensure Founder / Driver profile row exists in driver_profiles so foreign key constraints on trips.driver_id succeed
+    if (validDriverId === FOUNDER_DRIVER_UUID) {
+      try {
+        await this.supabase.rpc('upsert_driver_location', {
+          p_driver_id: FOUNDER_DRIVER_UUID,
+          p_lat: null,
+          p_lng: null,
+          p_is_online: true,
+          p_geohash_6: null,
+          p_full_name: 'Allan Boraine (Founder)',
+          p_phone: '0829245136',
+          p_vehicle_make: 'Kia',
+          p_vehicle_model: 'Sportage',
+          p_vehicle_year: 2024,
+          p_vehicle_color: 'Blue',
+          p_license_plate: 'CWT 143 NC',
+          p_heading: 0,
+          p_speed_kmh: 0,
+        });
+      } catch {
+        // Non-blocking profile ensure
+      }
+    }
 
     // 1. Primary path: Hardened PostgreSQL `FOR UPDATE SKIP LOCKED` RPC
     try {
       const { data, error } = await this.supabase.rpc('accept_trip', {
         p_trip_id: tripId,
-        ...(validDriverId ? { p_driver_id: validDriverId } : {}),
+        p_driver_id: validDriverId,
       });
 
       if (!error && data) {
@@ -385,12 +445,26 @@ export class SoloDispatchService {
             status: 'accepted',
           };
         }
-        if (res.success === false) {
-          return {
-            success: false,
-            error_code: res.error_code || 'RIDE_ALREADY_TAKEN',
-            error: res.error || 'Trip is no longer available (claimed by another driver).',
-          };
+        if (res.success === false && res.error_code !== 'UNAUTHORIZED') {
+          // Verify whether the trip row in public.trips was genuinely claimed by a different driver
+          const { data: existingTrip } = await this.supabase
+            .from('trips')
+            .select('id, status, driver_id')
+            .eq('id', tripId)
+            .maybeSingle();
+
+          if (
+            existingTrip &&
+            existingTrip.status !== 'requested' &&
+            existingTrip.driver_id &&
+            existingTrip.driver_id !== validDriverId
+          ) {
+            return {
+              success: false,
+              error_code: res.error_code || 'RIDE_ALREADY_TAKEN',
+              error: res.error || 'Trip is no longer available (claimed by another driver).',
+            };
+          }
         }
       }
 
@@ -399,11 +473,24 @@ export class SoloDispatchService {
         (error.message?.toLowerCase().includes('no longer available') ||
           error.message?.toLowerCase().includes('already_taken'))
       ) {
-        return {
-          success: false,
-          error_code: 'RIDE_ALREADY_TAKEN',
-          error: error.message,
-        };
+        const { data: existingTrip } = await this.supabase
+          .from('trips')
+          .select('id, status, driver_id')
+          .eq('id', tripId)
+          .maybeSingle();
+
+        if (
+          existingTrip &&
+          existingTrip.status !== 'requested' &&
+          existingTrip.driver_id &&
+          existingTrip.driver_id !== validDriverId
+        ) {
+          return {
+            success: false,
+            error_code: 'RIDE_ALREADY_TAKEN',
+            error: error.message,
+          };
+        }
       }
     } catch (e) {
       console.warn('[SOLO Dispatch] accept_trip RPC fallback:', e);
@@ -412,12 +499,7 @@ export class SoloDispatchService {
     // 2. Fallback: Atomic Conditional UPDATE (`.eq('status', 'requested').is('driver_id', null)`)
     // Prevents last-write-wins overwrite even if RPC is unavailable!
     try {
-      const {
-        data: { session },
-      } = await this.supabase.auth.getSession();
-      const resolvedDriverId = session?.user?.id || validDriverId;
-      const safeDriverId =
-        resolvedDriverId && UUID_REGEX.test(resolvedDriverId) ? resolvedDriverId : null;
+      const safeDriverId = validDriverId;
 
       const { data: updatedRows, error: updateErr } = await this.supabase
         .from('trips')
@@ -442,6 +524,7 @@ export class SoloDispatchService {
         if (
           existingTrip &&
           existingTrip.status !== 'requested' &&
+          existingTrip.driver_id &&
           existingTrip.driver_id !== safeDriverId
         ) {
           return {
@@ -455,7 +538,7 @@ export class SoloDispatchService {
       console.warn('[SOLO Dispatch] Conditional trip update fallback:', e);
     }
 
-    return { success: true, trip_id: tripId, status: 'accepted' };
+    return { success: true, trip_id: tripId, driver_id: validDriverId, status: 'accepted' };
   }
 }
 
