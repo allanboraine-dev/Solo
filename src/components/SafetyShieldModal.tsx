@@ -73,15 +73,15 @@ export function SafetyFloatingButton({
         onClick();
       }}
       aria-label="Open SOLO South Africa Rapid-Response Safety & Panic Shield"
-      className={`group flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider shadow-2xl border transition-all active:scale-95 pointer-events-auto touch-manipulation ${
+      className={`group flex items-center gap-2 px-4 py-3 min-h-[46px] rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider shadow-2xl border transition-all active:scale-95 pointer-events-auto touch-manipulation ${
         hasActiveAlert
           ? "bg-red-600 text-white border-red-300 animate-pulse shadow-red-600/50"
           : "bg-red-600/95 hover:bg-red-600 text-white border-red-400/50 shadow-red-600/30"
       } ${className}`}
     >
-      <ShieldAlert size={17} className="shrink-0" />
+      <ShieldAlert size={19} className="shrink-0" />
       <span>SOS Panic</span>
-      <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+      <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
     </button>
   );
 }

@@ -923,36 +923,36 @@ export default function RiderPage() {
           <button
             type="button"
             onClick={() => setIsSheetMinimized(prev => !prev)}
-            className="w-full pt-2.5 pb-1 flex flex-col items-center justify-center md:hidden focus:outline-none shrink-0"
+            className="w-full pt-3 pb-1.5 flex flex-col items-center justify-center md:hidden focus:outline-none shrink-0"
             aria-label={isSheetMinimized ? 'Expand booking panel' : 'Minimize booking panel to view map'}
           >
-            <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
+            <div className="w-14 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
           </button>
 
           <div className="p-4 pt-1 pb-5 sm:p-5 md:p-5 lg:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="mb-3 md:mb-4 flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="mb-3.5 md:mb-4 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-lg shadow-blue-500/30 shrink-0">
                       <img
                         src="/rider-icon-192.png"
                         alt="SOLO Rider Portal"
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-[0.9rem] object-cover border border-white/20"
+                        className="w-11 h-11 sm:w-12 sm:h-12 rounded-[0.95rem] object-cover border border-white/20"
                       />
                     </div>
                     <div className="min-w-0">
-                      <h1 className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight leading-tight truncate">Where to?</h1>
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight truncate">Where to?</h1>
                       <button
                         type="button"
                         onClick={() => setShowDriversModal(true)}
                         className="flex items-center gap-1.5 mt-0.5 group text-left transition"
                         title="View all online drivers with drive and car details"
                       >
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                        <span className="text-[11px] sm:text-xs font-semibold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5 truncate">
+                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5 truncate">
                           <span className="truncate">{availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online</span>
-                          <span className="text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-md border border-green-200 dark:border-green-800 hidden sm:inline-flex items-center gap-0.5 shrink-0">
+                          <span className="text-xs font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-md border border-green-200 dark:border-green-800 hidden sm:inline-flex items-center gap-0.5 shrink-0">
                             <span>View</span>
                             <span>&rarr;</span>
                           </span>
@@ -960,44 +960,44 @@ export default function RiderPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowDriversModal(true)}
-                      className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2.5 py-1.5 rounded-xl border border-blue-200/70 dark:border-blue-800/60 transition active:scale-95 shadow-2xs"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-3 py-2 min-h-[42px] rounded-xl border border-blue-200/80 dark:border-blue-800/60 transition active:scale-95 shadow-2xs"
                       title="View all online drivers and vehicles"
                     >
-                      <Car size={14} />
+                      <Car size={16} />
                       <span className="hidden sm:inline md:hidden lg:inline">Drivers</span>
-                      <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                      <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-full">
                         {availableDrivers.length}
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={handleOpenSupport}
-                      className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2.5 py-1.5 rounded-xl border border-amber-200/70 dark:border-amber-800/60 transition active:scale-95 shadow-2xs"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-3 py-2 min-h-[42px] rounded-xl border border-amber-200/80 dark:border-amber-800/60 transition active:scale-95 shadow-2xs"
                       title="Help, Lost & Found, and Trip Support"
                     >
-                      <HelpCircle size={14} />
+                      <HelpCircle size={16} />
                       <span className="hidden sm:inline md:hidden lg:inline">Help</span>
                     </button>
-                    <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-zinc-800" />
+                    <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800" />
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}
-                      className="flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0 transition"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-3 py-2 min-h-[42px] rounded-xl border border-gray-200/80 dark:border-zinc-800 shrink-0 transition"
                       title={isSheetMinimized ? 'Expand booking panel' : 'Minimize panel to inspect map'}
                     >
                       {isSheetMinimized ? (
                         <>
                           <span>Book</span>
-                          <ChevronUp size={14} />
+                          <ChevronUp size={16} />
                         </>
                       ) : (
                         <>
                           <span>Map</span>
-                          <ChevronDown size={14} />
+                          <ChevronDown size={16} />
                         </>
                       )}
                     </button>
@@ -1008,8 +1008,8 @@ export default function RiderPage() {
                   <>
                     <NotificationPermissionBanner role="rider" userId={currentUser?.id} className="mb-3" />
                     {declineNotice && (
-                      <div className="mb-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-medium">
-                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <div className="mb-3 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-sm font-medium">
+                        <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                         <div className="flex-1">
                           <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">Ride Request Declined</p>
                           <p>{declineNotice}</p>
@@ -1017,7 +1017,7 @@ export default function RiderPage() {
                         <button
                           type="button"
                           onClick={() => setDeclineNotice(null)}
-                          className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-1"
+                          className="text-amber-600 dark:text-amber-400 hover:opacity-75 font-bold px-2 py-1"
                         >
                           ✕
                         </button>
@@ -1047,22 +1047,22 @@ export default function RiderPage() {
             ) : (
               <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500">
                 {/* Compact Active Trip Header (Always Visible even when Minimized) */}
-                <div className="flex items-center justify-between gap-2 mb-2.5 shrink-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                    <h2 className="text-base sm:text-lg md:text-xl font-black tracking-tight capitalize truncate">
+                <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight capitalize truncate">
                       {activeTrip.status.replace('_', ' ')}
                     </h2>
                     {activeTrip.verification_pin && (
-                      <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-blue-600 text-white shadow-2xs shrink-0">
+                      <span className="text-xs sm:text-sm font-black px-2.5 py-1 rounded-lg bg-blue-600 text-white shadow-2xs shrink-0">
                         PIN: {activeTrip.verification_pin}
                       </span>
                     )}
-                    <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 shrink-0">
                       R{activeTrip.fare_amount}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {isSheetMinimized && (
                       <button
                         type="button"
@@ -1070,29 +1070,29 @@ export default function RiderPage() {
                           setTripSubTab('chat')
                           setIsSheetMinimized(false)
                         }}
-                        className="relative flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
+                        className="relative flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-3 py-2 min-h-[40px] rounded-xl border border-blue-200 dark:border-blue-800"
                       >
-                        <MessageCircle size={13} />
+                        <MessageCircle size={15} />
                         <span>Chat</span>
                         {unreadChatCount > 0 && (
-                          <span className="w-2 h-2 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
                         )}
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}
-                      className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 transition"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-3 py-2 min-h-[40px] rounded-xl border border-gray-200/80 dark:border-zinc-800 transition"
                     >
                       {isSheetMinimized ? (
                         <>
                           <span>Expand</span>
-                          <ChevronUp size={14} />
+                          <ChevronUp size={16} />
                         </>
                       ) : (
                         <>
                           <span>Map</span>
-                          <ChevronDown size={14} />
+                          <ChevronDown size={16} />
                         </>
                       )}
                     </button>
@@ -1102,32 +1102,32 @@ export default function RiderPage() {
                 {!isSheetMinimized && (
                   <>
                     {/* Segmented Navigation Bar: Eliminates vertical scroll conflict between Trip Details & Chat Input */}
-                    <div className="grid grid-cols-2 gap-1.5 p-1 mb-2.5 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-white/5 shrink-0">
+                    <div className="grid grid-cols-2 gap-2 p-1.5 mb-3 rounded-2xl bg-gray-100 dark:bg-zinc-900 border border-gray-200/80 dark:border-white/10 shrink-0">
                       <button
                         type="button"
                         onClick={() => setTripSubTab('details')}
-                        className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                        className={`flex items-center justify-center gap-2 py-2.5 px-3 min-h-[46px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation ${
                           tripSubTab === 'details'
                             ? 'bg-white dark:bg-zinc-800 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                         }`}
                       >
-                        <MapPin size={14} className={tripSubTab === 'details' ? 'text-blue-600 dark:text-blue-400' : ''} />
+                        <MapPin size={16} className={tripSubTab === 'details' ? 'text-blue-600 dark:text-blue-400' : ''} />
                         <span>Trip Info &amp; PIN</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setTripSubTab('chat')}
-                        className={`relative flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all touch-manipulation ${
+                        className={`relative flex items-center justify-center gap-2 py-2.5 px-3 min-h-[46px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation ${
                           tripSubTab === 'chat'
                             ? 'bg-blue-600 text-white shadow-sm'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                         }`}
                       >
-                        <MessageCircle size={14} />
+                        <MessageCircle size={16} />
                         <span>Chat with Driver</span>
                         {unreadChatCount > 0 && tripSubTab !== 'chat' && (
-                          <span className="px-1.5 py-0.5 text-[10px] font-black bg-red-500 text-white rounded-full animate-bounce leading-none shadow-sm">
+                          <span className="px-2 py-0.5 text-xs font-black bg-red-500 text-white rounded-full animate-bounce leading-none shadow-sm">
                             {unreadChatCount}
                           </span>
                         )}
@@ -1138,30 +1138,30 @@ export default function RiderPage() {
                     {incomingMessageToast && tripSubTab === 'details' && (
                       <div
                         onClick={() => setTripSubTab('chat')}
-                        className="mb-2.5 p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-between gap-2 text-xs font-medium shadow-md cursor-pointer animate-in fade-in slide-in-from-top-2 transition active:scale-[0.98]"
+                        className="mb-3 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-between gap-2 text-sm font-semibold shadow-md cursor-pointer animate-in fade-in slide-in-from-top-2 transition active:scale-[0.98]"
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <MessageCircle size={16} className="shrink-0 animate-pulse text-blue-200" />
+                          <MessageCircle size={18} className="shrink-0 animate-pulse text-blue-200" />
                           <span className="truncate">
                             <strong className="text-blue-100">{incomingMessageToast.sender}:</strong> {incomingMessageToast.text}
                           </span>
                         </div>
-                        <span className="text-[11px] underline shrink-0 font-bold text-blue-100">Reply →</span>
+                        <span className="text-xs underline shrink-0 font-bold text-blue-100">Reply →</span>
                       </div>
                     )}
 
                     {tripSubTab === 'details' ? (
-                      <div className="p-3.5 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/50">
+                      <div className="p-4 md:p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 rounded-2xl border border-blue-200/80 dark:border-blue-800/50">
                         {/* Live ETA & Road Distance Banner */}
                         {activeTrip.status === 'accepted' && (
-                          <div className="mb-3 p-3 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-between gap-3 text-emerald-950 dark:text-emerald-100 animate-in fade-in">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
-                                <Navigation size={16} />
+                          <div className="mb-3.5 p-3.5 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/35 rounded-2xl flex items-center justify-between gap-3 text-emerald-950 dark:text-emerald-100 animate-in fade-in">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                                <Navigation size={18} />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Driver En Route</p>
-                                <p className="text-sm font-bold truncate">
+                                <p className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Driver En Route</p>
+                                <p className="text-base font-bold truncate">
                                   {liveTrackingInfo?.durationMinutes 
                                     ? `Arriving in ~${liveTrackingInfo.durationMinutes} min` 
                                     : 'Approaching pickup point...'}
@@ -1169,7 +1169,7 @@ export default function RiderPage() {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <span className="text-xs font-mono font-black bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                              <span className="text-xs sm:text-sm font-mono font-black bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-2xs">
                                 {liveTrackingInfo?.distanceKm ? `${liveTrackingInfo.distanceKm.toFixed(1)} km` : 'Live GPS'}
                               </span>
                             </div>
@@ -1177,14 +1177,14 @@ export default function RiderPage() {
                         )}
 
                         {activeTrip.status === 'in_progress' && (
-                          <div className="mb-3 p-3 bg-blue-500/15 dark:bg-blue-500/20 border border-blue-500/30 rounded-2xl flex items-center justify-between gap-3 text-blue-950 dark:text-blue-100 animate-in fade-in">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
-                                <Car size={16} />
+                          <div className="mb-3.5 p-3.5 bg-blue-500/15 dark:bg-blue-500/20 border border-blue-500/35 rounded-2xl flex items-center justify-between gap-3 text-blue-950 dark:text-blue-100 animate-in fade-in">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+                                <Car size={18} />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Heading to Destination</p>
-                                <p className="text-sm font-bold truncate">
+                                <p className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Heading to Destination</p>
+                                <p className="text-base font-bold truncate">
                                   {liveTrackingInfo?.durationMinutes 
                                     ? `~${liveTrackingInfo.durationMinutes} min to dropoff` 
                                     : 'En route to destination...'}
@@ -1192,14 +1192,14 @@ export default function RiderPage() {
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <span className="text-xs font-mono font-black bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-2xs">
+                              <span className="text-xs sm:text-sm font-mono font-black bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-2xs">
                                 {liveTrackingInfo?.distanceKm ? `${liveTrackingInfo.distanceKm.toFixed(1)} km` : 'Live GPS'}
                               </span>
                             </div>
                           </div>
                         )}
 
-                        <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 font-semibold">
+                        <p className="text-sm md:text-base text-gray-800 dark:text-gray-200 font-bold">
                           {activeTrip.scheduled_time && activeTrip.status === 'requested' && (
                             <span className="block mb-1 text-blue-500">
                               Scheduled for: {new Date(activeTrip.scheduled_time).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
@@ -1212,17 +1212,17 @@ export default function RiderPage() {
                         </p>
 
                         {/* Route Summary */}
-                        <div className="mt-2.5 pt-2.5 border-t border-blue-200/50 dark:border-blue-800/40 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                            <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{activeTrip.pickup_location}</span>
+                        <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 space-y-1.5 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="flex items-center gap-2.5 truncate">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                            <span className="font-bold text-gray-900 dark:text-gray-100 truncate">{activeTrip.pickup_location}</span>
                           </div>
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="w-2 h-2 rounded-none bg-emerald-500 shrink-0" />
-                            <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{activeTrip.dropoff_location}</span>
+                          <div className="flex items-center gap-2.5 truncate">
+                            <span className="w-2.5 h-2.5 rounded-none bg-emerald-500 shrink-0" />
+                            <span className="font-bold text-gray-900 dark:text-gray-100 truncate">{activeTrip.dropoff_location}</span>
                           </div>
-                          <div className="flex items-center justify-between pt-1 text-[11px]">
-                            <span className="font-medium text-gray-500 dark:text-gray-400">Trip Occupants:</span>
+                          <div className="flex items-center justify-between pt-1.5 text-xs sm:text-sm">
+                            <span className="font-semibold text-gray-600 dark:text-gray-400">Trip Occupants:</span>
                             <span className="font-bold text-blue-600 dark:text-blue-400">
                               {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
                             </span>
@@ -1231,12 +1231,12 @@ export default function RiderPage() {
 
                         {/* Driver Arrived PIN Alert */}
                         {activeTrip.status === 'arrived' && (
-                          <div className="mt-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-2.5 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-pulse">
+                          <div className="mt-3.5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-sm font-bold animate-pulse">
                             <div className="flex items-center gap-2 min-w-0">
-                              <MapPin size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                              <MapPin size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
                               <span className="truncate">Driver is waiting outside. Share PIN to board:</span>
                             </div>
-                            <span className="font-mono font-black text-sm bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
+                            <span className="font-mono font-black text-base sm:text-lg bg-white dark:bg-zinc-900 px-3 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
                               {activeTrip.verification_pin}
                             </span>
                           </div>
@@ -1244,30 +1244,30 @@ export default function RiderPage() {
 
                         {/* Dispatched Driver & Vehicle Identification Card */}
                         {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
-                          <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/80 dark:bg-zinc-950/80 -mx-1 px-3.5 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
+                          <div className="mt-3.5 pt-3.5 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/90 dark:bg-zinc-950/90 -mx-1 px-4 py-3.5 rounded-2xl shadow-sm border border-gray-200/70 dark:border-white/10">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <div className="relative shrink-0">
                                   <img
                                     src="/driver-icon-192.png"
                                     alt="Assigned Driver Avatar"
-                                    className="w-11 h-11 rounded-2xl object-cover border border-emerald-500/40 shadow-md"
+                                    className="w-12 h-12 rounded-2xl object-cover border border-emerald-500/40 shadow-md"
                                   />
-                                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white dark:ring-zinc-950">
+                                  <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white dark:ring-zinc-950">
                                     {assignedDriverInfo?.fullName ? assignedDriverInfo.fullName.charAt(0).toUpperCase() : '✓'}
                                   </span>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-bold text-base text-gray-900 dark:text-white truncate">
                                       {assignedDriverInfo?.fullName || 'Assigned Driver'}
                                     </h4>
-                                    <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
+                                    <span className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full">
                                       ★ {assignedDriverInfo?.rating ? assignedDriverInfo.rating.toFixed(1) : '5.0'}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200 font-bold mt-0.5">
-                                    <Car size={14} className="text-blue-500 shrink-0" />
+                                  <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-200 font-bold mt-0.5">
+                                    <Car size={16} className="text-blue-500 shrink-0" />
                                     <span className="truncate">
                                       {[assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'}
                                     </span>
@@ -1277,33 +1277,33 @@ export default function RiderPage() {
 
                               {/* South African License Plate Number Badge */}
                               <div className="shrink-0 flex flex-col items-end">
-                                <span className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">License Plate</span>
-                                <div className="px-2.5 py-1 bg-amber-300 dark:bg-amber-400 text-black font-mono font-black text-xs sm:text-sm tracking-wider rounded-lg border-2 border-black/60 shadow-sm uppercase flex items-center gap-1">
-                                  <span className="text-[10px] opacity-80">🇿🇦</span>
+                                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">License Plate</span>
+                                <div className="px-3 py-1 bg-amber-300 dark:bg-amber-400 text-black font-mono font-black text-sm sm:text-base tracking-wider rounded-lg border-2 border-black/60 shadow-sm uppercase flex items-center gap-1.5">
+                                  <span className="text-xs opacity-90">🇿🇦</span>
                                   <span>{assignedDriverInfo?.licensePlate || 'NC 482-910'}</span>
                                 </div>
                               </div>
                             </div>
 
                             {/* Security & Verification Reminder + Quick Message Button */}
-                            <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium truncate">
-                                <ShieldCheck size={13} className="shrink-0" /> Verify plate before boarding
+                            <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
+                              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                                <ShieldCheck size={15} className="shrink-0" /> Verify plate before boarding
                               </span>
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-2.5 shrink-0">
                                 <button
                                   type="button"
                                   onClick={() => setTripSubTab('chat')}
-                                  className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg flex items-center gap-1 hover:bg-blue-100 transition"
+                                  className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-100 transition"
                                 >
-                                  <MessageCircle size={11} /> Message Driver
+                                  <MessageCircle size={14} /> Message Driver
                                 </button>
                                 {assignedDriverInfo?.phone && (
                                   <a
                                     href={`tel:${assignedDriverInfo.phone}`}
-                                    className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                                    className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 hover:underline px-2 py-1"
                                   >
-                                    <Phone size={11} /> Call
+                                    <Phone size={14} /> Call
                                   </a>
                                 )}
                               </div>
@@ -1311,35 +1311,35 @@ export default function RiderPage() {
                           </div>
                         )}
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                           <button
                             type="button"
                             onClick={() => setTripSubTab('chat')}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
+                            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 px-3.5 py-2.5 min-h-[44px] rounded-xl shadow-sm transition active:scale-95"
                           >
-                            <MessageCircle size={14} />
+                            <MessageCircle size={16} />
                             <span>Open Driver Chat</span>
                           </button>
                           <a
                             href={buildWhatsAppTripShareUrl(activeTrip)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-2 rounded-xl transition"
+                            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 px-3.5 py-2.5 min-h-[44px] rounded-xl transition"
                           >
-                            <MessageCircle size={14} />
+                            <MessageCircle size={16} />
                             <span>Share via WhatsApp</span>
                           </a>
                           <button
                             type="button"
                             onClick={() => setShowSafetyModal(true)}
-                            className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-red-600 hover:bg-red-500 px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
+                            className="inline-flex items-center gap-2 text-xs sm:text-sm font-black text-white bg-red-600 hover:bg-red-500 px-3.5 py-2.5 min-h-[44px] rounded-xl shadow-sm transition active:scale-95"
                           >
                             <span>🚨 SOS</span>
                           </button>
                           <button
                             type="button"
                             onClick={handleCancelActiveTrip}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-2 rounded-xl transition touch-manipulation"
+                            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3.5 py-2.5 min-h-[44px] rounded-xl transition touch-manipulation"
                           >
                             <span>{activeTrip.status === 'requested' ? 'Cancel Request' : 'Cancel / End Trip'}</span>
                           </button>
@@ -1355,7 +1355,7 @@ export default function RiderPage() {
               </div>
             )}
             <div className="pt-3 mt-2 border-t border-gray-200/50 dark:border-white/5 text-center">
-              <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400 dark:text-gray-500">
+              <p className="text-[11px] font-semibold tracking-widest uppercase text-gray-500 dark:text-gray-400">
                 Built and Powered by <span className="font-black text-blue-600 dark:text-blue-400">Boraine Tech (Pty) Ltd</span>
               </p>
             </div>
@@ -1365,66 +1365,66 @@ export default function RiderPage() {
 
       {/* Rider Direct Fare Settlement Modal */}
       {activeTrip?.status === 'payment_pending' && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-white/10 relative animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-950 rounded-3xl w-full max-w-md p-6 shadow-2xl border-2 border-gray-200 dark:border-white/15 relative animate-in zoom-in-95 duration-300">
             {/* Top Close Button */}
             <button
               type="button"
               onClick={handleForceCloseTrip}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-black dark:hover:text-white transition-colors touch-manipulation"
+              className="absolute top-4 right-4 p-2.5 text-gray-400 hover:text-black dark:hover:text-white transition-colors touch-manipulation"
               title="Close modal"
             >
-              <X size={20} />
+              <X size={22} />
             </button>
-            <div className="flex items-center justify-between mb-1 pr-8">
-              <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Settle Fare</h2>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-2.5 py-1 rounded-full">
-                <ShieldCheck size={13} />
+            <div className="flex items-center justify-between mb-1.5 pr-8">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-gray-900 dark:text-white">Settle Fare</h2>
+              <span className="flex items-center gap-1.5 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 px-3 py-1 rounded-full">
+                <ShieldCheck size={15} />
                 Direct Payment
               </span>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+            <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm sm:text-base">
               Your driver has completed the trip. 100% of your fare goes directly to them.
             </p>
             
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-6 mb-5 border border-blue-100 dark:border-blue-900/50 flex flex-col items-center shadow-inner">
-              <span className="text-blue-800 dark:text-blue-300 font-bold mb-1 uppercase tracking-wider text-xs">Total Due</span>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-6 mb-5 border border-blue-200 dark:border-blue-900/50 flex flex-col items-center shadow-inner">
+              <span className="text-blue-800 dark:text-blue-300 font-bold mb-1 uppercase tracking-wider text-xs sm:text-sm">Total Due</span>
               <span className="font-black text-5xl text-blue-600 dark:text-blue-400">R{activeTrip.fare_amount}</span>
               
-              <div className="w-full mt-4 pt-3 border-t border-blue-200/60 dark:border-blue-900/60 flex justify-between text-xs text-gray-600 dark:text-gray-400">
+              <div className="w-full mt-4 pt-3 border-t border-blue-200/60 dark:border-blue-900/60 flex justify-between text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                 <span>SOLO Platform Commission</span>
                 <span className="font-bold text-green-600 dark:text-green-400">R0.00 (0%)</span>
               </div>
             </div>
 
             {/* Direct In-Vehicle Payment Guidance */}
-            <div className="bg-gray-50 dark:bg-zinc-900/70 rounded-2xl p-4 mb-6 border border-gray-200/80 dark:border-white/5 space-y-2.5 text-xs text-gray-600 dark:text-gray-300">
-              <div className="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
-                <CreditCard size={14} className="text-emerald-600 dark:text-emerald-400" />
+            <div className="bg-gray-50 dark:bg-zinc-900/70 rounded-2xl p-4 mb-6 border border-gray-200/80 dark:border-white/10 space-y-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base">
+                <CreditCard size={18} className="text-emerald-600 dark:text-emerald-400" />
                 <span>Pay Driver Directly</span>
               </div>
-              <p className="text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">
+              <p className="text-xs sm:text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                 Please pay the driver directly using their mobile card machine (Speedpoint POS tap or insert) or with cash.
               </p>
-              <div className="flex items-center gap-2 pt-1 text-[10px] text-gray-400 font-medium">
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Speedpoint POS</span>
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Card Tap / Chip</span>
-                <span className="bg-white dark:bg-zinc-800 px-2 py-0.5 rounded border border-gray-200 dark:border-zinc-700">Cash</span>
+              <div className="flex items-center gap-2 pt-1 text-xs text-gray-600 dark:text-gray-300 font-semibold flex-wrap">
+                <span className="bg-white dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">Speedpoint POS</span>
+                <span className="bg-white dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">Card Tap / Chip</span>
+                <span className="bg-white dark:bg-zinc-800 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700">Cash</span>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
               <button
                 type="button"
                 onClick={handleSettleWithCash}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-2xl transition-all shadow-md shadow-emerald-600/20 flex justify-center items-center gap-2 active:scale-95 text-sm touch-manipulation"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 min-h-[54px] rounded-2xl transition-all shadow-md shadow-emerald-600/25 flex justify-center items-center gap-2 active:scale-95 text-base touch-manipulation"
               >
                 <span>✓ I Have Paid Driver (Speedpoint / Cash)</span>
               </button>
               <button
                 type="button"
                 onClick={handleForceCloseTrip}
-                className="w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 py-1 transition text-center underline touch-manipulation"
+                className="w-full text-xs sm:text-sm font-semibold text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 py-2 transition text-center underline touch-manipulation"
               >
                 Dismiss &amp; Close Trip
               </button>

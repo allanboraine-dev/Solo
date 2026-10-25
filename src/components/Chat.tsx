@@ -98,10 +98,10 @@ export default function Chat({ tripId, role }: ChatProps) {
       {/* Scrollable Message History (isolated scroll container) */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-3 space-y-2"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-3.5 space-y-2.5"
       >
         {messages.length === 0 && (
-          <p className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-5 font-medium">
             No messages yet. Tap a quick reply below or type a message to the {role === 'rider' ? 'driver' : 'rider'}.
           </p>
         )}
@@ -110,10 +110,10 @@ export default function Chat({ tripId, role }: ChatProps) {
           return (
             <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[84%] px-3 py-2 rounded-2xl text-xs sm:text-sm leading-snug shadow-2xs ${
+                className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-snug shadow-2xs ${
                   isMe
-                    ? 'bg-blue-600 text-white rounded-br-xs font-medium'
-                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-gray-100 rounded-bl-xs'
+                    ? 'bg-blue-600 text-white rounded-br-xs font-semibold'
+                    : 'bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-gray-100 rounded-bl-xs font-medium'
                 }`}
               >
                 {m.text}
@@ -124,13 +124,13 @@ export default function Chat({ tripId, role }: ChatProps) {
       </div>
 
       {/* 1-Tap Mobile Quick-Reply Chips (Zero typing needed while moving) */}
-      <div className="px-2.5 py-1.5 bg-gray-50/90 dark:bg-zinc-900/90 border-t border-gray-200/70 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      <div className="px-3 py-2 bg-gray-50/95 dark:bg-zinc-900/95 border-t border-gray-200/80 dark:border-zinc-800 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
         {quickReplies.map((chip) => (
           <button
             key={chip}
             type="button"
             onClick={() => sendText(chip)}
-            className="shrink-0 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-gray-200 dark:border-zinc-700 text-[11px] font-semibold text-gray-700 dark:text-gray-200 active:scale-95 transition whitespace-nowrap"
+            className="shrink-0 px-3.5 py-2 min-h-[38px] rounded-full bg-white dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 border border-gray-200 dark:border-zinc-700 text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 active:scale-95 transition whitespace-nowrap"
           >
             {chip}
           </button>
@@ -138,7 +138,7 @@ export default function Chat({ tripId, role }: ChatProps) {
       </div>
 
       {/* Keyboard-Friendly Input Bar (Always fully displayed & pinned) */}
-      <div className="p-2 sm:p-2.5 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center gap-2 shrink-0 z-20">
+      <div className="p-2.5 sm:p-3 border-t border-gray-200 dark:border-zinc-800 bg-gray-50/95 dark:bg-zinc-900/95 backdrop-blur-md flex items-center gap-2 shrink-0 z-20">
         <input 
           ref={inputRef}
           type="text" 
@@ -151,16 +151,16 @@ export default function Chat({ tripId, role }: ChatProps) {
           }}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder={`Message ${role === 'rider' ? 'driver' : 'rider'}...`}
-          className="flex-1 min-w-0 px-3 py-2.5 text-base sm:text-sm border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-black outline-none focus:border-blue-500 text-gray-900 dark:text-white"
+          className="flex-1 min-w-0 px-3.5 py-3 min-h-[46px] text-base border border-gray-300 dark:border-zinc-700 rounded-xl bg-white dark:bg-black outline-none focus:border-blue-500 text-gray-900 dark:text-white font-medium"
         />
         <button 
           type="button"
           onClick={handleSend}
           disabled={!input.trim()}
-          className="px-3.5 sm:px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold disabled:opacity-40 shrink-0 flex items-center justify-center gap-1.5 active:scale-95 transition min-w-[76px] h-10 shadow-sm whitespace-nowrap cursor-pointer touch-manipulation"
+          className="px-4 sm:px-5 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-sm sm:text-base font-bold disabled:opacity-40 shrink-0 flex items-center justify-center gap-2 active:scale-95 transition min-w-[88px] min-h-[46px] shadow-sm whitespace-nowrap cursor-pointer touch-manipulation"
           title="Send message"
         >
-          <Send size={15} className="shrink-0" />
+          <Send size={17} className="shrink-0" />
           <span className="shrink-0 font-bold">Send</span>
         </button>
       </div>

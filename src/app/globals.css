@@ -28,10 +28,14 @@ body {
   background: var(--background);
   height: 100%;
   min-height: 100%;
+  font-size: 16px;
+  line-height: 1.5;
   overscroll-behavior-y: contain;
   overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Fast tap response & eliminate 300ms mobile touch delay across Samsung Internet & WebKit */

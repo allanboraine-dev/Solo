@@ -504,13 +504,13 @@ export default function CustomSearchInput({
           spellCheck={false}
           autoComplete="off"
           placeholder={placeholder}
-          className={`w-full p-3 md:p-4 bg-transparent outline-none font-medium text-base sm:text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100 ${
-            hasRightAction ? 'pr-20' : 'pr-10'
+          className={`w-full p-3.5 md:p-4 min-h-[52px] bg-transparent outline-none font-semibold text-base placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-gray-100 ${
+            hasRightAction ? 'pr-24' : 'pr-12'
           }`}
         />
         {isLoading ? (
-          <div className={`absolute ${hasRightAction ? 'right-12' : 'right-4'} top-1/2 -translate-y-1/2 pointer-events-none`}>
-            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className={`absolute ${hasRightAction ? 'right-14' : 'right-4'} top-1/2 -translate-y-1/2 pointer-events-none`}>
+            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : value ? (
           <button
@@ -523,11 +523,11 @@ export default function CustomSearchInput({
               setActiveIndex(-1)
             }}
             className={`absolute ${
-              hasRightAction ? 'right-12' : 'right-3.5'
-            } top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full transition`}
+              hasRightAction ? 'right-14' : 'right-3'
+            } top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-full transition`}
             title="Clear address"
           >
-            <X size={14} />
+            <X size={18} />
           </button>
         ) : null}
       </div>
@@ -549,9 +549,9 @@ export default function CustomSearchInput({
                     onGetCurrentLocation()
                     setIsOpen(false)
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-300 text-xs font-bold transition border border-blue-200/60 dark:border-blue-800/50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 min-h-[44px] rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 dark:text-blue-300 text-xs sm:text-sm font-bold transition border border-blue-200/60 dark:border-blue-800/50"
                 >
-                  <LocateFixed size={14} className="shrink-0" />
+                  <LocateFixed size={16} className="shrink-0" />
                   <span>Use Current GPS</span>
                 </button>
               )}
@@ -563,9 +563,9 @@ export default function CustomSearchInput({
                     onSelectOnMap()
                     setIsOpen(false)
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-xs font-bold transition border border-emerald-200/60 dark:border-emerald-800/50"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 min-h-[44px] rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-xs sm:text-sm font-bold transition border border-emerald-200/60 dark:border-emerald-800/50"
                 >
-                  <MapIcon size={14} className="shrink-0" />
+                  <MapIcon size={16} className="shrink-0" />
                   <span>Choose on Map</span>
                 </button>
               )}
@@ -573,7 +573,7 @@ export default function CustomSearchInput({
           )}
 
           {/* Category Tabs Header */}
-          <div className="px-3 py-2 bg-gray-50/60 dark:bg-zinc-800/50 border-b border-gray-200/70 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-3 py-2.5 bg-gray-50/60 dark:bg-zinc-800/50 border-b border-gray-200/70 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {CATEGORIES.map((cat) => (
                 <button
@@ -581,10 +581,10 @@ export default function CustomSearchInput({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                  className={`px-3 py-1.5 min-h-[36px] rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition ${
                     activeCategory === cat.id
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-white dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 border border-gray-200/60 dark:border-zinc-700'
+                      : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700 border border-gray-200/80 dark:border-zinc-700'
                   }`}
                 >
                   {cat.label}
@@ -595,7 +595,7 @@ export default function CustomSearchInput({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 px-1.5 py-0.5 rounded shrink-0"
+              className="text-sm font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 px-2.5 py-1 rounded-lg shrink-0"
             >
               ✕
             </button>
@@ -604,17 +604,17 @@ export default function CustomSearchInput({
           {/* Recent Searches Section (when input is empty) */}
           {(!value || value.trim().length === 0) && recentSearches.length > 0 && (
             <div className="border-b border-gray-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 shrink-0">
-              <div className="px-3 py-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-400">
+              <div className="px-3.5 py-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1.5">
-                  <Clock size={12} className="text-blue-500" /> Recent Locations
+                  <Clock size={14} className="text-blue-500" /> Recent Locations
                 </span>
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={handleClearHistory}
-                  className="text-gray-400 hover:text-red-500 text-[10px] font-semibold lowercase flex items-center gap-1"
+                  className="text-gray-500 hover:text-red-500 text-xs font-bold lowercase flex items-center gap-1 px-2 py-0.5"
                 >
-                  <Trash2 size={10} /> clear
+                  <Trash2 size={12} /> clear
                 </button>
               </div>
               <div className="divide-y divide-gray-50 dark:divide-zinc-800/40">
@@ -623,16 +623,16 @@ export default function CustomSearchInput({
                     key={`desk-recent-${item.id}-${idx}`}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSelect(item)}
-                    className="px-3.5 py-2 cursor-pointer flex items-center justify-between hover:bg-blue-50/50 dark:hover:bg-zinc-800/60 transition"
+                    className="px-3.5 py-2.5 cursor-pointer flex items-center justify-between hover:bg-blue-50/50 dark:hover:bg-zinc-800/60 transition"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <Clock size={14} className="text-gray-400 shrink-0" />
+                      <Clock size={16} className="text-gray-400 shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{item.display_name}</p>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.display_name}</p>
                       </div>
                     </div>
-                    <span className="text-[10px] text-blue-600 font-bold shrink-0">Select</span>
+                    <span className="text-xs text-blue-600 font-bold shrink-0">Select</span>
                   </div>
                 ))}
               </div>
@@ -641,15 +641,15 @@ export default function CustomSearchInput({
 
           {/* Popular Hubs Quick Pill Row */}
           {(!value || value.trim().length === 0) && (
-            <div className="px-3 py-1.5 bg-gray-50/40 dark:bg-zinc-900/50 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Popular:</span>
+            <div className="px-3 py-2 bg-gray-50/40 dark:bg-zinc-900/50 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">Popular:</span>
               {popularHubs.map((hub) => (
                 <button
                   key={`desk-hub-${hub.name}`}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleAutofill(hub.query)}
-                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-zinc-800 border border-gray-200/70 dark:border-zinc-700 hover:bg-blue-50 hover:text-blue-600 text-gray-700 dark:text-gray-300 whitespace-nowrap shrink-0 transition"
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200/80 dark:border-zinc-700 hover:bg-blue-50 hover:text-blue-600 text-gray-700 dark:text-gray-200 whitespace-nowrap shrink-0 transition"
                 >
                   {hub.name}
                 </button>
@@ -695,10 +695,10 @@ export default function CustomSearchInput({
 
           {/* Smart Auto-fill Banner as user types */}
           {topMatch && (
-            <div className="px-3.5 py-2 bg-blue-50/90 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between gap-2 shrink-0">
+            <div className="px-3.5 py-2.5 bg-blue-50/90 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <Sparkles size={14} className="text-blue-600 shrink-0" />
-                <span className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                <Sparkles size={16} className="text-blue-600 shrink-0" />
+                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 truncate">
                   Auto-fill: <strong className="text-blue-700 dark:text-blue-300 font-bold">{topMatch.name}</strong>
                 </span>
               </div>
@@ -706,7 +706,7 @@ export default function CustomSearchInput({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleAutofill(topMatch.name)}
-                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shrink-0 active:scale-95 transition"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shrink-0 active:scale-95 transition"
               >
                 Auto-fill ⇥
               </button>
@@ -715,8 +715,8 @@ export default function CustomSearchInput({
 
           {/* Quick House Number Chips (e.g. user typed "Memorial Road") */}
           {isStreetWithoutNumber && (
-            <div className="px-3 py-1.5 bg-gray-50/80 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">
+            <div className="px-3 py-2 bg-gray-50/80 dark:bg-zinc-900/60 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">
                 Add House #:
               </span>
               {['1', '5', '10', '12', '14', '20', '25', '50'].map((num) => (
@@ -725,7 +725,7 @@ export default function CustomSearchInput({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleAutofill(`${num} ${value.trim()}`)}
-                  className="px-2 py-0.5 rounded-md text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-blue-50 text-gray-800 dark:text-gray-200 shrink-0"
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-blue-50 text-gray-800 dark:text-gray-200 shrink-0"
                 >
                   #{num}
                 </button>
@@ -752,36 +752,36 @@ export default function CustomSearchInput({
                     }}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSelect(place)}
-                    className={`p-3 md:p-3.5 cursor-pointer flex items-center justify-between gap-3 transition-colors ${
+                    className={`p-3.5 md:p-4 cursor-pointer flex items-center justify-between gap-3 transition-colors ${
                       isSelected
                         ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100'
                         : 'hover:bg-blue-50/60 dark:hover:bg-zinc-800/70'
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="p-2 rounded-xl bg-blue-50/80 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 shadow-2xs">
+                      <div className="p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 shadow-2xs">
                         {getCategoryIcon(place)}
                       </div>
                       <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                          <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-snug">
+                          <span className="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 leading-snug">
                             {highlightMatch(place.name, value)}
                           </span>
                           {place.houseNumber && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
                               #{place.houseNumber}
                             </span>
                           )}
                           {place.category === 'address' && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50">
                               Street Address
                             </span>
                           )}
-                          <span className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded ml-auto">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded ml-auto">
                             {distLabel}
                           </span>
                         </div>
-                        <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-1 leading-relaxed">
+                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-1 leading-relaxed">
                           {place.display_name || subLabel}
                         </span>
                       </div>
@@ -795,11 +795,11 @@ export default function CustomSearchInput({
                         e.stopPropagation()
                         handleAutofill(place.name)
                       }}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-100/60 dark:hover:bg-zinc-700 transition shrink-0"
+                      className="p-2 rounded-xl text-gray-400 hover:text-blue-600 hover:bg-blue-100/60 dark:hover:bg-zinc-700 transition shrink-0"
                       title={`Autofill "${place.name}"`}
                       aria-label="Autofill this location"
                     >
-                      <ArrowUpRight size={16} />
+                      <ArrowUpRight size={18} />
                     </button>
                   </div>
                 )
