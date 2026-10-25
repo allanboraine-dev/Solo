@@ -6,13 +6,25 @@ export async function GET() {
     name: 'SOLO Rider | Fair Rides',
     short_name: 'SOLO Rider',
     description: 'Zero-commission e-hailing for South African commuters. Direct driver payment, fair fares.',
-    start_url: '/rider',
-    scope: '/rider',
+    start_url: '/rider?source=pwa',
+    scope: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     orientation: 'portrait',
     background_color: '#09090b',
     theme_color: '#2563eb',
     categories: ['travel', 'transportation'],
+    prefer_related_applications: false,
+    related_applications: [
+      {
+        platform: 'webapp',
+        url: '/manifest-rider.json'
+      },
+      {
+        platform: 'webapp',
+        url: '/manifest.json'
+      }
+    ],
     icons: [
       {
         src: '/rider-icon-192.png',
@@ -41,7 +53,7 @@ export async function GET() {
     shortcuts: [
       {
         name: "Book a Ride",
-        url: "/rider",
+        url: "/rider?source=pwa",
         icons: [{ src: "/rider-icon-192.png", sizes: "192x192" }]
       }
     ]

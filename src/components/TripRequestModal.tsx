@@ -25,8 +25,8 @@ export default function TripRequestModal({ request, onAccept, onDecline }: TripR
   if (!request) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto">
-      <div className="bg-white dark:bg-zinc-950 p-5 sm:p-6 rounded-3xl max-w-sm w-full shadow-2xl border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar flex flex-col justify-between">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-3 sm:p-5 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto">
+      <div className="bg-white dark:bg-zinc-950 p-5 sm:p-6 md:p-7 rounded-3xl max-w-sm sm:max-w-md w-full shadow-2xl border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-300 max-h-[92vh] max-h-[92dvh] overflow-y-auto custom-scrollbar flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60 animate-pulse">

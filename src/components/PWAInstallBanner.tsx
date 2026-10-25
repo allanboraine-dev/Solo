@@ -1,7 +1,7 @@
 "use client";
 
 import { usePWA } from "@/lib/PWAContext";
-import { Download, X, Share, PlusSquare, Smartphone, Check } from "lucide-react";
+import { Download, X, Share, PlusSquare, Check } from "lucide-react";
 import Image from "next/image";
 
 interface PWAInstallBannerProps {
@@ -12,7 +12,8 @@ interface PWAInstallBannerProps {
 export function PWAInstallBanner({ appName = "SOLO", role = "rider" }: PWAInstallBannerProps) {
   const {
     isStandalone,
-    isIOS,
+    isInstalled,
+    isPwaReady,
     showIosGuide,
     setShowIosGuide,
     installApp,
@@ -20,8 +21,8 @@ export function PWAInstallBanner({ appName = "SOLO", role = "rider" }: PWAInstal
     isBannerDismissed,
   } = usePWA();
 
-  // If already running in standalone mode (already installed), never show the banner
-  if (isStandalone) return null;
+  // If already running in standalone mode or already installed, never show the banner
+  if (!isPwaReady || isStandalone || isInstalled) return null;
 
   const isDriver = role === "driver";
   const iconSrc = isDriver ? "/driver-icon-192.png" : "/rider-icon-192.png";

@@ -976,8 +976,8 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Header */}
-      <div className="absolute top-2 sm:top-2.5 md:top-4 pt-safe left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 z-30 pointer-events-auto">
-        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-white/40 dark:border-white/10 p-2.5 sm:p-3.5 md:p-5 flex justify-between items-center gap-2.5 transition-all">
+      <div className="absolute top-2 sm:top-2.5 md:top-3.5 pt-safe left-2.5 right-2.5 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto md:left-4 lg:left-6 md:right-auto md:mx-0 md:w-[390px] lg:w-[430px] md:max-w-none z-30 pointer-events-auto">
+        <div className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-white/40 dark:border-white/10 p-2.5 sm:p-3.5 md:p-3.5 lg:p-4 flex justify-between items-center gap-2.5 transition-all">
           <div className="relative shrink-0">
             <img
               src="/driver-icon-192.png"
@@ -1115,10 +1115,12 @@ export default function DriverPage() {
 
       {/* Floating Main Content Panel */}
       <div 
-        className={`absolute left-2.5 right-2.5 md:left-8 md:right-auto md:w-96 flex flex-col z-20 pointer-events-none transition-all duration-300 ${
+        className={`absolute left-2.5 right-2.5 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto md:left-4 lg:left-6 md:right-auto md:mx-0 md:w-[390px] lg:w-[430px] md:max-w-none flex flex-col z-20 pointer-events-none transition-all duration-300 ${
           activeTab === 'home'
-            ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28 md:top-28 max-h-[72vh] max-h-[72dvh] md:max-h-none'
-            : 'top-[76px] sm:top-[86px] md:top-28 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-28'
+            ? isHomeSheetMinimized
+              ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-auto md:top-[88px] max-h-[52px]'
+              : 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-[82px] md:top-[88px] max-h-[72vh] max-h-[72dvh] md:max-h-none'
+            : 'top-[76px] sm:top-[86px] md:top-[88px] bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-[82px]'
         }`}
       >
         <div
@@ -1127,11 +1129,11 @@ export default function DriverPage() {
           }}
           className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-3xl shadow-2xl rounded-3xl border border-white/40 dark:border-white/10 overflow-hidden flex flex-col h-full pointer-events-auto gpu-composited"
         >
-          {/* Mobile Handle for Home tab */}
+          {/* Handle / Collapse Bar for Home tab (Mobile & Tablet) */}
           {activeTab === 'home' && (
             <div 
               onClick={() => setIsHomeSheetMinimized(!isHomeSheetMinimized)}
-              className="md:hidden flex items-center justify-between px-4 py-2.5 bg-gray-50/80 dark:bg-zinc-900/80 border-b border-gray-100 dark:border-white/5 cursor-pointer touch-manipulation select-none"
+              className="flex items-center justify-between px-4 py-2.5 bg-gray-50/80 dark:bg-zinc-900/80 border-b border-gray-100 dark:border-white/5 cursor-pointer touch-manipulation select-none shrink-0"
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-1 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
@@ -1170,12 +1172,12 @@ export default function DriverPage() {
             </div>
           )}
 
-          <div className={`p-3.5 sm:p-4 md:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
+          <div className={`p-3.5 sm:p-4 md:p-5 lg:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
             activeTab === 'home' && isHomeSheetMinimized
-              ? 'hidden md:flex'
+              ? 'hidden'
               : activeTab === 'home' && activeTrip
-                ? (driverTripSubTab === 'chat' ? 'pb-10 md:pb-6' : 'pb-4 md:pb-6')
-                : 'pb-28 md:pb-8'
+                ? (driverTripSubTab === 'chat' ? 'pb-10 md:pb-5' : 'pb-4 md:pb-5')
+                : 'pb-16 md:pb-6'
           }`}>
             {activeTab === 'home' && (
               activeTrip ? (
@@ -1551,7 +1553,7 @@ export default function DriverPage() {
                       </button>
                     </div>
                   )}
-                  <div className="mb-6 flex justify-center">
+                  <div className="mb-4 sm:mb-5 flex justify-center">
                     <div className={`relative p-1.5 rounded-[1.75rem] transition-all duration-500 ${
                       isOnline
                         ? 'bg-gradient-to-br from-emerald-400 via-teal-500 to-green-600 shadow-2xl shadow-emerald-500/35 scale-105'
@@ -1560,7 +1562,7 @@ export default function DriverPage() {
                       <img
                         src="/driver-icon-512.png"
                         alt="SOLO Driver Emblem"
-                        className="w-20 h-20 rounded-[1.4rem] object-cover border border-white/20 shadow-inner"
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.4rem] object-cover border border-white/20 shadow-inner"
                       />
                       <span
                         className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${
@@ -1569,10 +1571,10 @@ export default function DriverPage() {
                       />
                     </div>
                   </div>
-                  <h2 className="text-3xl font-bold mb-3 tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
                     {isOnline ? "You're Online" : "You're Offline"}
                   </h2>
-                  <p className="text-gray-500 mb-8 font-medium">
+                  <p className="text-gray-500 text-sm sm:text-base mb-5 sm:mb-6 font-medium">
                     {isOnline 
                       ? "Waiting for ride requests in your area..." 
                       : "Go online to start receiving ride requests."}
@@ -2119,7 +2121,7 @@ export default function DriverPage() {
       </div>
 
       {/* Floating Bottom Navigation */}
-      <div className="absolute bottom-2.5 sm:bottom-4 mb-safe inset-x-2.5 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full max-w-md mx-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-gray-200/80 dark:border-white/10 p-1 sm:p-1.5 flex justify-between items-center gap-1 rounded-2xl sm:rounded-3xl shadow-2xl z-30 pointer-events-auto">
+      <div className="absolute bottom-2.5 sm:bottom-3.5 mb-safe inset-x-2.5 sm:inset-x-4 sm:max-w-xl sm:mx-auto md:inset-x-auto md:left-4 lg:left-6 md:w-[390px] lg:w-[430px] md:max-w-none md:mx-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-gray-200/80 dark:border-white/10 p-1 sm:p-1.5 flex justify-between items-center gap-1 rounded-2xl sm:rounded-3xl shadow-2xl z-30 pointer-events-auto">
         <button 
           onClick={() => {
             setActiveTab('home')

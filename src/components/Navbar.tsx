@@ -8,13 +8,15 @@ import { usePWA } from "@/lib/PWAContext";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { isStandalone, installedRole, installApp } = usePWA();
+  const { isStandalone, isInstalled, isPwaReady, installedRole, installApp } = usePWA();
 
   const isRiderApp = pathname?.startsWith("/rider");
   const isDriverApp = pathname?.startsWith("/driver");
+  const isFleetApp = pathname?.startsWith("/fleet");
+  const isAppAlreadyInstalled = isStandalone || isInstalled;
 
-  // In standalone installed PWA mode, tapping the brand logo stays inside the installed portal
-  const brandHref = isStandalone
+  // In standalone / installed PWA mode, tapping the brand logo stays inside the installed portal
+  const brandHref = isAppAlreadyInstalled
     ? isDriverApp || installedRole === "driver"
       ? "/driver"
       : isRiderApp || installedRole === "rider"
@@ -23,10 +25,13 @@ export function Navbar() {
     : "/";
 
   return (
-    <div className="fixed top-2.5 md:top-4 pt-safe left-0 right-0 flex justify-center z-[1000] pointer-events-none px-3 md:px-4">
-      <nav className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3 bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-gray-200/60 dark:border-white/10 rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 w-full max-w-2xl pointer-events-auto transition-all">
-        <div className="flex gap-3 md:gap-6 items-center">
-          <Link href={brandHref} className="flex items-center gap-2 font-extrabold text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
+    <div className="fixed top-2 sm:top-2.5 md:top-3 pt-safe left-0 right-0 flex justify-center z-[1000] pointer-events-none px-3 sm:px-4 md:px-6">
+      <nav className="flex items-center justify-between px-3.5 sm:px-5 md:px-6 py-2 md:py-2.5 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-gray-200/70 dark:border-white/10 rounded-full shadow-lg shadow-black/5 dark:shadow-black/25 w-full max-w-xl md:max-w-2xl lg:max-w-3xl pointer-events-auto transition-all">
+        <div className="flex gap-2.5 sm:gap-4 md:gap-5 items-center min-w-0">
+          <Link
+            href={brandHref}
+            className="flex items-center gap-2 font-extrabold text-base sm:text-lg md:text-xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600 shrink-0"
+          >
             <img
               src={isDriverApp ? "/driver-icon-192.png" : isRiderApp ? "/rider-icon-192.png" : "/icon-192.png"}
               alt="SOLO Logo"
@@ -34,51 +39,80 @@ export function Navbar() {
             />
             <span>SOLO</span>
           </Link>
-          
-          {!isDriverApp && (!isStandalone || installedRole !== "driver") && (
+
+          {!isDriverApp && !isAppAlreadyInstalled && (
             <Link
               href="/rider"
-              className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 border border-blue-500/20 px-2.5 py-1 rounded-full transition-all"
+              className={`flex items-center gap-1.5 text-xs md:text-sm font-bold px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
+                isRiderApp
+                  ? "bg-blue-600 text-white border-blue-500 shadow-xs"
+                  : "text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 border-blue-500/20"
+              }`}
             >
               <img
                 src="/rider-icon-192.png"
                 alt="Rider Portal"
-                className="w-5 h-5 rounded-md object-cover border border-blue-400/40 shadow-2xs"
+                className="w-4 h-4 sm:w-5 sm:h-5 rounded-md object-cover border border-blue-400/40 shadow-2xs"
               />
               <span>Rider</span>
             </Link>
           )}
-          
-          {!isRiderApp && (!isStandalone || installedRole !== "rider") && (
+
+          {!isRiderApp && !isAppAlreadyInstalled && (
             <Link
               href="/driver"
-              className="flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-1 rounded-full transition-all"
+              className={`flex items-center gap-1.5 text-xs md:text-sm font-bold px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
+                isDriverApp
+                  ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
+                  : "text-gray-700 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/15 border-emerald-500/20"
+              }`}
             >
               <img
                 src="/driver-icon-192.png"
                 alt="Driver Portal"
-                className="w-5 h-5 rounded-md object-cover border border-emerald-400/40 shadow-2xs"
+                className="w-4 h-4 sm:w-5 sm:h-5 rounded-md object-cover border border-emerald-400/40 shadow-2xs"
               />
               <span>Driver</span>
             </Link>
           )}
 
-          {!isDriverApp && !isRiderApp && (
+          {!isDriverApp && !isRiderApp && !isAppAlreadyInstalled && (
             <Link
               href="/fleet"
-              className="hidden sm:flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 border border-purple-500/20 px-2.5 py-1 rounded-full transition-all"
+              className={`hidden sm:flex items-center gap-1.5 text-xs md:text-sm font-bold px-2.5 sm:px-3 py-1 rounded-full border transition-all ${
+                isFleetApp
+                  ? "bg-purple-600 text-white border-purple-500 shadow-xs"
+                  : "text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15 border-purple-500/20"
+              }`}
             >
               <span>Fleet</span>
             </Link>
           )}
+
+          {isAppAlreadyInstalled && (isDriverApp || isRiderApp) && (
+            <span
+              className={`inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-full border ${
+                isDriverApp
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25"
+                  : "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isDriverApp ? "bg-emerald-500" : "bg-blue-500"
+                }`}
+              />
+              <span>{isDriverApp ? "Driver Portal" : "Rider App"}</span>
+            </span>
+          )}
         </div>
-        
-        <div className="flex items-center gap-2">
-          {!isStandalone && (isDriverApp || isRiderApp) && (
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isPwaReady && !isAppAlreadyInstalled && (isDriverApp || isRiderApp) && (
             <button
               type="button"
               onClick={() => installApp(isDriverApp ? "driver" : "rider")}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold border transition-all active:scale-95 ${
                 isDriverApp
                   ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
                   : "bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30"
@@ -92,8 +126,8 @@ export function Navbar() {
               <span className="sm:hidden">Install</span>
             </button>
           )}
-          <div className="relative pl-1 md:pl-2">
-             <ThemeToggle />
+          <div className="relative pl-0.5 sm:pl-1">
+            <ThemeToggle />
           </div>
         </div>
       </nav>

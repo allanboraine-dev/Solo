@@ -80,9 +80,15 @@ label,
   }
 
   .h-mobile-portal {
-    height: calc(100vh - 64px);
-    height: calc(var(--vh, 1vh) * 100 - 64px);
-    height: calc(100dvh - 64px);
+    height: calc(100vh - 56px);
+    height: calc(var(--vh, 1vh) * 100 - 56px);
+    height: calc(100dvh - 56px);
+  }
+
+  .min-h-mobile-portal {
+    min-height: calc(100vh - 56px);
+    min-height: calc(var(--vh, 1vh) * 100 - 56px);
+    min-height: calc(100dvh - 56px);
   }
 
   /* Safe-area insets for notches, dynamic islands, and gesture navigation bars */
@@ -112,11 +118,29 @@ label,
   }
 }
 
+@media (min-width: 640px) {
+  .h-mobile-portal {
+    height: calc(100vh - 64px);
+    height: calc(var(--vh, 1vh) * 100 - 64px);
+    height: calc(100dvh - 64px);
+  }
+  .min-h-mobile-portal {
+    min-height: calc(100vh - 64px);
+    min-height: calc(var(--vh, 1vh) * 100 - 64px);
+    min-height: calc(100dvh - 64px);
+  }
+}
+
 @media (min-width: 768px) {
   .h-mobile-portal {
-    height: calc(100vh - 96px);
-    height: calc(var(--vh, 1vh) * 100 - 96px);
-    height: calc(100dvh - 96px);
+    height: calc(100vh - 80px);
+    height: calc(var(--vh, 1vh) * 100 - 80px);
+    height: calc(100dvh - 80px);
+  }
+  .min-h-mobile-portal {
+    min-height: calc(100vh - 80px);
+    min-height: calc(var(--vh, 1vh) * 100 - 80px);
+    min-height: calc(100dvh - 80px);
   }
 }
 

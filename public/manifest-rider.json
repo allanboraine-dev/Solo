@@ -3,13 +3,25 @@
   "name": "SOLO Rider | Book a Ride",
   "short_name": "SOLO Rider",
   "description": "SOLO Zero-Commission Rider App. Book safe, direct rides across South Africa.",
-  "start_url": "/rider",
-  "scope": "/rider",
+  "start_url": "/rider?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "categories": ["travel", "transportation", "business"],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest-rider.json"
+    },
+    {
+      "platform": "webapp",
+      "url": "/manifest.json"
+    }
+  ],
   "icons": [
     {
       "src": "/rider-icon-192.png",
@@ -40,7 +52,7 @@
       "name": "Book a Ride",
       "short_name": "Rider",
       "description": "Quickly book a zero-commission ride",
-      "url": "/rider",
+      "url": "/rider?source=pwa",
       "icons": [{ "src": "/rider-icon-192.png", "sizes": "192x192" }]
     }
   ]

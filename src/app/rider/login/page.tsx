@@ -245,8 +245,8 @@ export default function RiderLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4">
-      <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-zinc-800 relative">
+    <div className="min-h-mobile-portal bg-gray-50 dark:bg-zinc-950 flex flex-col justify-center items-center p-4 sm:p-6 md:p-8">
+      <div className="max-w-md sm:max-w-lg w-full bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl p-6 sm:p-8 md:p-10 border border-gray-200 dark:border-zinc-800 relative">
         <div className="text-center mb-8">
           <div className="relative w-18 h-18 p-1 rounded-[1.35rem] bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-xl shadow-blue-500/30 mx-auto mb-4 w-fit">
             <img

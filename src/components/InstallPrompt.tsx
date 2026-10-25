@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Share, PlusSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { detectStandaloneOrInstalled, markAppAsInstalled } from '@/lib/PWAContext';
 
 export default function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
@@ -12,35 +13,44 @@ export default function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    // Detect iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isIosDevice);
 
-    // Detect if app is already installed
-    const isStandAloneMode = window.matchMedia('(display-mode: standalone)').matches;
-    setIsStandalone(isStandAloneMode);
+    const { alreadyInstalled } = detectStandaloneOrInstalled();
+    setIsStandalone(alreadyInstalled);
 
-    // Handle Android install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      const { alreadyInstalled: nowInstalled } = detectStandaloneOrInstalled();
       setDeferredPrompt(e);
-      if (!isStandAloneMode) {
+      if (!nowInstalled) {
         setShowPrompt(true);
       }
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    const handleAppInstalled = () => {
+      markAppAsInstalled();
+      setIsStandalone(true);
+      setShowPrompt(false);
+      setDeferredPrompt(null);
+    };
 
-    // Show iOS prompt if not installed
-    if (isIosDevice && !isStandAloneMode) {
-      // Small delay so it's not instantly annoying
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    if (isIosDevice && !alreadyInstalled) {
       const timer = setTimeout(() => setShowPrompt(true), 2000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      };
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -49,6 +59,8 @@ export default function InstallPrompt() {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
+        markAppAsInstalled();
+        setIsStandalone(true);
         setShowPrompt(false);
       }
       setDeferredPrompt(null);

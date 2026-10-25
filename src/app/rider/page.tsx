@@ -823,7 +823,7 @@ export default function RiderPage() {
 
       {/* Interactive Map Pin Selection Mode Banner */}
       {pickingOnMapType && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="absolute top-4 left-1/2 md:left-[calc(50%+12rem)] -translate-x-1/2 z-40 w-[92%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="bg-blue-600 text-white p-3.5 rounded-2xl shadow-2xl flex items-center justify-between gap-3 border border-blue-400/80">
             <div className="flex items-center gap-2.5 min-w-0">
               <MapPin size={22} className="text-white shrink-0 animate-bounce" />
@@ -850,7 +850,7 @@ export default function RiderPage() {
 
       {/* Real-time Trip GPS Tracking Floating HUD Pill */}
       {activeTrip && (activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
-        <div className="absolute top-3 left-3 md:top-4 md:left-6 pt-safe z-30 pointer-events-none">
+        <div className="absolute top-3 left-3 md:top-4 md:left-[26rem] lg:left-[28.5rem] pt-safe z-30 pointer-events-none">
           <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10 flex items-center gap-2.5 pointer-events-auto">
             <div className={`w-2.5 h-2.5 rounded-full ${activeTrip.status === 'in_progress' ? 'bg-blue-500' : 'bg-emerald-500'} animate-ping shrink-0`} />
             <div className="min-w-0">
@@ -870,7 +870,7 @@ export default function RiderPage() {
       )}
 
       {/* Top Header: Rider Safety SOS Shield + Profile or Phone Auth Button */}
-      <div className="absolute top-3 right-3 md:top-4 md:right-4 pt-safe z-30 flex items-center gap-2">
+      <div className="absolute top-3 right-3 md:top-4 md:right-5 pt-safe z-30 flex items-center gap-2">
         <SafetyFloatingButton onClick={() => setShowSafetyModal(true)} />
         {currentUser ? (
           <div className="flex items-center gap-2 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-3 py-1.5 md:px-3.5 md:py-2 rounded-2xl shadow-xl border border-gray-200/80 dark:border-white/10">
@@ -886,7 +886,7 @@ export default function RiderPage() {
                 </span>
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white max-w-[110px] sm:max-w-none truncate">{currentUser.fullName}</p>
+                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white max-w-[110px] sm:max-w-[180px] lg:max-w-none truncate">{currentUser.fullName}</p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight hidden sm:block">{currentUser.phone || 'Verified Rider'}</p>
               </div>
             </div>
@@ -909,17 +909,17 @@ export default function RiderPage() {
         )}
       </div>
 
-      {/* Floating UI Panel / Mobile Bottom Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 w-full md:bottom-auto md:right-auto md:top-4 md:left-6 md:w-96 flex flex-col z-20 md:max-h-[calc(100vh-128px)] md:max-h-[calc(100dvh-128px)] gpu-composited">
+      {/* Floating UI Panel / Tablet Dock & Mobile Bottom Sheet */}
+      <div className="absolute bottom-0 left-0 right-0 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto w-full md:bottom-auto md:right-auto md:top-4 md:left-4 lg:left-6 md:w-[390px] lg:w-[430px] md:max-w-none md:mx-0 flex flex-col z-20 md:max-h-[calc(100vh-104px)] md:max-h-[calc(100dvh-104px)] gpu-composited">
         <div
           onFocusCapture={() => {
             if (isSheetMinimized) setIsSheetMinimized(false)
           }}
           className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
-            isSheetMinimized ? 'max-h-[82px] md:max-h-full overflow-hidden' : 'max-h-[76vh] max-h-[76dvh] md:max-h-full'
+            isSheetMinimized ? 'max-h-[82px] md:max-h-[92px] overflow-hidden' : 'max-h-[78vh] max-h-[78dvh] md:max-h-full'
           }`}
         >
-          {/* Mobile Sheet Handle / Minimize Toggle */}
+          {/* Sheet Handle / Minimize Toggle */}
           <button
             type="button"
             onClick={() => setIsSheetMinimized(prev => !prev)}
@@ -929,31 +929,31 @@ export default function RiderPage() {
             <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full" />
           </button>
 
-          <div className="p-4 pt-1 pb-5 md:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
+          <div className="p-4 pt-1 pb-5 sm:p-5 md:p-5 lg:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="mb-3 md:mb-5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                <div className="mb-3 md:mb-4 flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                     <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-lg shadow-blue-500/30 shrink-0">
                       <img
                         src="/rider-icon-192.png"
                         alt="SOLO Rider Portal"
-                        className="w-11 h-11 md:w-12 md:h-12 rounded-[0.9rem] object-cover border border-white/20"
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-[0.9rem] object-cover border border-white/20"
                       />
                     </div>
-                    <div>
-                      <h1 className="text-xl md:text-2xl font-bold tracking-tight leading-tight">Where to?</h1>
+                    <div className="min-w-0">
+                      <h1 className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight leading-tight truncate">Where to?</h1>
                       <button
                         type="button"
                         onClick={() => setShowDriversModal(true)}
                         className="flex items-center gap-1.5 mt-0.5 group text-left transition"
                         title="View all online drivers with drive and car details"
                       >
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs font-semibold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5">
-                          <span>{availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online nearby</span>
-                          <span className="text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-md border border-green-200 dark:border-green-800 flex items-center gap-1">
-                            <span>View All</span>
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        <span className="text-[11px] sm:text-xs font-semibold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5 truncate">
+                          <span className="truncate">{availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online</span>
+                          <span className="text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-md border border-green-200 dark:border-green-800 hidden sm:inline-flex items-center gap-0.5 shrink-0">
+                            <span>View</span>
                             <span>&rarr;</span>
                           </span>
                         </span>
@@ -968,7 +968,7 @@ export default function RiderPage() {
                       title="View all online drivers and vehicles"
                     >
                       <Car size={14} />
-                      <span className="hidden sm:inline">Drivers</span>
+                      <span className="hidden sm:inline md:hidden lg:inline">Drivers</span>
                       <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
                         {availableDrivers.length}
                       </span>
@@ -980,13 +980,14 @@ export default function RiderPage() {
                       title="Help, Lost & Found, and Trip Support"
                     >
                       <HelpCircle size={14} />
-                      <span className="hidden sm:inline">Help</span>
+                      <span className="hidden sm:inline md:hidden lg:inline">Help</span>
                     </button>
                     <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/70 dark:border-zinc-800" />
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}
-                      className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0"
+                      className="flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 shrink-0 transition"
+                      title={isSheetMinimized ? 'Expand booking panel' : 'Minimize panel to inspect map'}
                     >
                       {isSheetMinimized ? (
                         <>
@@ -1069,7 +1070,7 @@ export default function RiderPage() {
                           setTripSubTab('chat')
                           setIsSheetMinimized(false)
                         }}
-                        className="md:hidden relative flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
+                        className="relative flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800"
                       >
                         <MessageCircle size={13} />
                         <span>Chat</span>
@@ -1081,7 +1082,7 @@ export default function RiderPage() {
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}
-                      className="md:hidden flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800"
+                      className="flex items-center gap-1 text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-2.5 py-1.5 rounded-xl border border-gray-200/70 dark:border-zinc-800 transition"
                     >
                       {isSheetMinimized ? (
                         <>

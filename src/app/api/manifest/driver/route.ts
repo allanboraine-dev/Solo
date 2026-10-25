@@ -6,13 +6,25 @@ export async function GET() {
     name: 'SOLO Driver | Zero Commission',
     short_name: 'SOLO Driver',
     description: 'Zero-Commission Driver Portal: keep 100% of your trip fares with R499/pm flat SaaS.',
-    start_url: '/driver',
-    scope: '/driver',
+    start_url: '/driver?source=pwa',
+    scope: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     orientation: 'portrait',
     background_color: '#09090b',
     theme_color: '#16a34a',
     categories: ['transportation', 'business'],
+    prefer_related_applications: false,
+    related_applications: [
+      {
+        platform: 'webapp',
+        url: '/manifest-driver.json'
+      },
+      {
+        platform: 'webapp',
+        url: '/manifest.json'
+      }
+    ],
     icons: [
       {
         src: '/driver-icon-192.png',
@@ -41,12 +53,12 @@ export async function GET() {
     shortcuts: [
       {
         name: "Go Online",
-        url: "/driver",
+        url: "/driver?source=pwa",
         icons: [{ src: "/driver-icon-192.png", sizes: "192x192" }]
       },
       {
         name: "Driver KYC Documents",
-        url: "/driver",
+        url: "/driver?source=pwa",
         icons: [{ src: "/driver-icon-192.png", sizes: "192x192" }]
       }
     ]

@@ -297,7 +297,7 @@ export default function BookingForm({
                 value={pickupDetail}
                 onChange={(e) => setPickupDetail(e.target.value)}
                 placeholder="Add house #, unit, complex, or gate note (optional)"
-                className="w-full bg-transparent text-base sm:text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+                className="w-full bg-transparent text-base sm:text-sm md:text-xs lg:text-sm font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
               />
             </div>
           )}
@@ -334,7 +334,7 @@ export default function BookingForm({
                 value={dropoffDetail}
                 onChange={(e) => setDropoffDetail(e.target.value)}
                 placeholder="Add destination house #, building, or entrance (optional)"
-                className="w-full bg-transparent text-base sm:text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
+                className="w-full bg-transparent text-base sm:text-sm md:text-xs lg:text-sm font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none"
               />
             </div>
           )}

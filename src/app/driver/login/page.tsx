@@ -101,8 +101,8 @@ export default function DriverLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black p-4 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl p-8 border border-gray-200 dark:border-gray-800">
+    <div className="min-h-mobile-portal bg-gray-50 dark:bg-black p-4 sm:p-6 md:p-8 flex items-center justify-center">
+      <div className="max-w-md sm:max-w-lg w-full bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl p-6 sm:p-8 md:p-10 border border-gray-200 dark:border-gray-800">
         <div className="text-center mb-8">
           <div className="relative p-1 rounded-[1.35rem] bg-gradient-to-br from-emerald-500 via-teal-400 to-green-600 shadow-xl shadow-emerald-500/25 mx-auto mb-4 w-fit">
             <img

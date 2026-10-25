@@ -79,17 +79,40 @@ export default function RootLayout({
 
                 try {
                   var path = window.location.pathname;
+                  var isStandalone =
+                    (window.matchMedia && (
+                      window.matchMedia('(display-mode: standalone)').matches ||
+                      window.matchMedia('(display-mode: fullscreen)').matches ||
+                      window.matchMedia('(display-mode: minimal-ui)').matches ||
+                      window.matchMedia('(display-mode: window-controls-overlay)').matches
+                    )) ||
+                    window.navigator.standalone === true ||
+                    (document.referrer && document.referrer.indexOf('android-app://') !== -1) ||
+                    window.location.search.indexOf('source=pwa') !== -1 ||
+                    window.location.search.indexOf('mode=standalone') !== -1 ||
+                    sessionStorage.getItem('solo_pwa_session') === 'true';
+
+                  if (isStandalone) {
+                    sessionStorage.setItem('solo_pwa_session', 'true');
+                    localStorage.setItem('solo_pwa_installed', 'true');
+                    document.cookie = 'solo_pwa_installed=true; path=/; max-age=31536000; SameSite=Lax';
+                  }
+
                   if (path.indexOf('/driver') === 0) {
                     localStorage.setItem('solo_installed_app_role', 'driver');
                     document.cookie = 'solo_installed_app_role=driver; path=/; max-age=31536000; SameSite=Lax';
+                    if (isStandalone) {
+                      localStorage.setItem('solo_pwa_installed_driver', 'true');
+                      document.cookie = 'solo_pwa_installed_driver=true; path=/; max-age=31536000; SameSite=Lax';
+                    }
                   } else if (path.indexOf('/rider') === 0) {
                     localStorage.setItem('solo_installed_app_role', 'rider');
                     document.cookie = 'solo_installed_app_role=rider; path=/; max-age=31536000; SameSite=Lax';
+                    if (isStandalone) {
+                      localStorage.setItem('solo_pwa_installed_rider', 'true');
+                      document.cookie = 'solo_pwa_installed_rider=true; path=/; max-age=31536000; SameSite=Lax';
+                    }
                   } else if (path === '/') {
-                    var isStandalone =
-                      window.matchMedia('(display-mode: standalone)').matches ||
-                      window.navigator.standalone === true ||
-                      window.location.search.indexOf('source=pwa') !== -1;
                     if (isStandalone) {
                       var role = localStorage.getItem('solo_installed_app_role');
                       if (!role) {
@@ -97,8 +120,8 @@ export default function RootLayout({
                         if (match) role = match[1];
                       }
                       if (!role) {
-                        if (localStorage.getItem('solo_driver_session')) role = 'driver';
-                        else if (localStorage.getItem('solo_rider_session')) role = 'rider';
+                        if (localStorage.getItem('solo_driver_session') || localStorage.getItem('driver_id')) role = 'driver';
+                        else if (localStorage.getItem('solo_rider_session') || localStorage.getItem('solo_verified_rider')) role = 'rider';
                       }
                       if (role === 'driver' || role === 'rider') {
                         window.location.replace('/' + role + '?source=pwa');
@@ -116,7 +139,7 @@ export default function RootLayout({
           <PWAProvider>
             <OfflineIndicator />
             <Navbar />
-            <main className="min-h-[100dvh] pt-16 md:pt-24">
+            <main className="min-h-[100dvh] pt-14 sm:pt-16 md:pt-20">
               {children}
             </main>
           </PWAProvider>

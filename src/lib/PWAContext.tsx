@@ -18,6 +18,8 @@ export type PortalRole = 'rider' | 'driver';
 type PWAContextType = {
   isInstallable: boolean;
   isStandalone: boolean;
+  isInstalled: boolean;
+  isPwaReady: boolean;
   isIOS: boolean;
   isAndroid: boolean;
   installedRole: PortalRole | null;
@@ -31,6 +33,8 @@ type PWAContextType = {
 const PWAContext = createContext<PWAContextType>({
   isInstallable: false,
   isStandalone: false,
+  isInstalled: false,
+  isPwaReady: false,
   isIOS: false,
   isAndroid: false,
   installedRole: null,
@@ -38,11 +42,13 @@ const PWAContext = createContext<PWAContextType>({
   setShowIosGuide: () => {},
   installApp: async () => {},
   dismissBanner: () => {},
-  isBannerDismissed: false,
+  isBannerDismissed: true,
 });
 
 const DISMISS_KEY = 'solo_pwa_install_dismissed_until';
 export const INSTALLED_ROLE_KEY = 'solo_installed_app_role';
+export const INSTALLED_FLAG_KEY = 'solo_pwa_installed';
+export const PWA_SESSION_KEY = 'solo_pwa_session';
 
 function persistInstalledRole(role: PortalRole) {
   if (typeof window === 'undefined') return;
@@ -56,6 +62,96 @@ function persistInstalledRole(role: PortalRole) {
   } catch {
     // ignore cookie errors
   }
+}
+
+export function markAppAsInstalled(role?: PortalRole) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(INSTALLED_FLAG_KEY, 'true');
+    if (role) {
+      localStorage.setItem(`${INSTALLED_FLAG_KEY}_${role}`, 'true');
+      localStorage.setItem(INSTALLED_ROLE_KEY, role);
+    }
+  } catch {
+    // ignore storage errors
+  }
+  try {
+    sessionStorage.setItem(PWA_SESSION_KEY, 'true');
+  } catch {
+    // ignore session storage errors
+  }
+  try {
+    document.cookie = `${INSTALLED_FLAG_KEY}=true; path=/; max-age=31536000; SameSite=Lax`;
+    if (role) {
+      document.cookie = `${INSTALLED_FLAG_KEY}_${role}=true; path=/; max-age=31536000; SameSite=Lax`;
+      document.cookie = `${INSTALLED_ROLE_KEY}=${role}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+  } catch {
+    // ignore cookie errors
+  }
+}
+
+export function detectStandaloneOrInstalled(role?: PortalRole): {
+  standaloneDisplay: boolean;
+  alreadyInstalled: boolean;
+} {
+  if (typeof window === 'undefined') {
+    return { standaloneDisplay: false, alreadyInstalled: false };
+  }
+
+  let isDisplayStandalone = false;
+  try {
+    if (window.matchMedia) {
+      isDisplayStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        window.matchMedia('(display-mode: window-controls-overlay)').matches;
+    }
+  } catch {}
+
+  // @ts-expect-error iOS Safari navigator.standalone check
+  const isIosStandalone = typeof navigator !== 'undefined' && window.navigator.standalone === true;
+
+  let isTwa = false;
+  try {
+    isTwa = typeof document !== 'undefined' && document.referrer.includes('android-app://');
+  } catch {}
+
+  let isPwaSource = false;
+  try {
+    const search = window.location.search || '';
+    isPwaSource = search.includes('source=pwa') || search.includes('mode=standalone');
+  } catch {}
+
+  let hasSessionFlag = false;
+  try {
+    hasSessionFlag = sessionStorage.getItem(PWA_SESSION_KEY) === 'true';
+  } catch {}
+
+  let hasPersistedInstall = false;
+  try {
+    if (localStorage.getItem(INSTALLED_FLAG_KEY) === 'true') {
+      hasPersistedInstall = true;
+    } else if (role && localStorage.getItem(`${INSTALLED_FLAG_KEY}_${role}`) === 'true') {
+      hasPersistedInstall = true;
+    }
+  } catch {}
+
+  try {
+    if (!hasPersistedInstall && typeof document !== 'undefined') {
+      if (/(?:^|;\s*)solo_pwa_installed=true/.test(document.cookie)) {
+        hasPersistedInstall = true;
+      } else if (role && new RegExp(`(?:^|;\\s*)solo_pwa_installed_${role}=true`).test(document.cookie)) {
+        hasPersistedInstall = true;
+      }
+    }
+  } catch {}
+
+  const standaloneDisplay = isDisplayStandalone || isIosStandalone || isTwa || isPwaSource || hasSessionFlag;
+  const alreadyInstalled = standaloneDisplay || hasPersistedInstall;
+
+  return { standaloneDisplay, alreadyInstalled };
 }
 
 export function getPersistedInstalledRole(): PortalRole | null {
@@ -75,8 +171,8 @@ export function getPersistedInstalledRole(): PortalRole | null {
     // ignore
   }
   try {
-    if (localStorage.getItem('solo_driver_session')) return 'driver';
-    if (localStorage.getItem('solo_rider_session')) return 'rider';
+    if (localStorage.getItem('solo_driver_session') || localStorage.getItem('driver_id')) return 'driver';
+    if (localStorage.getItem('solo_rider_session') || localStorage.getItem('solo_verified_rider')) return 'rider';
   } catch {
     // ignore
   }
@@ -131,6 +227,8 @@ export function PWAProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isPwaReady, setIsPwaReady] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
   const [installedRole, setInstalledRole] = useState<PortalRole | null>(null);
@@ -138,7 +236,7 @@ export function PWAProvider({ children }: { children: ReactNode }) {
   const [guideRole, setGuideRole] = useState<PortalRole>('rider');
   const [isBannerDismissed, setIsBannerDismissed] = useState(true);
 
-  // Sync active portal role & manifest whenever route changes
+  // Sync active portal role, manifest & installed status whenever route changes
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -147,34 +245,51 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       setInstalledRole(currentRole);
     }
 
+    let activePortalRole: PortalRole | undefined = currentRole || undefined;
     if (pathname?.startsWith('/driver')) {
+      activePortalRole = 'driver';
       persistInstalledRole('driver');
       setInstalledRole('driver');
       setGuideRole('driver');
       syncDocumentManifestAndIcons('driver');
     } else if (pathname?.startsWith('/rider')) {
+      activePortalRole = 'rider';
       persistInstalledRole('rider');
       setInstalledRole('rider');
       setGuideRole('rider');
       syncDocumentManifestAndIcons('rider');
     }
 
+    const { standaloneDisplay, alreadyInstalled } = detectStandaloneOrInstalled(activePortalRole);
+    if (standaloneDisplay) {
+      markAppAsInstalled(activePortalRole);
+    }
+    if (alreadyInstalled) {
+      setIsStandalone(true);
+      setIsInstalled(true);
+      setIsBannerDismissed(true);
+      setShowIosGuide(false);
+    }
+
     // Check if we navigated to /driver?install=driver or /rider?install=rider from the home page
     const params = new URLSearchParams(window.location.search);
     const installParam = params.get('install');
     if (installParam === 'driver' || installParam === 'rider' || installParam === 'true') {
-      const activeRole: PortalRole =
+      const targetRole: PortalRole =
         installParam === 'driver' || installParam === 'rider'
           ? installParam
           : pathname?.startsWith('/driver')
           ? 'driver'
           : 'rider';
 
-      persistInstalledRole(activeRole);
-      setInstalledRole(activeRole);
-      setGuideRole(activeRole);
-      syncDocumentManifestAndIcons(activeRole);
-      setShowIosGuide(true);
+      persistInstalledRole(targetRole);
+      setInstalledRole(targetRole);
+      setGuideRole(targetRole);
+      syncDocumentManifestAndIcons(targetRole);
+
+      if (!alreadyInstalled) {
+        setShowIosGuide(true);
+      }
 
       // Clean up the ?install= query parameter without reloading
       const cleanUrl = window.location.pathname;
@@ -185,22 +300,20 @@ export function PWAProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check standalone mode (Chrome PWA or iOS Home Screen WebClip)
-    let isStandaloneDisplay = false;
-    try {
-      if (window.matchMedia) {
-        const m = window.matchMedia('(display-mode: standalone)');
-        isStandaloneDisplay = m ? m.matches : false;
-      }
-    } catch {}
-    // @ts-expect-error iOS Safari navigator.standalone check
-    const isIosStandalone = typeof navigator !== 'undefined' && window.navigator.standalone === true;
-    let isPwaSource = false;
-    try {
-      isPwaSource = window.location.search.includes('source=pwa');
-    } catch {}
-    const standalone = isStandaloneDisplay || isIosStandalone || isPwaSource;
-    setIsStandalone(standalone);
+    const savedRole = getPersistedInstalledRole();
+    if (savedRole) {
+      setInstalledRole(savedRole);
+      syncDocumentManifestAndIcons(savedRole);
+    }
+
+    const { standaloneDisplay, alreadyInstalled } = detectStandaloneOrInstalled(savedRole || undefined);
+    if (standaloneDisplay) {
+      markAppAsInstalled(savedRole || undefined);
+    }
+
+    setIsStandalone(alreadyInstalled);
+    setIsInstalled(alreadyInstalled);
+    setIsPwaReady(true);
 
     // Platform detection
     const ua = window.navigator.userAgent.toLowerCase();
@@ -209,34 +322,77 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     setIsIOS(isIosDevice);
     setIsAndroid(isAndroidDevice);
 
-    const savedRole = getPersistedInstalledRole();
-    if (savedRole) {
-      setInstalledRole(savedRole);
-      syncDocumentManifestAndIcons(savedRole);
-    }
-
     // If launched in standalone mode on the root home page ('/'), immediately redirect to the installed portal!
-    if (standalone && window.location.pathname === '/') {
+    if (standaloneDisplay && window.location.pathname === '/') {
       const targetRole = savedRole || 'rider';
       router.replace(`/${targetRole}`);
     }
 
+    // Check Chromium getInstalledRelatedApps API if supported
+    try {
+      const nav = window.navigator as Navigator & {
+        getInstalledRelatedApps?: () => Promise<Array<{ id?: string; platform?: string; url?: string }>>;
+      };
+      if (typeof nav.getInstalledRelatedApps === 'function') {
+        nav
+          .getInstalledRelatedApps()
+          .then((apps) => {
+            if (Array.isArray(apps) && apps.length > 0) {
+              markAppAsInstalled(savedRole || undefined);
+              setIsStandalone(true);
+              setIsInstalled(true);
+              setIsBannerDismissed(true);
+              setShowIosGuide(false);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {}
+
     // Check dismissal status in localStorage
     try {
       const dismissedUntil = localStorage.getItem(DISMISS_KEY);
-      if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
+      if (alreadyInstalled || (dismissedUntil && Number(dismissedUntil) > Date.now())) {
         setIsBannerDismissed(true);
       } else {
-        setIsBannerDismissed(standalone);
+        setIsBannerDismissed(false);
       }
     } catch {
-      setIsBannerDismissed(false);
+      setIsBannerDismissed(alreadyInstalled);
     }
+
+    // Listen to display-mode changes dynamically
+    let mediaQuery: MediaQueryList | null = null;
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        const activeRole: PortalRole = window.location.pathname.startsWith('/driver')
+          ? 'driver'
+          : window.location.pathname.startsWith('/rider')
+          ? 'rider'
+          : getPersistedInstalledRole() || 'rider';
+        markAppAsInstalled(activeRole);
+        setIsStandalone(true);
+        setIsInstalled(true);
+        setIsBannerDismissed(true);
+        setShowIosGuide(false);
+      }
+    };
+    try {
+      if (window.matchMedia) {
+        mediaQuery = window.matchMedia('(display-mode: standalone)');
+        if (mediaQuery.addEventListener) {
+          mediaQuery.addEventListener('change', handleDisplayModeChange);
+        }
+      }
+    } catch {}
 
     // Capture Chrome/Android beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const { alreadyInstalled: isCurrentlyInstalled } = detectStandaloneOrInstalled();
+      if (!isCurrentlyInstalled) {
+        setDeferredPrompt(e as BeforeInstallPromptEvent);
+      }
     };
 
     const handleAppInstalled = () => {
@@ -247,9 +403,11 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         : getPersistedInstalledRole() || 'rider';
 
       persistInstalledRole(activeRole);
+      markAppAsInstalled(activeRole);
       setInstalledRole(activeRole);
       setDeferredPrompt(null);
       setIsStandalone(true);
+      setIsInstalled(true);
       setIsBannerDismissed(true);
       setShowIosGuide(false);
 
@@ -265,6 +423,11 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      try {
+        if (mediaQuery && mediaQuery.removeEventListener) {
+          mediaQuery.removeEventListener('change', handleDisplayModeChange);
+        }
+      } catch {}
     };
   }, [router]);
 
@@ -287,14 +450,22 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         ? 'rider'
         : 'rider');
 
+    const { alreadyInstalled } = detectStandaloneOrInstalled(targetRole);
+    if (alreadyInstalled) {
+      markAppAsInstalled(targetRole);
+      setIsStandalone(true);
+      setIsInstalled(true);
+      setIsBannerDismissed(true);
+      setShowIosGuide(false);
+      if (!pathname?.startsWith(`/${targetRole}`)) {
+        router.push(`/${targetRole}`);
+      }
+      return;
+    }
+
     const targetPath = `/${targetRole}`;
 
     // 1. If we are NOT on the target portal URL, navigate there first!
-    // Why:
-    // Chromium & Safari enforce that the active document URL must be within the manifest's scope.
-    // Driver manifest scope is /driver, Rider manifest scope is /rider.
-    // Navigating to the target portal ensures the correct manifest is active and prevents
-    // attempting to install from a different scope or triggering the other app.
     if (!pathname?.startsWith(targetPath)) {
       router.push(`${targetPath}?install=${targetRole}`);
       return;
@@ -312,7 +483,10 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         await deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === 'accepted') {
+          markAppAsInstalled(targetRole);
           setDeferredPrompt(null);
+          setIsStandalone(true);
+          setIsInstalled(true);
           setIsBannerDismissed(true);
           setShowIosGuide(false);
           return;
@@ -326,6 +500,14 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     setShowIosGuide(true);
   };
 
+  const handleConfirmManualInstall = () => {
+    markAppAsInstalled(guideRole);
+    setIsStandalone(true);
+    setIsInstalled(true);
+    setIsBannerDismissed(true);
+    setShowIosGuide(false);
+  };
+
   const portalLabel = guideRole === 'driver' ? 'SOLO Driver Portal' : 'SOLO Rider App';
   const portalIcon = guideRole === 'driver' ? '/driver-icon-192.png' : '/rider-icon-192.png';
   const accentBg =
@@ -333,25 +515,29 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       ? 'from-emerald-600 to-teal-600 border-emerald-500/40'
       : 'from-blue-600 to-indigo-600 border-blue-500/40';
 
+  const effectiveStandalone = isStandalone || isInstalled;
+
   return (
     <PWAContext.Provider
       value={{
-        isInstallable: !!deferredPrompt || isIOS,
-        isStandalone,
+        isInstallable: !effectiveStandalone && (!!deferredPrompt || isIOS),
+        isStandalone: effectiveStandalone,
+        isInstalled: effectiveStandalone,
+        isPwaReady,
         isIOS,
         isAndroid,
         installedRole,
-        showIosGuide,
+        showIosGuide: !effectiveStandalone && showIosGuide,
         setShowIosGuide,
         installApp,
         dismissBanner,
-        isBannerDismissed,
+        isBannerDismissed: effectiveStandalone || isBannerDismissed,
       }}
     >
       {children}
 
       {/* Role-Aware Mobile Install Guide Modal for iOS Safari & Android Browsers */}
-      {showIosGuide && (
+      {!effectiveStandalone && showIosGuide && (
         <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
             <div className={`bg-gradient-to-r ${accentBg} p-4 text-white flex items-center justify-between gap-3`}>
@@ -436,20 +622,30 @@ export function PWAProvider({ children }: { children: ReactNode }) {
                     <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
                       <Smartphone size={18} />
                     </div>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed">
-                    💡 <strong>Dual-App Tip:</strong> If your browser says &quot;App already installed&quot;, refresh the Rider app or remove the previous single-app shortcut so Android recognizes the independent <strong>/driver</strong> portal scope.
+                    <span>
+                      2. Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                    </span>
                   </div>
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => setShowIosGuide(false)}
-                className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 font-bold text-xs uppercase tracking-wider transition"
-              >
-                Got It
-              </button>
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleConfirmManualInstall}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>Already Installed</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowIosGuide(false)}
+                  className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 font-bold text-xs uppercase tracking-wider transition"
+                >
+                  Later
+                </button>
+              </div>
             </div>
           </div>
         </div>
