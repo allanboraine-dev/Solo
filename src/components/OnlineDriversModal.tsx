@@ -187,14 +187,14 @@ export default function OnlineDriversModal({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          <h4 className="font-bold text-sm sm:text-base text-gray-900 dark:text-white break-words">
                             {driver.fullName || 'Registered Driver'}
                           </h4>
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded-full border border-emerald-300 dark:border-emerald-800">
-                            <ShieldCheck size={11} /> Verified
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                            <ShieldCheck size={12} /> Verified
                           </span>
                         </div>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5 font-medium">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5 font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                           <span>{driver.tripId ? 'Currently on ride' : 'Available for pickup'}</span>
                         </p>
@@ -214,12 +214,12 @@ export default function OnlineDriversModal({
                   {/* Car & Vehicle Information Card */}
                   <div className="p-2.5 sm:p-3 bg-white dark:bg-zinc-950 rounded-xl border border-gray-200/60 dark:border-white/5 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 block mb-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 block mb-0.5">
                         Vehicle Details
                       </span>
                       <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100">
                         <Car size={15} className="text-blue-500 shrink-0" />
-                        <span className="truncate">{vehicleName}</span>
+                        <span className="break-words">{vehicleName}</span>
                       </div>
                       {vehicleMeta && (
                         <div className="text-[11px] text-gray-500 dark:text-gray-400 pl-5 mt-0.5 font-medium">

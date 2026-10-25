@@ -828,10 +828,10 @@ export default function RiderPage() {
             <div className="flex items-center gap-2.5 min-w-0">
               <MapPin size={22} className="text-white shrink-0 animate-bounce" />
               <div className="min-w-0">
-                <p className="text-xs font-black truncate">
+                <p className="text-xs sm:text-sm font-black leading-snug">
                   Tap map to set {pickingOnMapType === 'pickup' ? 'Pickup' : 'Dropoff'}
                 </p>
-                <p className="text-[11px] text-blue-100 truncate">Tap any street or gate on the map</p>
+                <p className="text-xs text-blue-100 leading-snug">Tap any street or gate on the map</p>
               </div>
             </div>
             <button
@@ -840,7 +840,7 @@ export default function RiderPage() {
                 setPickingOnMapType(null);
                 setIsSheetMinimized(false);
               }}
-              className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl shrink-0 transition"
+              className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl shrink-0 transition"
             >
               Cancel
             </button>
@@ -857,7 +857,7 @@ export default function RiderPage() {
               <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 {activeTrip.status === 'accepted' ? 'Driver En Route' : activeTrip.status === 'arrived' ? 'Driver Outside' : 'En Route to Dropoff'}
               </p>
-              <p className="text-xs font-black text-gray-900 dark:text-white truncate">
+              <p className="text-xs font-black text-gray-900 dark:text-white">
                 {liveTrackingInfo?.durationMinutes
                   ? `${liveTrackingInfo.durationMinutes} min away • ${liveTrackingInfo.distanceKm.toFixed(1)} km`
                   : activeTrip.status === 'arrived'
@@ -886,7 +886,7 @@ export default function RiderPage() {
                 </span>
               </div>
               <div className="text-left">
-                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white max-w-[110px] sm:max-w-[180px] lg:max-w-none truncate">{currentUser.fullName}</p>
+                <p className="text-xs font-bold leading-tight text-gray-900 dark:text-white">{currentUser.fullName}</p>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight hidden sm:block">{currentUser.phone || 'Verified Rider'}</p>
               </div>
             </div>
@@ -910,13 +910,13 @@ export default function RiderPage() {
       </div>
 
       {/* Floating UI Panel / Tablet Dock & Mobile Bottom Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto w-full md:bottom-auto md:right-auto md:top-4 md:left-4 lg:left-6 md:w-[390px] lg:w-[430px] md:max-w-none md:mx-0 flex flex-col z-20 md:max-h-[calc(100vh-104px)] md:max-h-[calc(100dvh-104px)] gpu-composited">
+      <div className="absolute bottom-0 left-0 right-0 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto w-full md:bottom-auto md:right-auto md:top-4 md:left-4 lg:left-6 md:w-[400px] lg:w-[440px] md:max-w-none md:mx-0 flex flex-col z-20 md:max-h-[calc(100vh-104px)] md:max-h-[calc(100dvh-104px)] gpu-composited">
         <div
           onFocusCapture={() => {
             if (isSheetMinimized) setIsSheetMinimized(false)
           }}
           className={`bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.18)] md:shadow-2xl rounded-t-3xl md:rounded-3xl border-t md:border border-white/40 dark:border-white/10 flex flex-col transition-all duration-300 ${
-            isSheetMinimized ? 'max-h-[82px] md:max-h-[92px] overflow-hidden' : 'max-h-[78vh] max-h-[78dvh] md:max-h-full'
+            isSheetMinimized ? 'max-h-[86px] md:max-h-[94px] overflow-hidden' : 'max-h-[78vh] max-h-[78dvh] md:max-h-full'
           }`}
         >
           {/* Sheet Handle / Minimize Toggle */}
@@ -932,61 +932,35 @@ export default function RiderPage() {
           <div className="p-4 pt-1 pb-5 sm:p-5 md:p-5 lg:p-6 pb-safe flex-1 min-h-0 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex flex-col">
             {!activeTrip ? (
               <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="mb-3.5 md:mb-4 flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-3 min-w-0">
+                {/* Row 1: Unobstructed "Where to?" Heading + Utility Controls */}
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
                     <div className="relative p-0.5 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-lg shadow-blue-500/30 shrink-0">
                       <img
                         src="/rider-icon-192.png"
                         alt="SOLO Rider Portal"
-                        className="w-11 h-11 sm:w-12 sm:h-12 rounded-[0.95rem] object-cover border border-white/20"
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-[0.9rem] object-cover border border-white/20"
                       />
                     </div>
-                    <div className="min-w-0">
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight truncate">Where to?</h1>
-                      <button
-                        type="button"
-                        onClick={() => setShowDriversModal(true)}
-                        className="flex items-center gap-1.5 mt-0.5 group text-left transition"
-                        title="View all online drivers with drive and car details"
-                      >
-                        <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
-                        <span className="text-xs sm:text-sm font-bold text-green-600 dark:text-green-400 group-hover:underline flex items-center gap-1.5 truncate">
-                          <span className="truncate">{availableDrivers.length} {availableDrivers.length === 1 ? 'driver' : 'drivers'} online</span>
-                          <span className="text-xs font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-md border border-green-200 dark:border-green-800 hidden sm:inline-flex items-center gap-0.5 shrink-0">
-                            <span>View</span>
-                            <span>&rarr;</span>
-                          </span>
-                        </span>
-                      </button>
-                    </div>
+                    <h1 className="text-xl sm:text-2xl lg:text-[26px] font-extrabold tracking-tight leading-tight whitespace-nowrap text-gray-900 dark:text-white">
+                      Where to?
+                    </h1>
                   </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowDriversModal(true)}
-                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-3 py-2 min-h-[42px] rounded-xl border border-blue-200/80 dark:border-blue-800/60 transition active:scale-95 shadow-2xs"
-                      title="View all online drivers and vehicles"
-                    >
-                      <Car size={16} />
-                      <span className="hidden sm:inline md:hidden lg:inline">Drivers</span>
-                      <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-full">
-                        {availableDrivers.length}
-                      </span>
-                    </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={handleOpenSupport}
-                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-3 py-2 min-h-[42px] rounded-xl border border-amber-200/80 dark:border-amber-800/60 transition active:scale-95 shadow-2xs"
+                      className="flex items-center gap-1 text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2.5 py-2 min-h-[40px] rounded-xl border border-amber-200/80 dark:border-amber-800/60 transition active:scale-95 shadow-2xs whitespace-nowrap"
                       title="Help, Lost & Found, and Trip Support"
                     >
-                      <HelpCircle size={16} />
-                      <span className="hidden sm:inline md:hidden lg:inline">Help</span>
+                      <HelpCircle size={16} className="shrink-0" />
+                      <span>Help</span>
                     </button>
                     <ThemeToggle className="bg-gray-100 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800" />
                     <button
                       type="button"
                       onClick={() => setIsSheetMinimized(prev => !prev)}
-                      className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-3 py-2 min-h-[42px] rounded-xl border border-gray-200/80 dark:border-zinc-800 shrink-0 transition"
+                      className="flex items-center gap-1 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-zinc-900 hover:bg-gray-200 dark:hover:bg-zinc-800 px-2.5 py-2 min-h-[40px] rounded-xl border border-gray-200/80 dark:border-zinc-800 shrink-0 transition whitespace-nowrap"
                       title={isSheetMinimized ? 'Expand booking panel' : 'Minimize panel to inspect map'}
                     >
                       {isSheetMinimized ? (
@@ -1003,6 +977,27 @@ export default function RiderPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Row 2: Dedicated Full-Width Online Drivers Bar (Never blocks "Where to?") */}
+                {!isSheetMinimized && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDriversModal(true)}
+                    className="w-full mb-3.5 px-3.5 py-2.5 min-h-[42px] rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-2 transition active:scale-[0.99] text-left shadow-2xs"
+                    title="View all online drivers with driver and car details"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span className="text-xs sm:text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                        {availableDrivers.length} {availableDrivers.length === 1 ? 'Driver' : 'Drivers'} Online
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                      <Car size={16} className="shrink-0" />
+                      <span>View Drivers &amp; Cars &rarr;</span>
+                    </div>
+                  </button>
+                )}
 
                 {!isSheetMinimized && (
                   <>
@@ -1047,10 +1042,10 @@ export default function RiderPage() {
             ) : (
               <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-500">
                 {/* Compact Active Trip Header (Always Visible even when Minimized) */}
-                <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-3 shrink-0 flex-wrap">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
                     <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                    <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight capitalize truncate">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight capitalize">
                       {activeTrip.status.replace('_', ' ')}
                     </h2>
                     {activeTrip.verification_pin && (
@@ -1140,9 +1135,9 @@ export default function RiderPage() {
                         onClick={() => setTripSubTab('chat')}
                         className="mb-3 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-between gap-2 text-sm font-semibold shadow-md cursor-pointer animate-in fade-in slide-in-from-top-2 transition active:scale-[0.98]"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <MessageCircle size={18} className="shrink-0 animate-pulse text-blue-200" />
-                          <span className="truncate">
+                        <div className="flex items-start gap-2 min-w-0">
+                          <MessageCircle size={18} className="shrink-0 mt-0.5 animate-pulse text-blue-200" />
+                          <span className="break-words">
                             <strong className="text-blue-100">{incomingMessageToast.sender}:</strong> {incomingMessageToast.text}
                           </span>
                         </div>
@@ -1161,7 +1156,7 @@ export default function RiderPage() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Driver En Route</p>
-                                <p className="text-base font-bold truncate">
+                                <p className="text-base font-bold leading-snug">
                                   {liveTrackingInfo?.durationMinutes 
                                     ? `Arriving in ~${liveTrackingInfo.durationMinutes} min` 
                                     : 'Approaching pickup point...'}
@@ -1184,7 +1179,7 @@ export default function RiderPage() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Heading to Destination</p>
-                                <p className="text-base font-bold truncate">
+                                <p className="text-base font-bold leading-snug">
                                   {liveTrackingInfo?.durationMinutes 
                                     ? `~${liveTrackingInfo.durationMinutes} min to dropoff` 
                                     : 'En route to destination...'}
@@ -1212,16 +1207,16 @@ export default function RiderPage() {
                         </p>
 
                         {/* Route Summary */}
-                        <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 space-y-1.5 text-sm text-gray-700 dark:text-gray-300">
-                          <div className="flex items-center gap-2.5 truncate">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
-                            <span className="font-bold text-gray-900 dark:text-gray-100 truncate">{activeTrip.pickup_location}</span>
+                        <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="flex items-start gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                            <span className="font-bold text-gray-900 dark:text-gray-100 break-words">{activeTrip.pickup_location}</span>
                           </div>
-                          <div className="flex items-center gap-2.5 truncate">
-                            <span className="w-2.5 h-2.5 rounded-none bg-emerald-500 shrink-0" />
-                            <span className="font-bold text-gray-900 dark:text-gray-100 truncate">{activeTrip.dropoff_location}</span>
+                          <div className="flex items-start gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-none bg-emerald-500 shrink-0 mt-1.5" />
+                            <span className="font-bold text-gray-900 dark:text-gray-100 break-words">{activeTrip.dropoff_location}</span>
                           </div>
-                          <div className="flex items-center justify-between pt-1.5 text-xs sm:text-sm">
+                          <div className="flex items-center justify-between pt-1.5 text-xs sm:text-sm flex-wrap gap-1">
                             <span className="font-semibold text-gray-600 dark:text-gray-400">Trip Occupants:</span>
                             <span className="font-bold text-blue-600 dark:text-blue-400">
                               {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
@@ -1234,7 +1229,7 @@ export default function RiderPage() {
                           <div className="mt-3.5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-sm font-bold animate-pulse">
                             <div className="flex items-center gap-2 min-w-0">
                               <MapPin size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                              <span className="truncate">Driver is waiting outside. Share PIN to board:</span>
+                              <span className="leading-snug">Driver is waiting outside. Share PIN to board:</span>
                             </div>
                             <span className="font-mono font-black text-base sm:text-lg bg-white dark:bg-zinc-900 px-3 py-1 rounded-xl border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
                               {activeTrip.verification_pin}
@@ -1245,7 +1240,7 @@ export default function RiderPage() {
                         {/* Dispatched Driver & Vehicle Identification Card */}
                         {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived' || activeTrip.status === 'in_progress') && (
                           <div className="mt-3.5 pt-3.5 border-t border-blue-200/60 dark:border-blue-800/40 bg-white/90 dark:bg-zinc-950/90 -mx-1 px-4 py-3.5 rounded-2xl shadow-sm border border-gray-200/70 dark:border-white/10">
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
                               <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <div className="relative shrink-0">
                                   <img
@@ -1259,7 +1254,7 @@ export default function RiderPage() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="font-bold text-base text-gray-900 dark:text-white truncate">
+                                    <h4 className="font-bold text-base text-gray-900 dark:text-white break-words">
                                       {assignedDriverInfo?.fullName || 'Assigned Driver'}
                                     </h4>
                                     <span className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full">
@@ -1268,7 +1263,7 @@ export default function RiderPage() {
                                   </div>
                                   <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-200 font-bold mt-0.5">
                                     <Car size={16} className="text-blue-500 shrink-0" />
-                                    <span className="truncate">
+                                    <span className="break-words">
                                       {[assignedDriverInfo?.vehicleMake, assignedDriverInfo?.vehicleModel].filter(Boolean).join(' ') || 'Toyota Corolla Quest'}
                                     </span>
                                   </div>
@@ -1286,8 +1281,8 @@ export default function RiderPage() {
                             </div>
 
                             {/* Security & Verification Reminder + Quick Message Button */}
-                            <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                            <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex-wrap">
+                              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                                 <ShieldCheck size={15} className="shrink-0" /> Verify plate before boarding
                               </span>
                               <div className="flex items-center gap-2.5 shrink-0">

@@ -628,8 +628,8 @@ export default function CustomSearchInput({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Clock size={16} className="text-gray-400 shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.display_name}</p>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 break-words">{item.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 break-words">{item.display_name}</p>
                       </div>
                     </div>
                     <span className="text-xs text-blue-600 font-bold shrink-0">Select</span>
@@ -698,7 +698,7 @@ export default function CustomSearchInput({
             <div className="px-3.5 py-2.5 bg-blue-50/90 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Sparkles size={16} className="text-blue-600 shrink-0" />
-                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 truncate">
+                <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 break-words">
                   Auto-fill: <strong className="text-blue-700 dark:text-blue-300 font-bold">{topMatch.name}</strong>
                 </span>
               </div>
@@ -781,7 +781,7 @@ export default function CustomSearchInput({
                             {distLabel}
                           </span>
                         </div>
-                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-1 leading-relaxed">
+                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 break-words leading-relaxed">
                           {place.display_name || subLabel}
                         </span>
                       </div>
@@ -900,10 +900,10 @@ export default function CustomSearchInput({
               <ArrowLeft size={22} />
             </button>
             <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+              <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug">
                 {label || (hasRightAction ? 'Pickup Location' : 'Destination / Dropoff')}
               </h2>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
                 {currentHouseNo
                   ? `Enter street name for House #${currentHouseNo}`
                   : 'Enter house number, street name, or building'}
@@ -1050,7 +1050,7 @@ export default function CustomSearchInput({
               <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Sparkles size={15} className="text-blue-600 shrink-0" />
-                  <span className="text-xs text-gray-700 dark:text-gray-200 truncate">
+                  <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-200 break-words">
                     Auto-fill: <strong className="text-blue-700 dark:text-blue-300 font-bold">{topMatch.name}</strong>
                   </span>
                 </div>
@@ -1133,8 +1133,8 @@ export default function CustomSearchInput({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Clock size={14} className="text-gray-400 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{item.name}</p>
-                          <p className="text-[10px] text-gray-400 truncate">{item.display_name}</p>
+                          <p className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 break-words">{item.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 break-words">{item.display_name}</p>
                         </div>
                       </div>
                       <ChevronRight size={14} className="text-gray-300 shrink-0" />
@@ -1196,7 +1196,7 @@ export default function CustomSearchInput({
                             {distLabel}
                           </span>
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+                        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed break-words">
                           {place.display_name || subLabel}
                         </span>
                       </div>

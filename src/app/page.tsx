@@ -127,18 +127,18 @@ export default function Home() {
               <div className={`grid ${isPwaReady && !isAppAlreadyInstalled ? "grid-cols-2" : "grid-cols-1"} gap-2.5 sm:gap-3`}>
                 <Link
                   href="/driver"
-                  className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base"
+                  className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base text-center leading-tight"
                 >
                   <Car size={18} className="text-green-500 shrink-0" />
-                  <span className="truncate">Driver Sign In</span>
+                  <span>Driver Sign In</span>
                 </Link>
                 {isPwaReady && !isAppAlreadyInstalled && (
                   <button 
                     onClick={handleDriverInstall} 
-                    className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base"
+                    className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base text-center leading-tight"
                   >
                     <Download size={18} className="shrink-0" />
-                    <span className="truncate">Install App</span>
+                    <span>Install App</span>
                   </button>
                 )}
               </div>

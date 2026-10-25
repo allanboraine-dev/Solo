@@ -416,7 +416,7 @@ export default function BookingForm({
 
       {/* Number of Occupants Selector: Maximum 2 Riders Per Trip */}
       <div className="p-3 rounded-2xl bg-gray-50/95 dark:bg-zinc-900/70 border border-gray-200/80 dark:border-white/10 space-y-2">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex items-center justify-between gap-2 flex-wrap px-1">
           <span className="text-xs sm:text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
             Number of Occupants
           </span>
@@ -428,33 +428,33 @@ export default function BookingForm({
           <button
             type="button"
             onClick={() => setOccupantCount(1)}
-            className={`flex items-center justify-center gap-2 py-3 px-3 min-h-[48px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-3 px-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all touch-manipulation border text-center leading-tight ${
               occupantCount === 1
                 ? 'bg-blue-600 text-white border-blue-500 shadow-md'
                 : 'bg-white dark:bg-zinc-950 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <User size={18} className="shrink-0" />
-            <span className="truncate">1 Rider (Lowest)</span>
+            <span>1 Rider (Lowest)</span>
           </button>
           <button
             type="button"
             onClick={() => setOccupantCount(2)}
-            className={`flex items-center justify-center gap-2 py-3 px-3 min-h-[48px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-3 px-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all touch-manipulation border text-center leading-tight ${
               occupantCount === 2
                 ? 'bg-blue-600 text-white border-blue-500 shadow-md'
                 : 'bg-white dark:bg-zinc-950 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <Users size={18} className="shrink-0" />
-            <span className="truncate">2 Riders (+R4)</span>
+            <span>2 Riders (+R4)</span>
           </button>
         </div>
       </div>
 
       {/* Ride Payment Options: Speedpoint Machine or Cash */}
       <div className="p-3 rounded-2xl bg-gray-50/95 dark:bg-zinc-900/70 border border-gray-200/80 dark:border-white/10 space-y-2">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex items-center justify-between gap-2 flex-wrap px-1">
           <span className="text-xs sm:text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
             Ride Payment Method
           </span>
@@ -466,26 +466,26 @@ export default function BookingForm({
           <button
             type="button"
             onClick={() => setPaymentMethod('speedpoint')}
-            className={`flex items-center justify-center gap-2 py-3 px-3 min-h-[48px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-3 px-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all touch-manipulation border text-center leading-tight ${
               paymentMethod === 'speedpoint'
                 ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
                 : 'bg-white dark:bg-zinc-950 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <CreditCard size={18} className="shrink-0" />
-            <span className="truncate">Speedpoint POS</span>
+            <span>Speedpoint POS</span>
           </button>
           <button
             type="button"
             onClick={() => setPaymentMethod('cash')}
-            className={`flex items-center justify-center gap-2 py-3 px-3 min-h-[48px] rounded-xl text-sm sm:text-base font-bold transition-all touch-manipulation border ${
+            className={`flex items-center justify-center gap-1.5 py-3 px-2.5 min-h-[48px] rounded-xl text-xs sm:text-sm md:text-base font-bold transition-all touch-manipulation border text-center leading-tight ${
               paymentMethod === 'cash'
                 ? 'bg-purple-600 text-white border-purple-500 shadow-md'
                 : 'bg-white dark:bg-zinc-950 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             <Banknote size={18} className="shrink-0" />
-            <span className="truncate">Cash</span>
+            <span>Cash</span>
           </button>
         </div>
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 px-1 leading-snug">
@@ -499,7 +499,7 @@ export default function BookingForm({
       <button 
         onClick={handleBook}
         disabled={isBooking || fare === null}
-        className="w-full bg-blue-600 hover:bg-blue-500 dark:bg-white dark:text-black text-white font-black py-4 px-5 min-h-[56px] rounded-2xl hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-45 disabled:hover:scale-100 shadow-xl shadow-blue-600/25 dark:shadow-white/5 flex justify-center items-center gap-2.5 text-base md:text-lg sticky bottom-0 z-10"
+        className="w-full bg-blue-600 hover:bg-blue-500 dark:bg-white dark:text-black text-white font-black py-4 px-5 min-h-[56px] rounded-2xl hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-45 disabled:hover:scale-100 shadow-xl shadow-blue-600/25 dark:shadow-white/5 flex justify-center items-center gap-2.5 text-base md:text-lg sticky bottom-0 z-10 text-center leading-snug"
       >
         {isBooking ? (
           <div className="w-6 h-6 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
@@ -515,7 +515,7 @@ export default function BookingForm({
       {/* Online Drivers & Vehicle Telematics Section for Riders */}
       <div className="pt-0.5">
         <div className="bg-gray-50/95 dark:bg-zinc-900/70 rounded-2xl p-3 md:p-3.5 border border-gray-200/80 dark:border-white/10 space-y-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -558,17 +558,17 @@ export default function BookingForm({
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          <p className="font-bold text-sm text-gray-900 dark:text-white break-words">
                             {driver.fullName || 'Registered Driver'}
                           </p>
                           <span className="text-amber-500 font-bold text-xs flex items-center gap-0.5">
                             ★ {driver.rating ? driver.rating.toFixed(1) : '5.0'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium flex-wrap">
                           <Car size={14} className="text-blue-500 shrink-0" />
-                          <span className="truncate">{vehicleName}</span>
-                          {vehicleMeta && <span className="text-gray-500 text-xs hidden sm:inline">• {vehicleMeta}</span>}
+                          <span className="break-words">{vehicleName}</span>
+                          {vehicleMeta && <span className="text-gray-500 text-xs">• {vehicleMeta}</span>}
                         </div>
                       </div>
                     </div>
