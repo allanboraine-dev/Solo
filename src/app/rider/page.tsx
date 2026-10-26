@@ -14,9 +14,10 @@ import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { reverseGeocode } from '@/utils/mapService'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle, Download } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { audioAlert } from '@/utils/audioAlert'
+import { usePWA } from '@/lib/PWAContext'
 
 // Dynamically import Map component to disable SSR
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
@@ -30,6 +31,7 @@ const MapComponent = dynamic(() => import('@/components/MapComponent'), {
 })
 
 export default function RiderPage() {
+  const { installApp, isStandalone } = usePWA()
   const [pickupCoords, setPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [dropoffCoords, setDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
@@ -981,7 +983,7 @@ export default function RiderPage() {
                   <button
                     type="button"
                     onClick={() => setShowDriversModal(true)}
-                    className="w-full mb-3.5 px-3.5 py-2.5 min-h-[42px] rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-2 transition active:scale-[0.99] text-left shadow-2xs"
+                    className="w-full mb-2.5 px-3.5 py-2.5 min-h-[42px] rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/50 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-2 transition active:scale-[0.99] text-left shadow-2xs"
                     title="View all online drivers with driver and car details"
                   >
                     <div className="flex items-center gap-2">
@@ -994,6 +996,33 @@ export default function RiderPage() {
                       <Car size={16} className="shrink-0" />
                       <span>View Drivers &amp; Cars &rarr;</span>
                     </div>
+                  </button>
+                )}
+
+                {/* Install Rider App Action on Rider Home Page Portal */}
+                {!isStandalone && !isSheetMinimized && (
+                  <button
+                    type="button"
+                    onClick={() => installApp('rider')}
+                    className="w-full mb-3.5 px-3.5 py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-between gap-2.5 transition active:scale-[0.99] text-left shadow-md shadow-blue-500/20"
+                    title="Install SOLO Rider App to your Home Screen"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 rounded-xl bg-white/20 shrink-0">
+                        <Download size={16} className="text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight">
+                          Install Rider App
+                        </span>
+                        <span className="text-[11px] text-blue-100 font-medium block leading-tight">
+                          Add SOLO Rider to your Home Screen for 1-tap booking
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black uppercase tracking-wider bg-white text-blue-700 px-3 py-1.5 rounded-xl shrink-0 shadow-2xs">
+                      Install
+                    </span>
                   </button>
                 )}
 

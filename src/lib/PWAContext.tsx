@@ -91,7 +91,7 @@ export function markAppAsInstalled(role?: PortalRole) {
   }
 }
 
-export function detectStandaloneOrInstalled(role?: PortalRole): {
+export function detectStandaloneOrInstalled(_role?: PortalRole): {
   standaloneDisplay: boolean;
   alreadyInstalled: boolean;
 } {
@@ -129,27 +129,8 @@ export function detectStandaloneOrInstalled(role?: PortalRole): {
     hasSessionFlag = sessionStorage.getItem(PWA_SESSION_KEY) === 'true';
   } catch {}
 
-  let hasPersistedInstall = false;
-  try {
-    if (localStorage.getItem(INSTALLED_FLAG_KEY) === 'true') {
-      hasPersistedInstall = true;
-    } else if (role && localStorage.getItem(`${INSTALLED_FLAG_KEY}_${role}`) === 'true') {
-      hasPersistedInstall = true;
-    }
-  } catch {}
-
-  try {
-    if (!hasPersistedInstall && typeof document !== 'undefined') {
-      if (/(?:^|;\s*)solo_pwa_installed=true/.test(document.cookie)) {
-        hasPersistedInstall = true;
-      } else if (role && new RegExp(`(?:^|;\\s*)solo_pwa_installed_${role}=true`).test(document.cookie)) {
-        hasPersistedInstall = true;
-      }
-    }
-  } catch {}
-
   const standaloneDisplay = isDisplayStandalone || isIosStandalone || isTwa || isPwaSource || hasSessionFlag;
-  const alreadyInstalled = standaloneDisplay || hasPersistedInstall;
+  const alreadyInstalled = standaloneDisplay;
 
   return { standaloneDisplay, alreadyInstalled };
 }
@@ -264,11 +245,10 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     if (standaloneDisplay) {
       markAppAsInstalled(activePortalRole);
     }
+    setIsStandalone(standaloneDisplay);
+    setIsInstalled(alreadyInstalled);
     if (alreadyInstalled) {
-      setIsStandalone(true);
-      setIsInstalled(true);
       setIsBannerDismissed(true);
-      setShowIosGuide(false);
     }
 
     // Check if we navigated to /driver?install=driver or /rider?install=rider from the home page
@@ -287,7 +267,7 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       setGuideRole(targetRole);
       syncDocumentManifestAndIcons(targetRole);
 
-      if (!alreadyInstalled) {
+      if (!standaloneDisplay) {
         setShowIosGuide(true);
       }
 
@@ -311,7 +291,7 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       markAppAsInstalled(savedRole || undefined);
     }
 
-    setIsStandalone(alreadyInstalled);
+    setIsStandalone(standaloneDisplay);
     setIsInstalled(alreadyInstalled);
     setIsPwaReady(true);
 
@@ -327,27 +307,6 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       const targetRole = savedRole || 'rider';
       router.replace(`/${targetRole}`);
     }
-
-    // Check Chromium getInstalledRelatedApps API if supported
-    try {
-      const nav = window.navigator as Navigator & {
-        getInstalledRelatedApps?: () => Promise<Array<{ id?: string; platform?: string; url?: string }>>;
-      };
-      if (typeof nav.getInstalledRelatedApps === 'function') {
-        nav
-          .getInstalledRelatedApps()
-          .then((apps) => {
-            if (Array.isArray(apps) && apps.length > 0) {
-              markAppAsInstalled(savedRole || undefined);
-              setIsStandalone(true);
-              setIsInstalled(true);
-              setIsBannerDismissed(true);
-              setShowIosGuide(false);
-            }
-          })
-          .catch(() => {});
-      }
-    } catch {}
 
     // Check dismissal status in localStorage
     try {
@@ -389,8 +348,8 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     // Capture Chrome/Android beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      const { alreadyInstalled: isCurrentlyInstalled } = detectStandaloneOrInstalled();
-      if (!isCurrentlyInstalled) {
+      const { standaloneDisplay: isCurrentlyStandalone } = detectStandaloneOrInstalled();
+      if (!isCurrentlyStandalone) {
         setDeferredPrompt(e as BeforeInstallPromptEvent);
       }
     };
@@ -448,10 +407,10 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         ? 'driver'
         : pathname?.startsWith('/rider')
         ? 'rider'
-        : 'rider');
+        : installedRole || 'rider');
 
-    const { alreadyInstalled } = detectStandaloneOrInstalled(targetRole);
-    if (alreadyInstalled) {
+    const { standaloneDisplay } = detectStandaloneOrInstalled(targetRole);
+    if (standaloneDisplay) {
       markAppAsInstalled(targetRole);
       setIsStandalone(true);
       setIsInstalled(true);
@@ -463,21 +422,13 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const targetPath = `/${targetRole}`;
-
-    // 1. If we are NOT on the target portal URL, navigate there first!
-    if (!pathname?.startsWith(targetPath)) {
-      router.push(`${targetPath}?install=${targetRole}`);
-      return;
-    }
-
-    // 2. Persist the target portal role and dynamically switch manifest + icons
+    // 1. Persist the target portal role and dynamically switch manifest + icons
     persistInstalledRole(targetRole);
     setInstalledRole(targetRole);
     setGuideRole(targetRole);
     syncDocumentManifestAndIcons(targetRole);
 
-    // 3. If native Android/Chrome install prompt is ready on this portal, trigger it
+    // 2. If native Android/Chrome install prompt is ready, trigger it directly within the user gesture
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();
@@ -489,6 +440,9 @@ export function PWAProvider({ children }: { children: ReactNode }) {
           setIsInstalled(true);
           setIsBannerDismissed(true);
           setShowIosGuide(false);
+          if (!pathname?.startsWith(`/${targetRole}`)) {
+            router.push(`/${targetRole}`);
+          }
           return;
         }
       } catch (err) {
@@ -496,15 +450,12 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 4. On iOS or when native prompt has already been dismissed / requires manual install
+    // 3. On iOS or when native prompt requires manual install, show the role-aware install guide
     setShowIosGuide(true);
   };
 
   const handleConfirmManualInstall = () => {
-    markAppAsInstalled(guideRole);
-    setIsStandalone(true);
-    setIsInstalled(true);
-    setIsBannerDismissed(true);
+    dismissBanner();
     setShowIosGuide(false);
   };
 
@@ -520,14 +471,14 @@ export function PWAProvider({ children }: { children: ReactNode }) {
   return (
     <PWAContext.Provider
       value={{
-        isInstallable: !effectiveStandalone && (!!deferredPrompt || isIOS),
-        isStandalone: effectiveStandalone,
+        isInstallable: !isStandalone && (!!deferredPrompt || isIOS),
+        isStandalone,
         isInstalled: effectiveStandalone,
         isPwaReady,
         isIOS,
         isAndroid,
         installedRole,
-        showIosGuide: !effectiveStandalone && showIosGuide,
+        showIosGuide,
         setShowIosGuide,
         installApp,
         dismissBanner,
@@ -536,8 +487,8 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     >
       {children}
 
-      {/* Role-Aware Mobile Install Guide Modal for iOS Safari & Android Browsers */}
-      {!effectiveStandalone && showIosGuide && (
+      {/* Role-Aware Mobile & Desktop Install Guide Modal */}
+      {showIosGuide && (
         <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
             <div className={`bg-gradient-to-r ${accentBg} p-4 text-white flex items-center justify-between gap-3`}>

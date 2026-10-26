@@ -99,4 +99,44 @@ describe('PWA Mobile Installation & Offline Optimization Suite', () => {
     assert.ok(content.includes('10177'), 'Must include Ambulance 10177 hotline');
     assert.ok(content.includes('112'), 'Must include Mobile SOS 112 hotline');
   });
+
+  it('verifies Rider and Driver Home Page Portals both include dedicated Install App buttons', () => {
+    const riderPagePath = path.join(rootDir, 'src', 'app', 'rider', 'page.tsx');
+    const driverPagePath = path.join(rootDir, 'src', 'app', 'driver', 'page.tsx');
+
+    const riderContent = fs.readFileSync(riderPagePath, 'utf8');
+    const driverContent = fs.readFileSync(driverPagePath, 'utf8');
+
+    assert.ok(riderContent.includes("installApp('rider')"), 'Rider portal must invoke installApp("rider")');
+    assert.ok(riderContent.includes('Install Rider App'), 'Rider portal must display "Install Rider App" action');
+
+    assert.ok(driverContent.includes("installApp('driver')"), 'Driver portal must invoke installApp("driver")');
+    assert.ok(driverContent.includes('Install Driver App'), 'Driver portal must display "Install Driver App" action');
+  });
+
+  it('verifies SOLO Landing Page and Navbar display Install App buttons in mobile browser view', () => {
+    const landingPagePath = path.join(rootDir, 'src', 'app', 'page.tsx');
+    const navbarPath = path.join(rootDir, 'src', 'components', 'Navbar.tsx');
+
+    const landingContent = fs.readFileSync(landingPagePath, 'utf8');
+    const navbarContent = fs.readFileSync(navbarPath, 'utf8');
+
+    assert.ok(landingContent.includes("installApp('rider')"), 'Landing page must invoke installApp("rider")');
+    assert.ok(landingContent.includes("installApp('driver')"), 'Landing page must invoke installApp("driver")');
+    assert.ok(landingContent.includes('Install Rider App'), 'Landing page must display "Install Rider App"');
+    assert.ok(landingContent.includes('Install Driver App'), 'Landing page must display "Install Driver App"');
+    assert.ok(landingContent.includes('Install App'), 'Landing page must display "Install App"');
+    assert.strictEqual(
+      landingContent.includes('isAppAlreadyInstalled'),
+      false,
+      'Landing page must not hide install buttons behind stale persisted isAppAlreadyInstalled flags'
+    );
+
+    assert.ok(navbarContent.includes('!isStandalone'), 'Navbar must show Install button whenever !isStandalone');
+    assert.strictEqual(
+      navbarContent.includes('isAppAlreadyInstalled'),
+      false,
+      'Navbar must not hide Install button behind stale persisted isAppAlreadyInstalled flags'
+    );
+  });
 });

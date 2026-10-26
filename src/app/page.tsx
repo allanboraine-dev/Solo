@@ -5,8 +5,7 @@ import { Car, Map, ShieldCheck, Download, UserPlus, Building2, ArrowUpRight } fr
 import { usePWA } from "@/lib/PWAContext";
 
 export default function Home() {
-  const { installApp, isStandalone, isInstalled, isPwaReady } = usePWA();
-  const isAppAlreadyInstalled = isStandalone || isInstalled;
+  const { installApp, isStandalone } = usePWA();
 
   const handleDriverInstall = () => {
     installApp('driver');
@@ -47,6 +46,27 @@ export default function Home() {
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm"><Car size={20} className="text-purple-500 shrink-0"/> 7 Days Free, then R499/pm</div>
           </div>
 
+          {!isStandalone && (
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-2.5 sm:gap-3 pt-2 max-w-md sm:max-w-none mx-auto">
+              <button
+                type="button"
+                onClick={() => installApp('rider')}
+                className="px-4 py-3 min-h-[48px] rounded-2xl sm:rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 active:scale-95"
+              >
+                <Download size={16} className="shrink-0" />
+                <span>Install Rider App</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDriverInstall}
+                className="px-4 py-3 min-h-[48px] rounded-2xl sm:rounded-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-95"
+              >
+                <Download size={16} className="shrink-0" />
+                <span>Install Driver App</span>
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-wrap justify-center gap-3 pt-1 text-sm">
             <Link href="/manual" className="px-4 py-2.5 min-h-[44px] rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 font-semibold transition flex items-center gap-2 shadow-sm">
               📘 Download Operational Manual (SOP)
@@ -84,10 +104,11 @@ export default function Home() {
                 <img src="/rider-icon-192.png" alt="" className="w-6 h-6 rounded-md object-cover border border-white/30" />
                 <span>Book a Ride Now</span>
               </Link>
-              {isPwaReady && !isAppAlreadyInstalled && (
+              {!isStandalone && (
                 <button 
+                  type="button"
                   onClick={() => installApp('rider')} 
-                  className="flex items-center justify-center gap-2.5 w-full py-3.5 min-h-[48px] bg-white dark:bg-zinc-800/90 text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-sm sm:text-base"
+                  className="flex items-center justify-center gap-2.5 w-full py-3.5 min-h-[48px] bg-white dark:bg-zinc-800/90 text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-sm sm:text-base active:scale-95"
                 >
                   <Download size={18} /> Install Rider App (PWA)
                 </button>
@@ -124,7 +145,7 @@ export default function Home() {
                 <UserPlus size={20} /> Register as New Driver
               </Link>
 
-              <div className={`grid ${isPwaReady && !isAppAlreadyInstalled ? "grid-cols-2" : "grid-cols-1"} gap-2.5 sm:gap-3`}>
+              <div className={`grid ${!isStandalone ? "grid-cols-2" : "grid-cols-1"} gap-2.5 sm:gap-3`}>
                 <Link
                   href="/driver"
                   className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base text-center leading-tight"
@@ -132,10 +153,11 @@ export default function Home() {
                   <Car size={18} className="text-green-500 shrink-0" />
                   <span>Driver Sign In</span>
                 </Link>
-                {isPwaReady && !isAppAlreadyInstalled && (
+                {!isStandalone && (
                   <button 
+                    type="button"
                     onClick={handleDriverInstall} 
-                    className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base text-center leading-tight"
+                    className="flex items-center justify-center gap-2 py-3.5 px-3 min-h-[48px] bg-white dark:bg-zinc-800/90 text-gray-800 dark:text-gray-100 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700 transition-all text-sm sm:text-base text-center leading-tight active:scale-95"
                   >
                     <Download size={18} className="shrink-0" />
                     <span>Install App</span>

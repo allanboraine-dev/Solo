@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -23,6 +23,7 @@ import SafetyShieldModal from '@/components/SafetyShieldModal'
 import { AdaptiveTelemetryGovernor, TELEMETRY_TIER_CONFIGS, type ComputedGpsSample } from '@/utils/telemetryEngine'
 import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
 import { updateSupportTicketStatus, type SupportTicket } from '@/utils/supportStore'
+import { usePWA } from '@/lib/PWAContext'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -35,6 +36,7 @@ const MapComponent = dynamic(() => import('@/components/MapComponent'), {
 
 export default function DriverPage() {
   const router = useRouter()
+  const { installApp, isStandalone } = usePWA()
   const [isOnline, setIsOnline] = useState(false)
   const [activeTab, setActiveTab] = useState<'home' | 'earnings' | 'profile' | 'help'>('home')
   const [isHomeSheetMinimized, setIsHomeSheetMinimized] = useState(false)
@@ -1751,6 +1753,31 @@ export default function DriverPage() {
                   )}
 
                   <div className="mt-4 text-left space-y-3">
+                    {!isStandalone && (
+                      <button
+                        type="button"
+                        onClick={() => installApp('driver')}
+                        className="w-full px-3.5 py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center justify-between gap-2.5 transition active:scale-[0.99] text-left shadow-md shadow-emerald-500/20"
+                        title="Install SOLO Driver App to your Home Screen"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-2 rounded-xl bg-white/20 shrink-0">
+                            <Download size={16} className="text-white" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight">
+                              Install Driver App
+                            </span>
+                            <span className="text-[11px] text-emerald-100 font-medium block leading-tight">
+                              Add SOLO Driver Portal to your Home Screen
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black uppercase tracking-wider bg-white text-emerald-700 px-3 py-1.5 rounded-xl shrink-0 shadow-2xs">
+                          Install
+                        </span>
+                      </button>
+                    )}
                     <NotificationPermissionBanner role="driver" userId={profile?.id} />
                   </div>
                 </div>
