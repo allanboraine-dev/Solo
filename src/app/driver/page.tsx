@@ -200,7 +200,8 @@ export default function DriverPage() {
     const loadProfile = async () => {
       const prof = await getDriverProfile();
       if (!prof) {
-        router.push('/driver/login')
+        const search = typeof window !== 'undefined' ? window.location.search : '';
+        router.replace('/driver/login' + search)
       } else {
         // Check for return from Paystack checkout (?payment=success)
         if (typeof window !== 'undefined') {
@@ -1055,6 +1056,17 @@ export default function DriverPage() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={() => installApp('driver')}
+                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2.5 min-h-[46px] rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 text-xs sm:text-sm font-black transition active:scale-95 touch-manipulation"
+                title="Install SOLO Driver App"
+              >
+                <Download size={16} className="shrink-0" />
+                <span className="hidden xs:inline sm:inline">Install</span>
+              </button>
+            )}
             <button 
               onClick={async () => {
                 const nextOnline = !isOnline;

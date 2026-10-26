@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { isPlatformOwner, isOwnerPassword, FOUNDER_DRIVER_UUID } from '@/utils/owner'
 import { setSafeLocalStorageItem } from '@/utils/session'
+import { usePWA } from '@/lib/PWAContext'
+import { Download } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DriverLogin() {
   const router = useRouter()
+  const { installApp, isStandalone } = usePWA()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -115,6 +118,32 @@ export default function DriverLogin() {
           <h1 className="text-3xl font-black mb-2">Driver Login</h1>
           <p className="text-gray-500">Welcome back to SOLO.</p>
         </div>
+
+        {!isStandalone && (
+          <button
+            type="button"
+            onClick={() => installApp('driver')}
+            className="w-full mb-6 px-4 py-3 min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center justify-between gap-2.5 transition active:scale-[0.99] text-left shadow-md shadow-emerald-500/20"
+            title="Install SOLO Driver App to your Home Screen"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-white/20 shrink-0">
+                <Download size={16} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight">
+                  Install Driver App
+                </span>
+                <span className="text-[11px] text-emerald-100 font-medium block leading-tight">
+                  Add SOLO Driver Portal to your Home Screen
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-black uppercase tracking-wider bg-white text-emerald-700 px-3 py-1.5 rounded-xl shrink-0 shadow-2xs">
+              Install
+            </span>
+          </button>
+        )}
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm">

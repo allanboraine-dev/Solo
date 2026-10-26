@@ -139,4 +139,25 @@ describe('PWA Mobile Installation & Offline Optimization Suite', () => {
       'Navbar must not hide Install button behind stale persisted isAppAlreadyInstalled flags'
     );
   });
+
+  it('verifies Driver Login and Driver Registration pages include dedicated Install Driver App buttons for mobile devices', () => {
+    const driverLoginPath = path.join(rootDir, 'src', 'app', 'driver', 'login', 'page.tsx');
+    const driverRegisterPath = path.join(rootDir, 'src', 'app', 'driver', 'register', 'page.tsx');
+    const driverManifestPath = path.join(rootDir, 'public', 'manifest-driver.json');
+
+    const loginContent = fs.readFileSync(driverLoginPath, 'utf8');
+    const registerContent = fs.readFileSync(driverRegisterPath, 'utf8');
+    const driverManifest = JSON.parse(fs.readFileSync(driverManifestPath, 'utf8'));
+
+    assert.ok(loginContent.includes("installApp('driver')"), 'Driver Login must invoke installApp("driver")');
+    assert.ok(loginContent.includes('Install Driver App'), 'Driver Login must display "Install Driver App"');
+
+    assert.ok(registerContent.includes("installApp('driver')"), 'Driver Register must invoke installApp("driver")');
+    assert.ok(registerContent.includes('Install Driver App'), 'Driver Register must display "Install Driver App"');
+
+    const iconSizes = driverManifest.icons.map((i: { sizes: string }) => i.sizes);
+    assert.strictEqual(iconSizes.includes('180x180'), false, 'Driver manifest must not declare mismatched 180x180 size on 192x192 PNG');
+    assert.ok(iconSizes.includes('192x192'), 'Driver manifest must include 192x192 icon');
+    assert.ok(iconSizes.includes('512x512'), 'Driver manifest must include 512x512 icon');
+  });
 });

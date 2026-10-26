@@ -167,11 +167,17 @@ function syncDocumentManifestAndIcons(role: PortalRole) {
     const iconHref = role === 'driver' ? '/driver-icon-192.png' : '/rider-icon-192.png';
     const appTitle = role === 'driver' ? 'SOLO Driver' : 'SOLO Rider';
 
-    let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
-    if (manifestLink) {
-      manifestLink.href = manifestHref;
+    const manifestLinks = document.querySelectorAll('link[rel="manifest"]');
+    if (manifestLinks.length > 0) {
+      manifestLinks.forEach((link, idx) => {
+        if (idx === 0) {
+          (link as HTMLLinkElement).href = manifestHref;
+        } else {
+          link.parentNode?.removeChild(link);
+        }
+      });
     } else {
-      manifestLink = document.createElement('link');
+      const manifestLink = document.createElement('link');
       manifestLink.rel = 'manifest';
       manifestLink.href = manifestHref;
       document.head.appendChild(manifestLink);
@@ -345,9 +351,26 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    // Capture Chrome/Android beforeinstallprompt event
+    // Capture Chrome/Android beforeinstallprompt event (including early pre-hydration capture)
+    const win = window as Window & { __soloDeferredPrompt?: BeforeInstallPromptEvent | null };
+    if (win.__soloDeferredPrompt && !standaloneDisplay) {
+      setDeferredPrompt(win.__soloDeferredPrompt);
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .getRegistration('/')
+        .then((reg) => {
+          if (!reg) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      win.__soloDeferredPrompt = e as BeforeInstallPromptEvent;
       const { standaloneDisplay: isCurrentlyStandalone } = detectStandaloneOrInstalled();
       if (!isCurrentlyStandalone) {
         setDeferredPrompt(e as BeforeInstallPromptEvent);
@@ -364,6 +387,7 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       persistInstalledRole(activeRole);
       markAppAsInstalled(activeRole);
       setInstalledRole(activeRole);
+      win.__soloDeferredPrompt = null;
       setDeferredPrompt(null);
       setIsStandalone(true);
       setIsInstalled(true);
@@ -372,7 +396,10 @@ export function PWAProvider({ children }: { children: ReactNode }) {
 
       // Ensure user lands directly in the portal they installed
       if (window.location.pathname === '/') {
-        router.replace(`/${activeRole}`);
+        const hasDriverAuth =
+          activeRole === 'driver' &&
+          (localStorage.getItem('driver_id') || localStorage.getItem('mock_driver_profile'));
+        router.replace(activeRole === 'driver' && !hasDriverAuth ? '/driver/login' : `/${activeRole}`);
       }
     };
 
@@ -422,26 +449,34 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // 1. Persist the target portal role and dynamically switch manifest + icons
+    // 1. Persist the target portal role first
     persistInstalledRole(targetRole);
     setInstalledRole(targetRole);
     setGuideRole(targetRole);
-    syncDocumentManifestAndIcons(targetRole);
 
-    // 2. If native Android/Chrome install prompt is ready, trigger it directly within the user gesture
-    if (deferredPrompt) {
+    // 2. If native Android/Chrome install prompt is ready, trigger it immediately inside the user click gesture
+    const win = typeof window !== 'undefined' ? (window as Window & { __soloDeferredPrompt?: BeforeInstallPromptEvent | null }) : null;
+    const activePrompt = deferredPrompt || win?.__soloDeferredPrompt || null;
+
+    if (activePrompt) {
       try {
-        await deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
+        await activePrompt.prompt();
+        const choice = await activePrompt.userChoice;
+        if (win) win.__soloDeferredPrompt = null;
+        setDeferredPrompt(null);
+        syncDocumentManifestAndIcons(targetRole);
         if (choice.outcome === 'accepted') {
           markAppAsInstalled(targetRole);
-          setDeferredPrompt(null);
           setIsStandalone(true);
           setIsInstalled(true);
           setIsBannerDismissed(true);
           setShowIosGuide(false);
           if (!pathname?.startsWith(`/${targetRole}`)) {
-            router.push(`/${targetRole}`);
+            let hasDriverAuth = false;
+            try {
+              hasDriverAuth = Boolean(localStorage.getItem('driver_id') || localStorage.getItem('mock_driver_profile'));
+            } catch {}
+            router.push(targetRole === 'driver' && !hasDriverAuth ? '/driver/login' : `/${targetRole}`);
           }
           return;
         }
@@ -450,7 +485,28 @@ export function PWAProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 3. On iOS or when native prompt requires manual install, show the role-aware install guide
+    // 3. Sync manifest + icons for the target portal
+    syncDocumentManifestAndIcons(targetRole);
+
+    // 4. If we are not yet on the target portal URL (e.g., user tapped Install Driver App on '/'),
+    // navigate to the target portal route with ?install=<role> so mobile Safari / Chrome
+    // bookmarks the dedicated /driver or /rider portal URL and manifest!
+    if (!pathname?.startsWith(`/${targetRole}`)) {
+      let targetDestination = `/${targetRole}`;
+      if (targetRole === 'driver' && typeof window !== 'undefined') {
+        try {
+          const hasDriverAuth = Boolean(localStorage.getItem('driver_id') || localStorage.getItem('mock_driver_profile'));
+          if (!hasDriverAuth) {
+            targetDestination = '/driver/login';
+          }
+        } catch {}
+      }
+      setShowIosGuide(true);
+      router.push(`${targetDestination}?install=${targetRole}`);
+      return;
+    }
+
+    // 5. Show the role-aware mobile install guide modal
     setShowIosGuide(true);
   };
 
@@ -516,16 +572,18 @@ export function PWAProvider({ children }: { children: ReactNode }) {
             </div>
 
             <div className="p-5 space-y-4 text-xs sm:text-sm text-gray-700 dark:text-gray-200">
-              {deferredPrompt ? (
+              {deferredPrompt && (
                 <button
                   type="button"
                   onClick={() => installApp(guideRole)}
-                  className={`w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r ${accentBg} text-white font-black flex items-center justify-center gap-2 shadow-lg`}
+                  className={`w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r ${accentBg} text-white font-black flex items-center justify-center gap-2 shadow-lg active:scale-95 transition`}
                 >
                   <Download size={18} />
                   <span>Install {portalLabel} Now</span>
                 </button>
-              ) : isIOS ? (
+              )}
+
+              {isIOS ? (
                 <div className="space-y-3">
                   <p className="font-semibold text-gray-900 dark:text-white">
                     To install <strong>{portalLabel}</strong> on your iPhone or iPad:
@@ -559,14 +617,14 @@ export function PWAProvider({ children }: { children: ReactNode }) {
               ) : (
                 <div className="space-y-3">
                   <p className="font-semibold text-gray-900 dark:text-white">
-                    To install <strong>{portalLabel}</strong> on your device:
+                    To install <strong>{portalLabel}</strong> on your Android / mobile device:
                   </p>
                   <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800">
                     <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
                       <MoreVertical size={18} />
                     </div>
                     <span>
-                      1. Tap the browser menu <strong>(⋮)</strong> or address bar install icon <strong>(⊕)</strong>.
+                      1. Tap the browser menu <strong>(⋮)</strong> in the top-right corner (or <strong>(≡)</strong> in Samsung Internet).
                     </span>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800">
@@ -574,7 +632,16 @@ export function PWAProvider({ children }: { children: ReactNode }) {
                       <Smartphone size={18} />
                     </div>
                     <span>
-                      2. Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                      2. Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-gray-200/80 dark:border-zinc-800">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 shrink-0">
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <span>
+                      3. Tap <strong>Install</strong> — launching the icon opens the{' '}
+                      <strong>{guideRole === 'driver' ? 'Driver Portal' : 'Rider Portal'}</strong> directly!
                     </span>
                   </div>
                 </div>

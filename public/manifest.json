@@ -12,20 +12,6 @@
   "theme_color": "#09090b",
   "categories": ["travel", "transportation", "business"],
   "prefer_related_applications": false,
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "/manifest.json"
-    },
-    {
-      "platform": "webapp",
-      "url": "/manifest-rider.json"
-    },
-    {
-      "platform": "webapp",
-      "url": "/manifest-driver.json"
-    }
-  ],
   "icons": [
     {
       "src": "/icon-192.png",

@@ -15,16 +15,6 @@ export async function GET() {
     theme_color: '#16a34a',
     categories: ['transportation', 'business'],
     prefer_related_applications: false,
-    related_applications: [
-      {
-        platform: 'webapp',
-        url: '/manifest-driver.json'
-      },
-      {
-        platform: 'webapp',
-        url: '/manifest.json'
-      }
-    ],
     icons: [
       {
         src: '/driver-icon-192.png',
@@ -33,21 +23,22 @@ export async function GET() {
         purpose: 'any'
       },
       {
+        src: '/driver-icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable'
+      },
+      {
         src: '/driver-icon-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any'
       },
       {
-        src: '/icon-maskable.png',
+        src: '/driver-icon-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable'
-      },
-      {
-        src: '/apple-touch-icon.png',
-        sizes: '180x180',
-        type: 'image/png'
       }
     ],
     shortcuts: [

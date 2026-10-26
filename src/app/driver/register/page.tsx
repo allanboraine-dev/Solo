@@ -23,12 +23,15 @@ import {
   Calendar,
   Sparkles,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react'
+import { usePWA } from '@/lib/PWAContext'
 import Link from 'next/link'
 
 export default function DriverRegistration() {
   const router = useRouter()
+  const { installApp, isStandalone } = usePWA()
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
@@ -699,6 +702,32 @@ export default function DriverRegistration() {
           <p className="text-blue-100 text-sm relative z-10">
             Keep 100% of your rider fares. 7-day free trial, then flat R499/month.
           </p>
+
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={() => installApp('driver')}
+              className="mt-4 w-full px-3.5 py-2.5 min-h-[46px] rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-white/25 flex items-center justify-between gap-2.5 transition active:scale-[0.99] text-left shadow-lg relative z-10"
+              title="Install SOLO Driver App to your Home Screen"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-white/20 shrink-0">
+                  <Download size={16} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs sm:text-sm font-black tracking-tight block leading-tight">
+                    Install Driver App
+                  </span>
+                  <span className="text-[11px] text-emerald-100 font-medium block leading-tight">
+                    Add SOLO Driver Portal to your Home Screen
+                  </span>
+                </div>
+              </div>
+              <span className="text-xs font-black uppercase tracking-wider bg-white text-emerald-700 px-3 py-1.5 rounded-xl shrink-0 shadow-2xs">
+                Install
+              </span>
+            </button>
+          )}
 
           {/* Driver Payment & Equipment Requirements Strip */}
           <div className="mt-4 flex flex-wrap gap-2 relative z-10">

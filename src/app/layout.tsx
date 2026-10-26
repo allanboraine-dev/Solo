@@ -78,6 +78,23 @@ export default function RootLayout({
                 window.addEventListener('orientationchange', syncViewport, { passive: true });
 
                 try {
+                  window.__soloDeferredPrompt = window.__soloDeferredPrompt || null;
+                  window.addEventListener('beforeinstallprompt', function(e) {
+                    e.preventDefault();
+                    window.__soloDeferredPrompt = e;
+                  });
+                  if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', function() {
+                      navigator.serviceWorker.getRegistration('/').then(function(reg) {
+                        if (!reg) {
+                          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+                        }
+                      }).catch(function() {});
+                    });
+                  }
+                } catch (e) {}
+
+                try {
                   var path = window.location.pathname;
                   var isStandalone =
                     (window.matchMedia && (
