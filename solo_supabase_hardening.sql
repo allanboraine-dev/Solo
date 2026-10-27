@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.driver_locations (
     is_stress_test BOOLEAN NOT NULL DEFAULT false
 );
 ALTER TABLE public.driver_locations SET (fillfactor = 70);
+ALTER TABLE public.driver_locations ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.ride_bids (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.ride_bids (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (trip_id, driver_id)
 );
+ALTER TABLE public.ride_bids ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- 3. STOP REALTIME WAL SATURATION ON HIGH-FREQUENCY GPS WRITES
@@ -271,3 +273,129 @@ DROP POLICY IF EXISTS "trips_select_policy" ON public.trips;
 CREATE POLICY "trips_select_policy" ON public.trips
     FOR SELECT TO authenticated, anon
     USING (rider_id = (select auth.uid()) OR driver_id = (select auth.uid()) OR status = 'requested');
+
+-- ----------------------------------------------------------------------------
+-- DRIVER LOCATIONS RLS POLICIES (Fixes rls_disabled_in_public)
+-- ----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "driver_locations_select" ON public.driver_locations;
+CREATE POLICY "driver_locations_select" ON public.driver_locations
+    FOR SELECT TO authenticated, anon
+    USING (driver_id = (select auth.uid()) OR is_online = true);
+
+DROP POLICY IF EXISTS "driver_locations_insert" ON public.driver_locations;
+CREATE POLICY "driver_locations_insert" ON public.driver_locations
+    FOR INSERT TO authenticated
+    WITH CHECK (driver_id = (select auth.uid()));
+
+DROP POLICY IF EXISTS "driver_locations_update" ON public.driver_locations;
+CREATE POLICY "driver_locations_update" ON public.driver_locations
+    FOR UPDATE TO authenticated
+    USING (driver_id = (select auth.uid()))
+    WITH CHECK (driver_id = (select auth.uid()));
+
+DROP POLICY IF EXISTS "driver_locations_delete" ON public.driver_locations;
+CREATE POLICY "driver_locations_delete" ON public.driver_locations
+    FOR DELETE TO authenticated
+    USING (driver_id = (select auth.uid()));
+
+-- ----------------------------------------------------------------------------
+-- RIDE BIDS RLS POLICIES (Fixes rls_disabled_in_public)
+-- ----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "ride_bids_select" ON public.ride_bids;
+CREATE POLICY "ride_bids_select" ON public.ride_bids
+    FOR SELECT TO authenticated
+    USING (
+        driver_id = (select auth.uid())
+        OR EXISTS (
+            SELECT 1 FROM public.trips t
+            WHERE t.id = ride_bids.trip_id
+              AND t.rider_id = (select auth.uid())
+        )
+    );
+
+DROP POLICY IF EXISTS "ride_bids_insert" ON public.ride_bids;
+CREATE POLICY "ride_bids_insert" ON public.ride_bids
+    FOR INSERT TO authenticated
+    WITH CHECK (
+        driver_id = (select auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM public.trips t
+            WHERE t.id = ride_bids.trip_id
+              AND t.status = 'requested'
+        )
+    );
+
+DROP POLICY IF EXISTS "ride_bids_update" ON public.ride_bids;
+CREATE POLICY "ride_bids_update" ON public.ride_bids
+    FOR UPDATE TO authenticated
+    USING (
+        driver_id = (select auth.uid())
+        OR EXISTS (
+            SELECT 1 FROM public.trips t
+            WHERE t.id = ride_bids.trip_id
+              AND t.rider_id = (select auth.uid())
+        )
+    )
+    WITH CHECK (
+        driver_id = (select auth.uid())
+        OR EXISTS (
+            SELECT 1 FROM public.trips t
+            WHERE t.id = ride_bids.trip_id
+              AND t.rider_id = (select auth.uid())
+        )
+    );
+
+DROP POLICY IF EXISTS "ride_bids_delete" ON public.ride_bids;
+CREATE POLICY "ride_bids_delete" ON public.ride_bids
+    FOR DELETE TO authenticated
+    USING (driver_id = (select auth.uid()));
+
+-- ----------------------------------------------------------------------------
+-- DYNAMIC GUARD: ENFORCE RLS ON ALL PUBLIC TABLES (rls_disabled_in_public)
+-- ----------------------------------------------------------------------------
+DO $$
+DECLARE
+    tbl RECORD;
+BEGIN
+    FOR tbl IN (
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('spatial_ref_sys', 'geography_columns', 'geometry_columns')
+    ) LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', tbl.tablename);
+    END LOOP;
+END $$;
+
+-- ----------------------------------------------------------------------------
+-- SECURITY DEFINER SEARCH_PATH HARDENING (Fixes function_search_path_mutable)
+-- ----------------------------------------------------------------------------
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'handle_driver_rating_update') THEN
+    ALTER FUNCTION public.handle_driver_rating_update() SET search_path = public, pg_temp;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'start_trip' AND pronargs = 2) THEN
+    ALTER FUNCTION public.start_trip(UUID, VARCHAR) SET search_path = public, pg_temp;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'complete_trip' AND pronargs = 2) THEN
+    ALTER FUNCTION public.complete_trip(UUID, TEXT) SET search_path = public, pg_temp;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'get_nearby_drivers' AND pronargs = 3) THEN
+    ALTER FUNCTION public.get_nearby_drivers(FLOAT8, FLOAT8, FLOAT8) SET search_path = public, pg_temp;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'get_nearby_requested_trips' AND pronargs = 3) THEN
+    ALTER FUNCTION public.get_nearby_requested_trips(FLOAT8, FLOAT8, FLOAT8) SET search_path = public, pg_temp;
+  END IF;
+END $$;
+
+-- Grant least-privilege permissions
+GRANT SELECT ON public.driver_locations TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON public.driver_locations TO authenticated;
+GRANT ALL ON public.driver_locations TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ride_bids TO authenticated;
+GRANT ALL ON public.ride_bids TO service_role;
