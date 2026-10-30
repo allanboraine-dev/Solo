@@ -69,6 +69,8 @@ export default function ResetDriverPasswordModal({
     recoveryLink?: string | null;
     emailSent?: boolean;
     message?: string;
+    warning?: string | null;
+    requiresServiceRoleKey?: boolean;
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -134,6 +136,17 @@ export default function ResetDriverPasswordModal({
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (data.requiresServiceRoleKey && data.emailSent) {
+          setSuccessData({
+            recoveryLink: data.recoveryLink || null,
+            emailSent: true,
+            requiresServiceRoleKey: true,
+            message: `A password reset link was dispatched to ${driver.email}.`,
+            warning:
+              "SUPABASE_SERVICE_ROLE_KEY is not configured on the server. Direct password modification requires the Service Role Key. A reset link was sent to the driver's email instead so they can set their password.",
+          });
+          return;
+        }
         throw new Error(data.error || "Failed to update driver password");
       }
 
@@ -141,7 +154,8 @@ export default function ResetDriverPasswordModal({
         password: passwordToSend || undefined,
         recoveryLink: data.recoveryLink || null,
         emailSent: !!data.emailSent,
-        message: data.message || "Password successfully updated.",
+        requiresServiceRoleKey: false,
+        message: data.message || "Password successfully updated in Supabase Auth.",
       });
 
       if (onSuccess) {
@@ -225,15 +239,30 @@ export default function ResetDriverPasswordModal({
         {/* Success View */}
         {successData ? (
           <div className="space-y-4 animate-in fade-in">
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 space-y-2">
-              <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
-                <CheckCircle2 size={18} />
-                <span>Password Reset Successfully!</span>
+            {successData.warning ? (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-amber-400">
+                  <AlertCircle size={18} />
+                  <span>Password Reset Email Sent to Driver</span>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  {successData.warning}
+                </p>
+                <div className="pt-1 text-[11px] text-amber-300/80 bg-zinc-950/60 p-2.5 rounded-xl border border-amber-500/20 font-mono">
+                  Tip: To enable instant 1-click password assignment directly from this console without sending email links, add <span className="text-white font-bold">SUPABASE_SERVICE_ROLE_KEY</span> from Supabase Project Settings to your .env.local file.
+                </div>
               </div>
-              <p className="text-xs text-zinc-300">
-                {successData.message} The driver can now sign in using their new credentials immediately.
-              </p>
-            </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
+                  <CheckCircle2 size={18} />
+                  <span>Password Reset & Email Confirmed!</span>
+                </div>
+                <p className="text-xs text-zinc-300">
+                  {successData.message} The driver can now sign in using their new credentials immediately.
+                </p>
+              </div>
+            )}
 
             {successData.password && (
               <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-2">

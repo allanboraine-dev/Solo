@@ -165,8 +165,17 @@ function DriverLoginForm() {
         )}
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm">
-            {error}
+          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm space-y-2">
+            <div>{error}</div>
+            {error.toLowerCase().includes('invalid login credentials') && (
+              <p className="text-xs text-red-700 dark:text-red-300">
+                If your password was recently reset or if your email has not been verified yet, please click{' '}
+                <Link href={`/driver/forgot-password?email=${encodeURIComponent(email)}`} className="underline font-bold hover:text-red-800 dark:hover:text-red-200">
+                  Forgot password?
+                </Link>{' '}
+                to receive an instant secure login link.
+              </p>
+            )}
           </div>
         )}
 

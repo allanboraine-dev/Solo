@@ -498,11 +498,19 @@ export default function DriverRegistration() {
         return
       }
 
-      // 3. Open Paystack Inline Modal popup for R1.00 test
-      const paystackPop = (window as any).PaystackPop
-      const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+      // 3. Launch Paystack secure card verification (server-authenticated checkout)
+      if (initData.authorization_url) {
+        setUploadProgressText('Redirecting to Paystack secure card verification...')
+        window.location.href = initData.authorization_url
+        return
+      }
 
-      if (paystackPop && publicKey && initData.reference) {
+      const paystackPop = (window as any).PaystackPop
+      const rawKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ''
+      const cleanPublicKey = rawKey.trim().replace(/^["']|["']$/g, '')
+      const hasValidPublicKey = cleanPublicKey.startsWith('pk_live_') || cleanPublicKey.startsWith('pk_test_')
+
+      if (paystackPop && hasValidPublicKey && initData.reference) {
         setUploadProgressText('Waiting for card details entry...')
 
         const completeTrialCardSetup = (reference: string) => {
@@ -596,46 +604,56 @@ export default function DriverRegistration() {
             })
         }
 
-        const handler = paystackPop.setup({
-          key: publicKey,
-          email,
-          amount: 100, // R1.00 in ZAR cents
-          currency: 'ZAR',
-          ref: initData.reference,
-          metadata: {
-            driverId,
+        try {
+          const handler = paystackPop.setup({
+            key: cleanPublicKey,
             email,
-            payment_type: 'driver_trial_card_capture',
-            custom_fields: [
-              {
-                display_name: 'Trial Duration',
-                variable_name: 'trial_duration',
-                value: '14 Days Free Trial (R0.00)',
-              },
-              {
-                display_name: 'Subsequent Billing',
-                variable_name: 'subsequent_billing',
-                value: 'R499.00 / month starting on Day 15',
-              },
-              {
-                display_name: 'Driver ID',
-                variable_name: 'driver_id',
-                value: driverId,
-              },
-            ],
-          },
-          callback: function (response: { reference: string }) {
-            completeTrialCardSetup(response.reference)
-          },
-          onClose: function () {
-            setIsSubmitting(false)
-            setUploadProgressText('')
-          },
-        })
+            amount: 100, // R1.00 in ZAR cents
+            currency: 'ZAR',
+            ref: initData.reference,
+            metadata: {
+              driverId,
+              email,
+              payment_type: 'driver_trial_card_capture',
+              custom_fields: [
+                {
+                  display_name: 'Trial Duration',
+                  variable_name: 'trial_duration',
+                  value: '14 Days Free Trial (R0.00)',
+                },
+                {
+                  display_name: 'Subsequent Billing',
+                  variable_name: 'subsequent_billing',
+                  value: 'R499.00 / month starting on Day 15',
+                },
+                {
+                  display_name: 'Driver ID',
+                  variable_name: 'driver_id',
+                  value: driverId,
+                },
+              ],
+            },
+            callback: function (response: { reference: string }) {
+              completeTrialCardSetup(response.reference)
+            },
+            onClose: function () {
+              setIsSubmitting(false)
+              setUploadProgressText('')
+            },
+          })
 
-        handler.openIframe()
+          handler.openIframe()
+        } catch (popupErr) {
+          console.warn('Paystack inline iframe error, falling back to hosted checkout URL:', popupErr)
+          if (initData.authorization_url) {
+            setUploadProgressText('Redirecting to Paystack secure checkout...')
+            window.location.href = initData.authorization_url
+          } else {
+            throw popupErr
+          }
+        }
       } else if (initData.authorization_url) {
-        // Fallback: Redirect to hosted checkout if inline popup script is unavailable
+        // Fallback: Redirect to hosted checkout if inline popup script or valid key is unavailable
         setUploadProgressText('Redirecting to Paystack secure checkout...')
         window.location.href = initData.authorization_url
       } else {
