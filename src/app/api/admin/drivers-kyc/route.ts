@@ -386,7 +386,10 @@ export async function DELETE(req: NextRequest) {
       await supabase.from('profiles').delete().eq('id', driverId).eq('user_type', 'driver');
 
       // 4.1 Delete driver authentication record from Supabase Auth (auth.users)
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const serviceKey =
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_SERVICE_KEY ||
+        process.env.SUPABASE_SECRET_KEY;
       if (serviceKey && process.env.NEXT_PUBLIC_SUPABASE_URL) {
         try {
           const adminAuthClient = createClient(
