@@ -125,7 +125,7 @@ export default function DriverRegistration() {
 
       if (isCardSetup && reference && driverId) {
         setIsSubmitting(true)
-        setUploadProgressText('Verifying R1 card test & activating 7-day free trial...')
+        setUploadProgressText('Verifying R1 card test & activating 14-day free trial...')
 
         fetch('/api/driver/setup-trial', {
           method: 'POST',
@@ -141,10 +141,10 @@ export default function DriverRegistration() {
             if (data.success) {
               const billingDateStr = data.nextBillingDate 
                 ? new Date(data.nextBillingDate).toLocaleDateString('en-ZA', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
-                : 'on the 8th day'
+                : 'on the 15th day'
 
               const now = Date.now()
-              const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+              const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
               const existingProf = safeJsonParse<any>(getSafeLocalStorageItem('mock_driver_profile'), null) || {}
               await saveDriverProfile({
                 ...existingProf,
@@ -152,7 +152,7 @@ export default function DriverRegistration() {
                 subscriptionActive: true,
                 subscriptionPlan: 'trial',
                 trialStartedAt: now,
-                trialEndsAt: now + SEVEN_DAYS_MS,
+                trialEndsAt: now + FOURTEEN_DAYS_MS,
                 cardLast4: data.card?.last4 || '••••',
                 cardBrand: data.card?.brand || 'Card',
                 cardExpMonth: data.card?.expMonth ? String(data.card.expMonth) : undefined,
@@ -162,7 +162,7 @@ export default function DriverRegistration() {
                 cardCaptured: true,
               })
 
-              alert(`🎉 R1.00 card test successful!\n\nYour 7-day free trial has begun. You keep 100% of your earnings with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 8th day (${billingDateStr}).\n\nWelcome to SOLO!`)
+              alert(`🎉 R1.00 card test successful!\n\nYour 14-day free trial has begun. You keep 100% of your earnings with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 15th day (${billingDateStr}).\n\nWelcome to SOLO!`)
               router.push('/driver')
             } else {
               setSubmitError(data.error || 'Failed to complete card verification.')
@@ -506,7 +506,7 @@ export default function DriverRegistration() {
         setUploadProgressText('Waiting for card details entry...')
 
         const completeTrialCardSetup = (reference: string) => {
-          setUploadProgressText('Verifying R1 card test & setting up 7-day free trial...')
+          setUploadProgressText('Verifying R1 card test & setting up 14-day free trial...')
           fetch('/api/driver/setup-trial', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -521,11 +521,11 @@ export default function DriverRegistration() {
               if (trialData.success) {
                 const billingDateStr = trialData.nextBillingDate 
                   ? new Date(trialData.nextBillingDate).toLocaleDateString('en-ZA', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
-                  : 'on the 8th day'
+                  : 'on the 15th day'
 
-                // Save local driver profile with active 7-day trial
+                // Save local driver profile with active 14-day trial
                 const now = Date.now()
-                const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+                const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000
                 await saveDriverProfile({
                   id: driverId,
                   fullName,
@@ -544,7 +544,7 @@ export default function DriverRegistration() {
                   subscriptionActive: true,
                   subscriptionPlan: 'trial',
                   trialStartedAt: now,
-                  trialEndsAt: now + SEVEN_DAYS_MS,
+                  trialEndsAt: now + FOURTEEN_DAYS_MS,
                   cardLast4: trialData.card?.last4 || '••••',
                   cardBrand: trialData.card?.brand || 'Card',
                   cardExpMonth: trialData.card?.expMonth ? String(trialData.card.expMonth) : undefined,
@@ -574,14 +574,14 @@ export default function DriverRegistration() {
                     subscriptionPlan: 'trial',
                     subscriptionActive: true,
                     trialStartedAt: now,
-                    trialEndsAt: now + SEVEN_DAYS_MS,
+                    trialEndsAt: now + FOURTEEN_DAYS_MS,
                     nextBillingDate: trialData.nextBillingDate,
                     createdAt: new Date().toISOString(),
                   })
                   setSafeLocalStorageItem('all_registered_drivers', JSON.stringify(filteredDrivers))
                 } catch {}
 
-                alert(`🎉 R1.00 card test successful!\n\nYour 7-day free trial has begun. You keep 100% of your rider fares with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 8th day (${billingDateStr}).\n\nWelcome to SOLO!`)
+                alert(`🎉 R1.00 card test successful!\n\nYour 14-day free trial has begun. You keep 100% of your rider fares with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 15th day (${billingDateStr}).\n\nWelcome to SOLO!`)
                 router.push(hasSession ? '/driver' : '/driver/login')
               } else {
                 setSubmitError(trialData.error || 'Failed to verify trial card with Paystack.')
@@ -610,12 +610,12 @@ export default function DriverRegistration() {
               {
                 display_name: 'Trial Duration',
                 variable_name: 'trial_duration',
-                value: '7 Days Free Trial (R0.00)',
+                value: '14 Days Free Trial (R0.00)',
               },
               {
                 display_name: 'Subsequent Billing',
                 variable_name: 'subsequent_billing',
-                value: 'R499.00 / month starting on Day 8',
+                value: 'R499.00 / month starting on Day 15',
               },
               {
                 display_name: 'Driver ID',
@@ -669,8 +669,8 @@ export default function DriverRegistration() {
     roadworthyFile,
   ].filter(Boolean).length
 
-  // 7-day trial date string (Day 8 first billing) for UI display
-  const trialEndDateString = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', {
+  // 14-day trial date string (Day 15 first billing) for UI display
+  const trialEndDateString = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-ZA', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -700,7 +700,7 @@ export default function DriverRegistration() {
             </span>
           </div>
           <p className="text-blue-100 text-sm relative z-10">
-            Keep 100% of your rider fares. 7-day free trial, then flat R499/month.
+            Keep 100% of your rider fares. 14-day free trial, then flat R499/month.
           </p>
 
           {!isStandalone && (
@@ -749,7 +749,7 @@ export default function DriverRegistration() {
             <span>1. Personal</span>
             <span>2. Vehicle</span>
             <span>3. KYC</span>
-            <span className={step === 4 ? 'text-emerald-300 font-bold' : ''}>4. 7-Day Trial</span>
+            <span className={step === 4 ? 'text-emerald-300 font-bold' : ''}>4. 14-Day Trial</span>
           </div>
         </div>
 
@@ -982,13 +982,13 @@ export default function DriverRegistration() {
               {!hasRequiredDocs && (
                 <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2.5">
                   <AlertCircle size={16} className="shrink-0 text-amber-600" />
-                  <span>Please capture or upload all 7 required items above before proceeding to the 7-day trial step.</span>
+                  <span>Please capture or upload all 7 required items above before proceeding to the 14-day trial step.</span>
                 </div>
               )}
 
               <div className="bg-blue-50 dark:bg-blue-950/40 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/40">
                 <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed text-center font-medium">
-                  Next: Securely link your card for your 7-day free trial. You won&apos;t be billed today.
+                  Next: Securely link your card for your 14-day free trial. You won&apos;t be billed today.
                 </p>
               </div>
 
@@ -1014,24 +1014,24 @@ export default function DriverRegistration() {
             </div>
           )}
 
-          {/* STEP 4: 7-Day Free Trial & R1 Card Verification Test */}
+          {/* STEP 4: 14-Day Free Trial & R1 Card Verification Test */}
           {step === 4 && (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 mb-2">
                 <div className="flex items-center gap-3 text-xl font-bold">
-                  <CreditCard className="text-emerald-500" /> 7-Day Free Trial &amp; Card Test
+                  <CreditCard className="text-emerald-500" /> 14-Day Free Trial &amp; Card Test
                 </div>
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1 rounded-full flex items-center gap-1">
                   <Sparkles size={13} /> 0% Commission
                 </span>
               </div>
 
-              {/* 7-Day Free Trial & R1 Card Test Breakdown */}
+              {/* 14-Day Free Trial & R1 Card Test Breakdown */}
               <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white p-5 rounded-2xl shadow-xl border border-zinc-800 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
-                      7-Day Free Trial + R1 Card Test
+                      14-Day Free Trial + R1 Card Test
                     </span>
                     <h3 className="text-xl font-black mt-1">Platform Membership</h3>
                   </div>
@@ -1047,7 +1047,7 @@ export default function DriverRegistration() {
                       <Sparkles size={14} className="text-amber-400" />
                       <span>Free Trial Duration</span>
                     </span>
-                    <span className="font-bold text-emerald-400">7 Days Free (R0.00 / week)</span>
+                    <span className="font-bold text-emerald-400">14 Days Free (R0.00)</span>
                   </div>
 
                   <div className="flex items-center justify-between text-zinc-300">
@@ -1063,7 +1063,7 @@ export default function DriverRegistration() {
                       <Calendar size={14} className="text-blue-400" />
                       <span>First Recurring Billing</span>
                     </span>
-                    <span className="font-bold text-white">R499.00 on Day 8 ({trialEndDateString})</span>
+                    <span className="font-bold text-white">R499.00 on Day 15 ({trialEndDateString})</span>
                   </div>
 
                   <div className="flex items-center justify-between text-zinc-300">
@@ -1089,13 +1089,13 @@ export default function DriverRegistration() {
                 <div className="flex items-start gap-2.5">
                   <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                   <p>
-                    <strong>7-Day Free Trial Activated Today:</strong> Complete the R1.00 card test to verify your payment method. You will enjoy 7 full days of zero platform fees and 0% commission. On the 8th day ({trialEndDateString}), your standard R499.00/month subscription will begin.
+                    <strong>14-Day Free Trial Activated Today:</strong> Complete the R1.00 card test to verify your payment method. You will enjoy 14 full days of zero platform fees and 0% commission. On the 15th day ({trialEndDateString}), your standard R499.00/month subscription will begin.
                   </p>
                 </div>
                 <div className="flex items-start gap-2.5">
                   <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
                   <p>
-                    <strong>Cancel Anytime:</strong> You can manage or cancel your subscription before Day 8 with zero monthly fee charged.
+                    <strong>Cancel Anytime:</strong> You can manage or cancel your subscription before Day 15 with zero monthly fee charged.
                   </p>
                 </div>
               </div>
@@ -1124,7 +1124,7 @@ export default function DriverRegistration() {
                   ) : (
                     <>
                       <CreditCard size={18} />
-                      <span>Pay R1.00 Test &amp; Start 7-Day Trial</span>
+                      <span>Pay R1.00 Test &amp; Start 14-Day Trial</span>
                     </>
                   )}
                 </button>

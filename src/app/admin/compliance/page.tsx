@@ -990,7 +990,7 @@ export default function AdminComplianceDashboard() {
                             : driver.subscriptionPlan === "paid"
                             ? "R499/mo Active"
                             : driver.subscriptionPlan === "trial"
-                            ? "7-Day Free Trial"
+                            ? "14-Day Free Trial"
                             : "Expired"}
                         </span>
                         <span>PrDP: {driver.prdpNumber || "N/A"}</span>

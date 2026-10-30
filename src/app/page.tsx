@@ -43,7 +43,7 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-2.5 sm:gap-3 pt-2 sm:pt-4 text-sm sm:text-base font-bold text-gray-800 dark:text-gray-200">
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm"><ShieldCheck size={20} className="text-green-500 shrink-0"/> Verified Drivers</div>
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm"><Map size={20} className="text-blue-500 shrink-0"/> Real-time Tracking</div>
-            <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm"><Car size={20} className="text-purple-500 shrink-0"/> 7 Days Free, then R499/pm</div>
+            <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm"><Car size={20} className="text-purple-500 shrink-0"/> 14 Days Free, then R499/pm</div>
           </div>
 
           {!isStandalone && (
@@ -128,12 +128,12 @@ export default function Home() {
                   />
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/60 px-3.5 py-1.5 rounded-full">
-                  7 Days Free Trial
+                  14 Days Free Trial
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5 sm:mb-3 tracking-tight">Driver Portal</h2>
               <p className="text-gray-700 dark:text-gray-300 text-base sm:text-lg leading-relaxed font-normal">
-                Keep 100% of your rider fares paid directly via your required in-car <strong>Speedpoint machine</strong> or <strong>Cash</strong>. 7-day free trial, then a flat R499/pm SaaS fee.
+                Keep 100% of your rider fares paid directly via your required in-car <strong>Speedpoint machine</strong> or <strong>Cash</strong>. 14-day free trial, then a flat R499/pm SaaS fee.
               </p>
             </div>
 

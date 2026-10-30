@@ -57,12 +57,12 @@ export async function POST(req: NextRequest) {
             {
               display_name: 'Trial Duration',
               variable_name: 'trial_duration',
-              value: '7 Days Free Trial (R0.00)',
+              value: '14 Days Free Trial (R0.00)',
             },
             {
               display_name: 'Subsequent Billing',
               variable_name: 'subsequent_billing',
-              value: 'R499.00 / month after 7-day trial',
+              value: 'R499.00 / month after 14-day trial',
             },
             {
               display_name: 'Driver ID',

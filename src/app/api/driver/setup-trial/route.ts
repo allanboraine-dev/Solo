@@ -80,13 +80,13 @@ export async function POST(req: NextRequest) {
     // 2. Fetch or create Paystack SOLO Driver Pro recurring monthly plan (R499/month)
     const planCode = await getOrCreateDriverPlan(secretKey);
 
-    // 3. Compute 7-day trial expiration date
-    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // 3. Compute 14-day trial expiration date
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
     let subscriptionCode: string | null = null;
     let nextBillingDate = trialEndsAt.toISOString();
 
-    // 4. Create Paystack subscription scheduled to start on Day 7
+    // 4. Create Paystack subscription scheduled to start on Day 14
     if (planCode) {
       try {
         const subRes = await fetch('https://api.paystack.co/subscription', {
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           transaction: reference,
           amount: 100, // 100 cents (R1.00)
-          merchant_note: 'SOLO 7-day free trial card verification refund',
+          merchant_note: 'SOLO 14-day free trial card verification refund',
         }),
       });
     } catch (refundErr) {
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: '7-Day Free Trial activated. Card linked for auto-billing after 7 days.',
+      message: '14-Day Free Trial activated. Card linked for auto-billing after 14 days.',
       trialStartedAt: new Date().toISOString(),
       trialEndsAt: trialEndsAt.toISOString(),
       nextBillingDate,

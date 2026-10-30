@@ -272,12 +272,25 @@ export default function DriverPage() {
           setIsOnline(false);
           setShowSubModal(true);
           setIsDriverVerified(!!prof.isVerified);
-        } else if (prof.subscriptionPlan === 'trial' && prof.trialStartedAt) {
-          const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-          if (Date.now() - prof.trialStartedAt > SEVEN_DAYS) {
+        } else if (prof.subscriptionPlan === 'trial' && (prof.trialStartedAt || prof.trialEndsAt)) {
+          const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+          const trialStart = typeof prof.trialStartedAt === 'number'
+            ? prof.trialStartedAt
+            : prof.trialStartedAt ? new Date(prof.trialStartedAt).getTime() : 0;
+          const trialEnd = prof.trialEndsAt
+            ? (typeof prof.trialEndsAt === 'number' ? prof.trialEndsAt : new Date(prof.trialEndsAt).getTime())
+            : (trialStart ? trialStart + FOURTEEN_DAYS : 0);
+
+          if (trialEnd && Date.now() > trialEnd) {
             setIsTrialExpired(true);
             setIsOnline(false);
             setShowSubModal(true);
+          } else if (trialStart && Date.now() - trialStart > FOURTEEN_DAYS) {
+            setIsTrialExpired(true);
+            setIsOnline(false);
+            setShowSubModal(true);
+          } else {
+            setIsTrialExpired(false);
           }
           setIsDriverVerified(!!prof.isVerified);
         } else {
@@ -1038,8 +1051,8 @@ export default function DriverPage() {
                 </span>
               ) : isTrialExpired ? (
                 <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-800 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
-                  <AlertCircle size={12} className="text-amber-600 dark:text-amber-400" />
-                  <span>Expired</span>
+                  <Lock size={12} className="text-amber-600 dark:text-amber-400" />
+                  <span>Locked (Trial Expired)</span>
                 </span>
               ) : profile?.subscriptionPlan === 'paid' ? (
                 <span className="bg-blue-100/80 text-blue-800 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider shrink-0">
@@ -1047,7 +1060,7 @@ export default function DriverPage() {
                 </span>
               ) : (
                 <span className="bg-green-100/80 text-green-800 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider shrink-0">
-                  <span className="hidden sm:inline">7-Day </span>Trial
+                  <span className="hidden sm:inline">14-Day </span>Trial
                 </span>
               )}
             </div>
@@ -1075,7 +1088,11 @@ export default function DriverPage() {
                     audioAlert.stopTripRingtoneLoop();
                     setIsOnline(false);
                     setShowSubModal(true);
-                    alert('Active subscription required: Your subscription is inactive or cancelled. You must pay R499.00 to go online and receive passenger trips.');
+                    alert(
+                      isTrialExpired
+                        ? 'Driver Profile Locked: Your 14-day free trial has expired. You must pay your monthly subscription of R499.00 to unlock your profile, go online, and continue earning.'
+                        : 'Active subscription required: Your subscription is inactive or cancelled. You must pay R499.00 to go online and receive passenger trips.'
+                    );
                     return;
                   }
                   audioAlert.unlockMobileAudio(true);
@@ -1539,6 +1556,27 @@ export default function DriverPage() {
                 </div>
               ) : (
                 <div className="text-center mt-6 animate-in fade-in duration-700">
+                  {isTrialExpired && (
+                    <div className="mb-5 p-5 rounded-3xl bg-gradient-to-br from-amber-500/10 via-red-500/10 to-amber-500/10 border-2 border-amber-500/40 text-center shadow-xl animate-in fade-in">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-2.5">
+                        <Lock size={22} />
+                      </div>
+                      <h3 className="text-base font-black text-gray-900 dark:text-white">
+                        Driver Profile Locked — 14-Day Free Trial Ended
+                      </h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 max-w-sm mx-auto leading-relaxed">
+                        Your 14-day free trial has expired. To unlock your account, go online, and continue earning 100% of your rider fares, please pay your monthly subscription of R499.00.
+                      </p>
+                      <button
+                        onClick={() => setShowSubModal(true)}
+                        className="mt-3.5 px-5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold rounded-2xl text-xs sm:text-sm shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 mx-auto active:scale-95 transition"
+                      >
+                        <CreditCard size={16} />
+                        <span>Pay R499.00 to Unlock &amp; Continue Earning</span>
+                      </button>
+                    </div>
+                  )}
+
                   {preemptedNotice && (
                     <div className="mb-4 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/60 flex flex-col gap-2.5 text-left text-amber-900 dark:text-amber-200 text-xs font-semibold animate-in fade-in shadow-md">
                       <div className="flex items-start justify-between gap-2">
@@ -1881,24 +1919,33 @@ export default function DriverPage() {
                         </span>
                       ) : isTrialExpired ? (
                         <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
-                          <AlertCircle size={14} /> Expired (No Platform Access)
+                          <Lock size={14} /> Locked (14-Day Trial Expired)
                         </span>
                       ) : profile?.subscriptionPlan === 'paid' ? (
                         <span className="text-blue-600 dark:text-blue-400">Active (Paid R499/mo)</span>
                       ) : (
                         <span className="text-emerald-600 dark:text-emerald-400">
-                          Active (7-Day Trial — {Math.max(0, Math.ceil(((profile?.trialEndsAt || (profile?.trialStartedAt ? profile.trialStartedAt + 7 * 86400000 : Date.now())) - Date.now()) / 86400000))}d left)
+                          Active (14-Day Trial — {Math.max(0, Math.ceil(((profile?.trialEndsAt ? new Date(profile.trialEndsAt).getTime() : (profile?.trialStartedAt ? (typeof profile.trialStartedAt === 'number' ? profile.trialStartedAt : new Date(profile.trialStartedAt).getTime()) + 14 * 86400000 : Date.now())) - Date.now()) / 86400000))}d left)
                         </span>
                       )}
                     </span>
                   </div>
+                  {isTrialExpired && (
+                    <div className="my-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-200">
+                      <Lock size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Profile Locked</span>
+                        <span>Your 14-day free trial has expired. Subscribe to R499/mo below to unlock your profile and continue earning.</span>
+                      </div>
+                    </div>
+                  )}
                   {!isOwner && profile?.subscriptionPlan === 'trial' && profile?.cardLast4 && profile?.subscriptionActive && (
                     <div className="py-1.5 px-3 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300">
                       <span className="flex items-center gap-1.5 font-medium">
                         <CreditCard size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                         Card Linked: {profile.cardBrand || 'Card'} •••• {profile.cardLast4}
                       </span>
-                      <span className="font-bold">Auto-bills R499 on Day 8</span>
+                      <span className="font-bold">Auto-bills R499 on Day 15</span>
                     </div>
                   )}
                 </div>
@@ -2060,7 +2107,7 @@ export default function DriverPage() {
                       <CreditCard size={18} />
                       <span>
                         {!isSubscriptionActive 
-                          ? 'Pay R499.00 & Reactivate Access' 
+                          ? (isTrialExpired ? 'Pay R499.00 & Unlock Profile' : 'Pay R499.00 & Reactivate Access')
                           : profile?.subscriptionPlan === 'paid' 
                             ? 'Manage Subscription' 
                             : 'Upgrade to R499/mo'}
@@ -2105,7 +2152,7 @@ export default function DriverPage() {
                   <button 
                     onClick={() => {
                       if (profile) {
-                        const expiredProfile = { ...profile, trialStartedAt: Date.now() - (8 * 24 * 60 * 60 * 1000) };
+                        const expiredProfile = { ...profile, trialStartedAt: Date.now() - (15 * 24 * 60 * 60 * 1000) };
                         saveDriverProfile(expiredProfile);
                         setProfile(expiredProfile);
                         setIsTrialExpired(true);
@@ -2114,7 +2161,7 @@ export default function DriverPage() {
                     }}
                     className="mt-2 w-full py-2 text-xs font-mono text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800"
                   >
-                    DEV: Simulate Expired Trial
+                    DEV: Simulate Expired 14-Day Trial
                   </button>
                 )}
               </div>
@@ -2162,7 +2209,7 @@ export default function DriverPage() {
 
                   <div className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5">
                     <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-2">4. Your Subscription</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">You keep 100% of all fares. Just pay a flat R499/month fee via the <b>Profile</b> tab after your 7-day trial ends.</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">You keep 100% of all fares. Just pay a flat R499/month fee via the <b>Profile</b> tab after your 14-day trial ends.</p>
                   </div>
                 </div>
               </div>
@@ -2371,7 +2418,7 @@ export default function DriverPage() {
                     ? (profile?.subscriptionPlan === 'cancelled'
                         ? 'Platform Access Suspended'
                         : isTrialExpired
-                          ? 'Trial Expired'
+                          ? 'Driver Profile Locked'
                           : 'Subscription Inactive')
                     : profile?.subscriptionPlan === 'paid'
                       ? 'Manage Subscription'
@@ -2382,7 +2429,7 @@ export default function DriverPage() {
                     ? (profile?.subscriptionPlan === 'cancelled'
                         ? 'Your subscription is cancelled. Pay R499.00 to reactivate and go online.'
                         : isTrialExpired
-                          ? 'Your 7-day free trial has ended. Subscribe to R499/mo to continue driving.'
+                          ? 'Your 14-day free trial has ended. Subscribe to R499/mo to unlock your profile and continue earning.'
                           : 'Active subscription required to go online and receive trips.')
                     : 'Keep 100% of your earnings for a flat fee.'}
                 </p>
@@ -2438,7 +2485,11 @@ export default function DriverPage() {
                   ) : (
                     <>
                       <CreditCard size={18} />
-                      <span>{!isSubscriptionActive ? 'Pay R499.00 & Reactivate Access' : 'Subscribe via Paystack (R499/mo)'}</span>
+                      <span>
+                        {!isSubscriptionActive 
+                          ? (isTrialExpired ? 'Pay R499.00 & Unlock Profile' : 'Pay R499.00 & Reactivate Access')
+                          : 'Subscribe via Paystack (R499/mo)'}
+                      </span>
                     </>
                   )}
                 </button>

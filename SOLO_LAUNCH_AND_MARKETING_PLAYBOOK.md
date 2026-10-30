@@ -2,7 +2,7 @@
 ### Built for Boraine Tech (Pty) Ltd | Republic of South Africa
 **Beachhead Market:** Kimberley, Northern Cape (Sol Plaatje Municipality)  
 **Platform:** SOLO Zero-Commission E-Hailing (`soloride.co.za`)  
-**Revenue Model:** R499/mo Driver SaaS (after 7-day free trial) | R770/mo + R499/vehicle B2B Fleet Hub ([`/fleet`](file:///c:/Users/BORAINE%20TECH/Downloads/Solo/src/app/fleet/page.tsx)) | 0.0% Trip Commission  
+**Revenue Model:** R499/mo Driver SaaS (after 14-day free trial) | R770/mo + R499/vehicle B2B Fleet Hub ([`/fleet`](file:///c:/Users/BORAINE%20TECH/Downloads/Solo/src/app/fleet/page.tsx)) | 0.0% Trip Commission  
 
 ---
 
@@ -63,7 +63,7 @@ Use these exact Kimberley routes in your local Facebook, TikTok, and Flyer ads:
 ### Phase 1: Kimberley Supply Lock-In — First 40 Verified Drivers & 5 Local Fleets (Days 1 to 14)
 > [!IMPORTANT]
 > **Rule #1: Lock in 30–40 Kimberley drivers BEFORE turning on passenger ads.**  
-> Because drivers get a **7-day unrestricted free trial** and keep 100% of fares, they can leave SOLO open in the background while waiting at Diamond Pavilion or North Cape Mall with zero financial risk.
+> Because drivers get a **14-day unrestricted free trial** and keep 100% of fares, they can leave SOLO open in the background while waiting at Diamond Pavilion or North Cape Mall with zero financial risk.
 
 #### Where to Recruit Every E-Hailing Driver in Kimberley in 7 Days:
 1. **Diamond Pavilion Mall & North Cape Mall Staging Zones:**
@@ -193,7 +193,7 @@ Because Kimberley ad and activation costs are so low while the SOLO subscription
 > **SOLO (`soloride.co.za`) is launching right here in KIMBERLEY:**  
 > ✅ **0.0% Commission:** A passenger pays R45 from Diamond Pavilion to Galeshewe? **You keep the full R45.00.**  
 > ✅ **Paid Immediately in Your Car:** Collect **Cash** or tap the passenger's card on **YOUR own Speedpoint** (Capitec, Yoco, iKhokha, Nedbank PocketPOS). Zero platform escrow delays!  
-> ✅ **First 7 Days 100% FREE:** Then just a flat **R499/month**—keep every extra Rand you earn above that.  
+> ✅ **First 14 Days 100% FREE:** Then just a flat **R499/month**—keep every extra Rand you earn above that.  
 > ✅ **Built-in Kimberley Safety:** Mandatory 4-digit passenger boarding PIN + 1-tap SAPS `10111` / `112` SOS + single-device protection.  
 >   
 > 👉 **Register as a Founding Kimberley Driver in 3 minutes:** `https://soloride.co.za/driver/register`  

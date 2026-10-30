@@ -12,7 +12,7 @@
 
 Traditional e-hailing aggregators deduct between 20% and 30% from every driver's earnings, lock driver earnings in platform escrow, and enforce weekly payout delays. SOLO replaces this legacy model with a **Pure Zero-Commission Model (0.0% Take-Rate)** and **Direct In-Vehicle Fare Settlement**:
 - **100% Direct Driver Fare Retention:** Fares are paid directly to the driver by the passenger in the vehicle via **Cash** (Rand banknotes and coins) or **In-Vehicle Mobile Card Machine / Speedpoint** (e.g. Yoco, iKhokha, Nedbank PocketPOS, Capitec, ABSA/FNB speedpoints) or in-app card fallback.
-- **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly fee of **R499.00 ZAR** (after an initial 7-day free trial; permanently free for platform founder Allan Boraine) purely for platform software access, dispatch matching, map routing, and safety infrastructure.
+- **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly fee of **R499.00 ZAR** (after an initial 14-day free trial; permanently free for platform founder Allan Boraine) purely for platform software access, dispatch matching, map routing, and safety infrastructure.
 - **Immediate Liquidity:** Zero platform escrow holding, zero cash-out delays, and zero platform deductions.
 
 ---

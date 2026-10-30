@@ -28,7 +28,7 @@
 
 ### Key Architectural Pillars
 1. **100% Direct Fare Retention for Drivers:** Drivers retain 100% of the metered gross fare calculated per trip (R12 base fare + R8/km, subject to an R25 minimum fare threshold). Fares are collected **directly by the driver from the passenger in the vehicle** via **Cash** or **In-Vehicle Mobile Card Machine / Speedpoint** (or optional in-app card settlement).
-2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly platform access fee of **R499.00 ZAR** after an initial **7-day unrestricted trial**, eliminating volatile revenue docking. Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access.
+2. **Predictable Flat-Rate SaaS Subscription:** Drivers pay a flat monthly platform access fee of **R499.00 ZAR** after an initial **14-day unrestricted trial**, eliminating volatile revenue docking. Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access.
 3. **Hardware Payment Freedom:** Drivers are free to use any portable South African point-of-sale card machine (Yoco, iKhokha, Nedbank PocketPOS, Capitec, ABSA/FNB speedpoint) or accept physical cash (ZAR banknotes and coins). SOLO never withholds driver funds in platform escrow.
 4. **Single-Device Active Concurrency Policy:** Drivers must and can only be active online on ONE device at a time, enforcing physical driver authentication, preventing account credential sharing, and protecting passenger safety.
 5. **Multi-Driver Ride Availability on Decline:** When a driver declines a ride request, the trip remains in the active dispatch pool for all other nearby registered online drivers, ensuring riders are never stranded.
@@ -56,7 +56,7 @@
 2. [Section B: Driver Operations & Partner Guide](#section-b-driver-operations--partner-guide)
    - 2.1 Driver Onboarding & Statutory Requirements (NLTA)
    - 2.2 KYC Document Submission Protocol & System Resilience
-   - 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
+   - 2.3 SaaS Subscription Model (14-Day Trial & R499/mo)
    - 2.4 South African Banking Setup & Mobile Card Machine Integration
    - 2.5 Single-Device Active Concurrency Enforcement
    - 2.6 Daily Operating Routine & Trip Rejection Handling
@@ -197,7 +197,7 @@ In compliance with the **National Land Transport Act (Act No. 5 of 2009)**, ever
 3. **Administrative / Lost Email Assistance:**
    - If a driver no longer has access to their registered email inbox, platform administrators can send a recovery link or update credentials via the Supabase Admin console after verifying the driver's registered South African phone number and vehicle registration / PrDP records.
 
-### 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
+### 2.3 SaaS Subscription Model (14-Day Trial & R499/mo)
 SOLO replaces predatory percentage commissions with a transparent, predictable flat-rate Software-as-a-Service model.
 
 | Metric | Traditional Aggregators (25% Commission) | SOLO Zero-Commission (R499/mo SaaS) | Driver Financial Advantage |
@@ -205,10 +205,10 @@ SOLO replaces predatory percentage commissions with a transparent, predictable f
 | **Gross Monthly Fares** | R20,000.00 | R20,000.00 | Equal |
 | **Platform Deduction** | **-R5,000.00 (25%)** | **-R499.00 (Flat Fee)** | **+R4,501.00 extra cash in pocket** |
 | **Net Driver Earnings** | R15,000.00 | **R19,501.00** | **+30.0% Net Increase** |
-| **Trial Period** | None (Immediate commission cut) | **7 Days Free** | Zero initial financial commitment |
+| **Trial Period** | None (Immediate commission cut) | **14 Days Free** | Zero initial financial commitment |
 
-- **7-Day Free Trial:** Approved drivers receive 7 days of unlimited dispatch with R0 platform charges.
-- **Monthly Subscription:** After 7 days, platform access is maintained for **R499.00 per month** billed automatically via Paystack.
+- **14-Day Free Trial:** Approved drivers receive 14 days of unlimited dispatch with R0 platform charges.
+- **Monthly Subscription:** After 14 days, platform access is maintained for **R499.00 per month** billed automatically via Paystack. If unpaid, the driver profile is locked until the subscription is paid.
 - **Platform Founder & Lifetime Exemption Policy:** Platform founder Allan Boraine (`allanboraine@gmail.com`) holds lifetime free access to SOLO Driver Pro with zero subscription charges and permanent 0% commission.
 
 ### 2.4 South African Banking Setup & Mobile Card Machine Integration
@@ -339,7 +339,7 @@ $$\text{Driver Earnings per Trip} = 100\% \times \text{Metered Dynamic Fare Char
 - **Immediate Cash in Hand:** Cash payments stay 100% in your wallet immediately with zero delays, zero platform processing fees, and zero banking transfer charges.
 - **Direct Card Machine Deposits:** Payments collected through your mobile card machine (Yoco, iKhokha, or bank POS) deposit directly into your designated South African bank account under your card provider's schedule (e.g., next business day), completely bypassing platform escrow.
 - **No Escrow Withholding or Payout Delays:** SOLO does not hold your trip money in platform escrow, eliminating payout disputes, weekly payout delays, or arbitrary payment freezes.
-- **Predictable Fixed Cost:** Your only platform cost is the flat **R499.00 / month** SaaS subscription fee (free for the first 7 days, and permanently free for platform founder Allan Boraine).
+- **Predictable Fixed Cost:** Your only platform cost is the flat **R499.00 / month** SaaS subscription fee (free for the first 14 days, and permanently free for platform founder Allan Boraine).
 
 ### 2.11 Vehicle Standards & Regulatory Inspections
 Partner vehicles must comply with South African passenger transport standards:
@@ -421,7 +421,7 @@ Billing operations are verified cryptographically at `/api/paystack-webhook` usi
 $$\text{Signature} = \text{HMAC-SHA512}\left(\text{Payload Body}, \text{PAYSTACK\_SECRET\_KEY}\right)$$
 
 Monitored events:
-- `subscription.create`: R499/mo SaaS plan initiated following 7-day trial.
+- `subscription.create`: R499/mo SaaS plan initiated following 14-day trial.
 - `subscription.disable`: Subscription paused or cancelled; driver set to `inactive`.
 - `invoice.payment_failed`: Billing error; 48-hour grace period initiated before suspension.
 - `charge.success`: Trip fare captured for optional in-app digital settlements, verified against database fare amounts via `/api/verify-trip-payment`.
