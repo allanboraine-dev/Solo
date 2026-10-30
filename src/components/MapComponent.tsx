@@ -110,7 +110,7 @@ const createAssignedDriverIcon = (driverName?: string) => {
   });
 };
 
-// Component to handle map bounds and routing
+// Component to handle map bounds, sizing, and routing
 const MapUpdater = ({
   pickupLat,
   pickupLng,
@@ -123,6 +123,28 @@ const MapUpdater = ({
 }: any) => {
   const map = useMap();
   const prevFocusedRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // Keep map dimensions strictly in sync with the DOM container
+  useEffect(() => {
+    map.invalidateSize();
+    const t1 = setTimeout(() => map.invalidateSize(), 150);
+    const t2 = setTimeout(() => map.invalidateSize(), 500);
+
+    const container = map.getContainer();
+    let ro: ResizeObserver | null = null;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      ro.observe(container);
+    }
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (ro) ro.disconnect();
+    };
+  }, [map]);
 
   useEffect(() => {
     // Coordinate sanity check helper (avoid zooming to 0,0 in the Atlantic ocean)
@@ -210,6 +232,44 @@ const MapClickHandler = ({
     },
   });
   return null;
+};
+
+const MapNavigationControls = ({ centerLat, centerLng }: { centerLat: number; centerLng: number }) => {
+  const map = useMap();
+  return (
+    <div className="leaflet-top leaflet-right" style={{ pointerEvents: 'auto', marginTop: '76px', marginRight: '14px', zIndex: 1000 }}>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => map.zoomIn()}
+          aria-label="Zoom In"
+          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => map.zoomOut()}
+          aria-label="Zoom Out"
+          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => map.setView([centerLat, centerLng], 15, { animate: true })}
+          aria-label="Recenter Map"
+          title="Recenter"
+          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
 };
 
 const MapComponent = (props: MapProps) => {
@@ -329,6 +389,8 @@ const MapComponent = (props: MapProps) => {
           tripStatus={tripStatus}
           focusedDriverCoords={focusedDriverCoords}
         />
+
+        <MapNavigationControls centerLat={centerLat} centerLng={centerLng} />
 
         {routeCoordinates.length > 0 && (
           <Polyline positions={routeCoordinates} color={polylineColor} weight={5} lineCap="round" lineJoin="round" />

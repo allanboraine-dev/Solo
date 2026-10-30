@@ -1,3 +1,4 @@
+@import 'leaflet/dist/leaflet.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -201,14 +202,20 @@ label,
   scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
 
-/* Prevent accidental text selection, jerky gestures, and Samsung Dark Mode color inversion on Leaflet maps */
+/* Prevent accidental text selection, jerky gestures, and ensure responsive dimensions on Leaflet maps */
 .leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
   -webkit-user-select: none;
   user-select: none;
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
-  background-color: #09090b !important;
+  background-color: #f1f5f9;
   color-scheme: light;
+}
+
+.dark .leaflet-container {
+  background-color: #09090b !important;
 }
 
 .leaflet-tile-pane,

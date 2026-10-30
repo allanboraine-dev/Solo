@@ -1065,7 +1065,7 @@ export default function DriverPage() {
               )}
             </div>
             <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-semibold mt-0.5 break-words">
-              Welcome back, {profile ? profile.fullName.split(' ')[0] : 'Driver'}
+              Welcome back, {profile?.fullName ? profile.fullName.split(' ')[0] : ((profile as any)?.full_name ? (profile as any).full_name.split(' ')[0] : 'Driver')}
             </p>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">

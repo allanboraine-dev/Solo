@@ -3036,11 +3036,11 @@ export function getTileLayerConfig(isDark: boolean = false) {
   if (MAPBOX_TOKEN) {
     const styleId = isDark ? 'navigation-night-v1' : 'navigation-day-v1';
     return {
-      url: `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`,
+      url: `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`,
       attribution:
         '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
-      tileSize: 256,
+      tileSize: 512,
       zoomOffset: -1,
     };
   }

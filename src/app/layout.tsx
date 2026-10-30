@@ -84,13 +84,27 @@ export default function RootLayout({
                     window.__soloDeferredPrompt = e;
                   });
                   if ('serviceWorker' in navigator) {
-                    window.addEventListener('load', function() {
-                      navigator.serviceWorker.getRegistration('/').then(function(reg) {
-                        if (!reg) {
-                          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+                    var isLocalhost = Boolean(
+                      window.location.hostname === 'localhost' ||
+                      window.location.hostname === '[::1]' ||
+                      window.location.hostname === '127.0.0.1' ||
+                      window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
+                    );
+                    if (isLocalhost) {
+                      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        for (var i = 0; i < registrations.length; i++) {
+                          registrations[i].unregister();
                         }
                       }).catch(function() {});
-                    });
+                    } else {
+                      window.addEventListener('load', function() {
+                        navigator.serviceWorker.getRegistration('/').then(function(reg) {
+                          if (!reg) {
+                            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function() {});
+                          }
+                        }).catch(function() {});
+                      });
+                    }
                   }
                 } catch (e) {}
 
