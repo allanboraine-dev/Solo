@@ -162,7 +162,7 @@ export function reconcileMemoryDriversWithDatabase(
   const validEmails = new Set(authoritativeDrivers.map((d) => d.email?.trim().toLowerCase()).filter(Boolean));
   const validPhones = new Set(authoritativeDrivers.map((d) => d.phone?.replace(/[\s\-\(\)]/g, '')).filter(Boolean));
 
-  for (const [id, driver] of memoryDrivers.entries()) {
+  for (const [id, driver] of Array.from(memoryDrivers.entries())) {
     // Platform owner is never purged
     if (isPlatformOwner(driver.email)) continue;
 

@@ -17,9 +17,11 @@ import {
   ExternalLink,
   RefreshCw,
   Trash2,
+  KeyRound,
 } from "lucide-react";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
 import { isPlatformOwner } from "@/utils/owner";
+import ResetDriverPasswordModal, { DriverToReset } from "@/components/ResetDriverPasswordModal";
 
 export default function AdminOverviewDashboard() {
   const [drivers, setDrivers] = useState<DriverKycSummary[]>([]);
@@ -32,6 +34,7 @@ export default function AdminOverviewDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [passwordResetDriver, setPasswordResetDriver] = useState<DriverToReset | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -418,6 +421,23 @@ export default function AdminOverviewDashboard() {
 
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPasswordResetDriver({
+                              id: driver.id,
+                              fullName: driver.fullName,
+                              email: driver.email,
+                              phone: driver.phone,
+                              licensePlate: driver.licensePlate,
+                            })
+                          }
+                          className="py-1.5 px-2.5 bg-zinc-800 hover:bg-zinc-700 hover:text-emerald-400 text-zinc-300 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-zinc-700 transition"
+                          title="Reset Driver Account Password"
+                        >
+                          <KeyRound size={13} />
+                          <span className="hidden sm:inline">Reset Password</span>
+                        </button>
                         <Link
                           href={`/admin/compliance?search=${encodeURIComponent(driver.fullName)}`}
                           className="py-1.5 px-3 bg-zinc-800 hover:bg-emerald-600 hover:text-white text-zinc-200 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border border-zinc-700 hover:border-emerald-500 transition"
@@ -444,6 +464,13 @@ export default function AdminOverviewDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Driver Password Reset Modal */}
+      <ResetDriverPasswordModal
+        isOpen={!!passwordResetDriver}
+        onClose={() => setPasswordResetDriver(null)}
+        driver={passwordResetDriver}
+      />
     </div>
   );
 }

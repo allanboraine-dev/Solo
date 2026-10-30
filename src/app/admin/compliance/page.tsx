@@ -30,6 +30,7 @@ import {
   VolumeX,
   Radio,
   Trash2,
+  KeyRound,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
@@ -37,6 +38,7 @@ import { isPlatformOwner } from "@/utils/owner";
 import { audioAlert } from "@/utils/audioAlert";
 import { createClient } from "@/utils/supabase/client";
 import { DriverSignupAlert } from "@/utils/kycStore";
+import ResetDriverPasswordModal, { DriverToReset } from "@/components/ResetDriverPasswordModal";
 
 const REJECTION_PRESETS = [
   "Document is expired according to license card date",
@@ -81,6 +83,7 @@ export default function AdminComplianceDashboard() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [passwordResetDriver, setPasswordResetDriver] = useState<DriverToReset | null>(null);
 
   const handleNewDriverAlert = (alert: DriverSignupAlert) => {
     if (!alert || !alert.fullName) return;
@@ -1055,6 +1058,23 @@ export default function AdminComplianceDashboard() {
                       <span>Inspect & Review ({driver.totalDocs}/7 Docs)</span>
                       <ChevronRight size={14} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPasswordResetDriver({
+                          id: driver.id,
+                          fullName: driver.fullName,
+                          email: driver.email,
+                          phone: driver.phone,
+                          licensePlate: driver.licensePlate,
+                        });
+                      }}
+                      className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 hover:text-emerald-400 border border-zinc-700 text-zinc-300 rounded-xl transition active:scale-95 flex items-center justify-center"
+                      title="Reset Driver Password"
+                    >
+                      <KeyRound size={15} />
+                    </button>
                     {!isOwnerDriver && (
                       <button
                         type="button"
@@ -1098,6 +1118,23 @@ export default function AdminComplianceDashboard() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPasswordResetDriver({
+                      id: selectedDriver.id,
+                      fullName: selectedDriver.fullName,
+                      email: selectedDriver.email,
+                      phone: selectedDriver.phone,
+                      licensePlate: selectedDriver.licensePlate,
+                    })
+                  }
+                  className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 hover:text-emerald-400 border border-zinc-700 text-zinc-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+                  title="Reset Driver Account Password"
+                >
+                  <KeyRound size={14} />
+                  <span className="hidden sm:inline">Reset Password</span>
+                </button>
                 {!(selectedDriver.subscriptionPlan === "owner" || isPlatformOwner(selectedDriver.email)) && (
                   <button
                     type="button"
@@ -1438,6 +1475,13 @@ export default function AdminComplianceDashboard() {
           </div>
         </div>
       )}
+
+      {/* Driver Password Reset Modal */}
+      <ResetDriverPasswordModal
+        isOpen={!!passwordResetDriver}
+        onClose={() => setPasswordResetDriver(null)}
+        driver={passwordResetDriver}
+      />
     </div>
   );
 }
