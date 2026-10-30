@@ -384,6 +384,39 @@ export async function DELETE(req: NextRequest) {
 
       // If registered under profiles table with driver role, delete
       await supabase.from('profiles').delete().eq('id', driverId).eq('user_type', 'driver');
+
+      // 4.1 Delete driver authentication record from Supabase Auth (auth.users)
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceKey && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        try {
+          const adminAuthClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            serviceKey,
+            { auth: { autoRefreshToken: false, persistSession: false } }
+          );
+
+          // Attempt direct deletion by driver UUID
+          const { error: directAuthErr } = await adminAuthClient.auth.admin.deleteUser(driverId);
+          
+          // If user wasn't found by ID or if we have an associated email, verify by email
+          const driverEmail = dbDriver?.email || memoryProfile?.email;
+          if (directAuthErr && driverEmail && !isPlatformOwner(driverEmail)) {
+            try {
+              const { data: userList } = await adminAuthClient.auth.admin.listUsers();
+              const matchedUser = userList?.users?.find(
+                (u) => u.email?.trim().toLowerCase() === driverEmail.trim().toLowerCase()
+              );
+              if (matchedUser?.id && !isPlatformOwner(matchedUser.email)) {
+                await adminAuthClient.auth.admin.deleteUser(matchedUser.id);
+              }
+            } catch (listErr) {
+              console.warn('[AdminKycAPI] Auth listUsers lookup notice:', listErr);
+            }
+          }
+        } catch (authEx) {
+          console.warn('[AdminKycAPI] Auth user deletion notice:', authEx);
+        }
+      }
     } catch (dbErr: any) {
       console.warn('[AdminKycAPI] DB deletion notice (continuing in-memory cleanup):', dbErr?.message);
     }
