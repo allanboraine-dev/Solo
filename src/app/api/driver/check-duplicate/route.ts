@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { checkDuplicateKycDriver } from '@/utils/kycStore';
+import { checkDuplicateKycDriver, reconcileMemoryDriversWithDatabase } from '@/utils/kycStore';
 import { checkDriverDuplicatesInMemory, type DuplicateCheckParams } from '@/utils/driverValidation';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,45 @@ export async function POST(req: NextRequest) {
     const body: DuplicateCheckParams = await req.json();
     const { email, phone, licensePlate, prdpNumber, driverId } = body;
 
-    // 1. In-memory check first (instant response)
+    // 1. Authoritative check against Supabase persistent database first
+    try {
+      let query = supabase
+        .from('driver_profiles')
+        .select('id, email, phone, license_plate, prdp_number');
+
+      if (driverId) {
+        query = query.neq('id', driverId);
+      }
+
+      const { data: dbDrivers, error: dbErr } = await query;
+
+      if (!dbErr && Array.isArray(dbDrivers)) {
+        // Evict any deleted ghost drivers from in-memory cache
+        reconcileMemoryDriversWithDatabase(dbDrivers);
+
+        const dbCheck = checkDriverDuplicatesInMemory(
+          { email, phone, licensePlate, prdpNumber, driverId },
+          dbDrivers
+        );
+
+        if (dbCheck.isDuplicate) {
+          return NextResponse.json({
+            isDuplicate: true,
+            field: dbCheck.field,
+            message: dbCheck.message,
+          });
+        }
+
+        // Database verified no duplicate exists!
+        return NextResponse.json({
+          isDuplicate: false,
+        });
+      }
+    } catch (dbError) {
+      console.warn('[CheckDuplicateAPI] Supabase query notice:', dbError);
+    }
+
+    // 2. Fallback to in-memory check only if database was unreachable
     const memCheck = checkDuplicateKycDriver({
       email,
       phone,
@@ -30,36 +68,6 @@ export async function POST(req: NextRequest) {
         field: memCheck.field,
         message: memCheck.message,
       });
-    }
-
-    // 2. Supabase DB check across driver_profiles
-    try {
-      let query = supabase
-        .from('driver_profiles')
-        .select('id, email, phone, license_plate, prdp_number');
-
-      if (driverId) {
-        query = query.neq('id', driverId);
-      }
-
-      const { data: dbDrivers, error: dbErr } = await query;
-
-      if (!dbErr && Array.isArray(dbDrivers) && dbDrivers.length > 0) {
-        const dbCheck = checkDriverDuplicatesInMemory(
-          { email, phone, licensePlate, prdpNumber, driverId },
-          dbDrivers
-        );
-
-        if (dbCheck.isDuplicate) {
-          return NextResponse.json({
-            isDuplicate: true,
-            field: dbCheck.field,
-            message: dbCheck.message,
-          });
-        }
-      }
-    } catch (dbError) {
-      console.warn('[CheckDuplicateAPI] Supabase query notice:', dbError);
     }
 
     return NextResponse.json({

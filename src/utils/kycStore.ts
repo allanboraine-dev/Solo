@@ -152,6 +152,36 @@ export function getAllKycDriverProfiles(): KycDriverProfile[] {
 }
 
 /**
+ * Synchronizes the in-memory driver store with authoritative database rows,
+ * evicting any in-memory drivers that were deleted from Supabase.
+ */
+export function reconcileMemoryDriversWithDatabase(
+  authoritativeDrivers: Array<{ id?: string | null; email?: string | null; phone?: string | null }>
+): void {
+  const validIds = new Set(authoritativeDrivers.map((d) => String(d.id || '')).filter(Boolean));
+  const validEmails = new Set(authoritativeDrivers.map((d) => d.email?.trim().toLowerCase()).filter(Boolean));
+  const validPhones = new Set(authoritativeDrivers.map((d) => d.phone?.replace(/[\s\-\(\)]/g, '')).filter(Boolean));
+
+  for (const [id, driver] of memoryDrivers.entries()) {
+    // Platform owner is never purged
+    if (isPlatformOwner(driver.email)) continue;
+
+    const normPhone = driver.phone?.replace(/[\s\-\(\)]/g, '');
+    const normEmail = driver.email?.trim().toLowerCase();
+
+    // If driver is not present in the authoritative database list by ID, email, or phone, evict them
+    const matchesId = validIds.has(String(id));
+    const matchesEmail = normEmail ? validEmails.has(normEmail) : false;
+    const matchesPhone = normPhone ? validPhones.has(normPhone) : false;
+
+    if (!matchesId && !matchesEmail && !matchesPhone) {
+      memoryDrivers.delete(id);
+      memoryDocuments.delete(id);
+    }
+  }
+}
+
+/**
  * Checks in-memory store for any conflicting duplicate driver profile
  * based on email, phone, license plate, or PrDP number.
  */

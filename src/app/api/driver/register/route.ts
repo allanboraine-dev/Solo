@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { saveKycDriverProfile, recordDriverSignupAlert, checkDuplicateKycDriver } from '@/utils/kycStore';
+import { saveKycDriverProfile, recordDriverSignupAlert, checkDuplicateKycDriver, reconcileMemoryDriversWithDatabase } from '@/utils/kycStore';
 import { checkDriverDuplicatesInMemory } from '@/utils/driverValidation';
 import { isPlatformOwner } from '@/utils/owner';
 import { checkRegistrationRateLimit } from '@/utils/rateLimit';
@@ -41,27 +41,8 @@ export async function POST(req: NextRequest) {
     const driverId = id || crypto.randomUUID();
     const isOwner = isPlatformOwner(email);
 
-    // 0. Restrict duplicate driver registrations (email, phone, vehicle plate, PrDP)
-    const memDuplicate = checkDuplicateKycDriver({
-      email,
-      phone,
-      licensePlate,
-      prdpNumber,
-      driverId,
-    });
-
-    if (memDuplicate.isDuplicate) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: memDuplicate.message,
-          field: memDuplicate.field,
-          code: 'DUPLICATE_REGISTRATION',
-        },
-        { status: 409 }
-      );
-    }
-
+    // 0. Authoritative check against Supabase persistent database first
+    let dbCheckedSuccessfully = false;
     try {
       let query = supabase
         .from('driver_profiles')
@@ -72,25 +53,54 @@ export async function POST(req: NextRequest) {
       }
 
       const { data: dbDrivers, error: dbErr } = await query;
-      if (!dbErr && Array.isArray(dbDrivers) && dbDrivers.length > 0) {
-        const dbDuplicate = checkDriverDuplicatesInMemory(
-          { email, phone, licensePlate, prdpNumber, driverId },
-          dbDrivers
-        );
-        if (dbDuplicate.isDuplicate) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: dbDuplicate.message,
-              field: dbDuplicate.field,
-              code: 'DUPLICATE_REGISTRATION',
-            },
-            { status: 409 }
+      if (!dbErr && Array.isArray(dbDrivers)) {
+        dbCheckedSuccessfully = true;
+        // Evict any deleted ghost drivers from in-memory cache
+        reconcileMemoryDriversWithDatabase(dbDrivers);
+
+        if (dbDrivers.length > 0) {
+          const dbDuplicate = checkDriverDuplicatesInMemory(
+            { email, phone, licensePlate, prdpNumber, driverId },
+            dbDrivers
           );
+          if (dbDuplicate.isDuplicate) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: dbDuplicate.message,
+                field: dbDuplicate.field,
+                code: 'DUPLICATE_REGISTRATION',
+              },
+              { status: 409 }
+            );
+          }
         }
       }
     } catch (dbCheckErr) {
       console.warn('[DriverRegisterAPI] DB duplicate check notice:', dbCheckErr);
+    }
+
+    // Fall back to in-memory check only if database query could not run
+    if (!dbCheckedSuccessfully) {
+      const memDuplicate = checkDuplicateKycDriver({
+        email,
+        phone,
+        licensePlate,
+        prdpNumber,
+        driverId,
+      });
+
+      if (memDuplicate.isDuplicate) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: memDuplicate.message,
+            field: memDuplicate.field,
+            code: 'DUPLICATE_REGISTRATION',
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // 1. Save into resilient in-memory server kycStore
