@@ -120,18 +120,22 @@ const createAssignedDriverIcon = (driverName?: string) => {
 };
 
 // Component to handle map bounds, sizing, and routing
-const MapUpdater = ({
-  pickupLat,
-  pickupLng,
-  dropoffLat,
-  dropoffLng,
-  driverLat,
-  driverLng,
+const MapUpdater = ({ 
+  pickupLat, 
+  pickupLng, 
+  dropoffLat, 
+  dropoffLng, 
+  driverLat, 
+  driverLng, 
   tripStatus,
   focusedDriverCoords,
 }: any) => {
   const map = useMap();
   const prevFocusedRef = useRef<{ lat: number; lng: number } | null>(null);
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  const prevRouteKeyRef = useRef<string>('');
+  const initialCenteredRef = useRef<boolean>(false);
+  const userInteractedRef = useRef<boolean>(false);
 
   // Keep map dimensions strictly in sync with the DOM container
   useEffect(() => {
@@ -155,6 +159,23 @@ const MapUpdater = ({
     };
   }, [map]);
 
+  // Track user manual interaction (drag, pinch, zoom buttons) so automatic GPS pings don't override manual zoom
+  useEffect(() => {
+    const handleUserInteraction = (e: L.LeafletEvent) => {
+      if ((e as any).originalEvent) {
+        userInteractedRef.current = true;
+      }
+    };
+
+    map.on('movestart', handleUserInteraction);
+    map.on('zoomstart', handleUserInteraction);
+
+    return () => {
+      map.off('movestart', handleUserInteraction);
+      map.off('zoomstart', handleUserInteraction);
+    };
+  }, [map]);
+
   useEffect(() => {
     // Coordinate sanity check helper (avoid zooming to 0,0 in the Atlantic ocean)
     const isValidCoord = (lat?: number | null, lng?: number | null) =>
@@ -174,6 +195,7 @@ const MapUpdater = ({
 
       if (isNewFocus) {
         prevFocusedRef.current = { lat: focusedDriverCoords.lat, lng: focusedDriverCoords.lng };
+        userInteractedRef.current = false;
         map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
         return;
       }
@@ -181,45 +203,72 @@ const MapUpdater = ({
       prevFocusedRef.current = null;
     }
 
-    // 1. If trip is accepted and driver is en route to pickup:
-    if (tripStatus === 'accepted' && hasValidDriver && hasValidPickup) {
-      const bounds = L.latLngBounds(
-        [driverLat, driverLng],
-        [pickupLat, pickupLng]
-      );
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+    const routeKey = `${pickupLat},${pickupLng}->${dropoffLat},${dropoffLng}`;
+    const isNewRoute = routeKey !== prevRouteKeyRef.current;
+    const isNewStatus = tripStatus !== prevStatusRef.current;
+
+    // 1. If trip status changed (e.g. accepted, arrived, in_progress), frame the new phase
+    if (isNewStatus && tripStatus) {
+      prevStatusRef.current = tripStatus;
+      userInteractedRef.current = false;
+
+      if (tripStatus === 'accepted' && hasValidDriver && hasValidPickup) {
+        const bounds = L.latLngBounds([driverLat, driverLng], [pickupLat, pickupLng]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
+        return;
+      }
+
+      if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
+        const bounds = L.latLngBounds([driverLat, driverLng], [dropoffLat, dropoffLng]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
+        return;
+      }
+
+      if (tripStatus === 'arrived' && hasValidPickup) {
+        map.setView([pickupLat, pickupLng], 16, { animate: true });
+        return;
+      }
+    }
+
+    // 2. If pickup / dropoff route changed
+    if (isNewRoute && (hasValidPickup || hasValidDropoff)) {
+      prevRouteKeyRef.current = routeKey;
+      userInteractedRef.current = false;
+
+      if (hasValidPickup && hasValidDropoff) {
+        const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+        return;
+      } else if (hasValidPickup) {
+        map.setView([pickupLat, pickupLng], 15, { animate: true });
+        return;
+      } else if (hasValidDropoff) {
+        map.setView([dropoffLat, dropoffLng], 15, { animate: true });
+        return;
+      }
+    }
+
+    // 3. Initial center on first load
+    if (!initialCenteredRef.current) {
+      if (hasValidPickup && hasValidDropoff) {
+        const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        initialCenteredRef.current = true;
+      } else if (hasValidPickup) {
+        map.setView([pickupLat, pickupLng], 15);
+        initialCenteredRef.current = true;
+      } else if (hasValidDriver) {
+        map.setView([driverLat, driverLng], 15);
+        initialCenteredRef.current = true;
+      }
       return;
     }
 
-    // 2. If trip is in progress and driver is en route to destination:
-    if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
-      const bounds = L.latLngBounds(
-        [driverLat, driverLng],
-        [dropoffLat, dropoffLng]
-      );
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
-      return;
-    }
-
-    // 3. If driver arrived at pickup:
-    if (tripStatus === 'arrived' && hasValidPickup) {
-      map.setView([pickupLat, pickupLng], 16);
-      return;
-    }
-
-    // 4. Default pickup to dropoff bounds:
-    if (hasValidPickup && hasValidDropoff) {
-      const bounds = L.latLngBounds(
-        [pickupLat, pickupLng],
-        [dropoffLat, dropoffLng]
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-    } else if (hasValidPickup) {
-      map.setView([pickupLat, pickupLng], 15);
-    } else if (hasValidDropoff) {
-      map.setView([dropoffLat, dropoffLng], 15);
-    } else if (hasValidDriver && !tripStatus) {
-      map.setView([driverLat, driverLng], 15);
+    // 4. Background GPS updates:
+    // Follow the driver if user hasn't manually panned away,
+    // AND PRESERVE the user's current zoom level (NEVER reset zoom on GPS tick!)
+    if (hasValidDriver && !userInteractedRef.current && !tripStatus) {
+      map.panTo([driverLat, driverLng], { animate: true, duration: 0.8 });
     }
   }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords]);
 
@@ -380,6 +429,10 @@ const MapComponent = (props: MapProps) => {
       <MapContainer 
         center={[centerLat, centerLng]} 
         zoom={14} 
+        minZoom={3}
+        maxZoom={19}
+        zoomDelta={1}
+        zoomSnap={1}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         // @ts-ignore Leaflet mobile tap emulation override
