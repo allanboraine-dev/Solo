@@ -188,6 +188,15 @@ In compliance with the **National Land Transport Act (Act No. 5 of 2009)**, ever
    - The platform utilizes resilient database user-provisioning triggers to prevent registration lockouts.
 4. Once submitted, your profile enters the verification queue with status `pending`.
 
+### 2.2.1 Driver Account Credentials & Password Recovery Protocol
+1. **Driver Identifier / Username:** A driver's username is strictly their registered **Email address** configured during onboarding.
+2. **Self-Service Password Reset:**
+   - If a driver forgets their password, they tap **"Forgot password?"** on `/driver/login` or navigate directly to `/driver/forgot-password`.
+   - Entering their registered email sends a cryptographically signed one-time reset link directly to their inbox.
+   - Following the secure link directs the driver to `/driver/reset-password`, allowing them to define a new password with instant Supabase Auth credential synchronization.
+3. **Administrative / Lost Email Assistance:**
+   - If a driver no longer has access to their registered email inbox, platform administrators can send a recovery link or update credentials via the Supabase Admin console after verifying the driver's registered South African phone number and vehicle registration / PrDP records.
+
 ### 2.3 SaaS Subscription Model (7-Day Trial & R499/mo)
 SOLO replaces predatory percentage commissions with a transparent, predictable flat-rate Software-as-a-Service model.
 

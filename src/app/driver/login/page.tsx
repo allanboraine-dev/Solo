@@ -1,21 +1,25 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { isPlatformOwner, isOwnerPassword, FOUNDER_DRIVER_UUID } from '@/utils/owner'
 import { setSafeLocalStorageItem } from '@/utils/session'
 import { usePWA } from '@/lib/PWAContext'
-import { Download } from 'lucide-react'
+import { Download, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function DriverLogin() {
+function DriverLoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { installApp, isStandalone } = usePWA()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const isResetSuccess = searchParams.get('reset') === 'success'
+  const isLinkExpired = searchParams.get('error') === 'reset_link_expired'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,6 +149,21 @@ export default function DriverLogin() {
           </button>
         )}
 
+        {isResetSuccess && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl mb-6 font-medium text-sm flex items-start gap-2.5">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+            <span>
+              Your password has been successfully reset! Please sign in with your new password below.
+            </span>
+          </div>
+        )}
+
+        {isLinkExpired && (
+          <div className="bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 p-4 rounded-xl mb-6 font-medium text-sm">
+            Your password reset link is invalid or has expired. Please request a new link via &ldquo;Forgot password?&rdquo; below.
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm">
             {error}
@@ -164,7 +183,15 @@ export default function DriverLogin() {
             />
           </div>
           <div>
-            <label className="block text-sm font-bold mb-2">Password</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold">Password</label>
+              <Link 
+                href="/driver/forgot-password" 
+                className="text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 transition"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input 
               required 
               type="password" 
@@ -189,5 +216,13 @@ export default function DriverLogin() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function DriverLogin() {
+  return (
+    <Suspense fallback={<div className="min-h-mobile-portal bg-gray-50 dark:bg-black" />}>
+      <DriverLoginForm />
+    </Suspense>
   )
 }
