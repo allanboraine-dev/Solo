@@ -6,6 +6,8 @@ const withPWA = withPWAInit({
   customWorkerSrc: "worker",
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
     runtimeCaching: [
       // 1. Mapbox Navigation & OpenStreetMap tiles
       {

@@ -50,17 +50,25 @@ interface MapProps {
 }
 
 // Create custom DivIcons for location markers
-const createCustomIcon = (text: string, bgColor: string, textColor: string) => {
+const createCustomIcon = (text: string, bgColor: string, textColor: string, isPulsing: boolean = false) => {
   return L.divIcon({
-    html: `<div style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 10px; border-radius: 999px; box-shadow: 0 4px 8px -1px rgba(0, 0, 0, 0.25); border: 2px solid white; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; width: max-content;">${text}</div>`,
+    html: `
+      <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35)); pointer-events: auto;">
+        <div style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 11px; border-radius: 9999px; border: 2px solid #ffffff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+          ${text}
+        </div>
+        <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid ${bgColor}; margin-top: -1px;"></div>
+        ${isPulsing ? `<div style="width: 8px; height: 8px; background-color: ${bgColor}; border: 1.5px solid #ffffff; border-radius: 9999px; margin-top: 1px; box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4);"></div>` : ''}
+      </div>
+    `,
     className: '',
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16]
+    iconAnchor: [44, 34],
+    popupAnchor: [0, -34]
   });
 };
 
-const pickupIcon = createCustomIcon('Pickup (A)', '#111827', '#ffffff');
-const dropoffIcon = createCustomIcon('Dropoff (B)', '#2563eb', '#ffffff');
+const pickupIcon = createCustomIcon('Pickup (A)', '#111827', '#ffffff', true);
+const dropoffIcon = createCustomIcon('Dropoff (B)', '#2563eb', '#ffffff', false);
 
 // Car icon for available roaming drivers
 const createAvailableCarIcon = (vehicleName?: string) => {
@@ -393,7 +401,26 @@ const MapComponent = (props: MapProps) => {
         <MapNavigationControls centerLat={centerLat} centerLng={centerLng} />
 
         {routeCoordinates.length > 0 && (
-          <Polyline positions={routeCoordinates} color={polylineColor} weight={5} lineCap="round" lineJoin="round" />
+          <>
+            {/* Route Outer Casing for elevation/contrast */}
+            <Polyline 
+              positions={routeCoordinates} 
+              color={tripStatus === 'accepted' ? '#064e3b' : '#1e3a8a'} 
+              weight={8} 
+              opacity={0.65} 
+              lineCap="round" 
+              lineJoin="round" 
+            />
+            {/* Route Main Navigation Line */}
+            <Polyline 
+              positions={routeCoordinates} 
+              color={polylineColor} 
+              weight={5} 
+              opacity={0.95} 
+              lineCap="round" 
+              lineJoin="round" 
+            />
+          </>
         )}
 
         {/* Pickup marker */}
