@@ -4,8 +4,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import mapboxgl from 'mapbox-gl';
-import MapboxGLMap from './MapboxGLMap';
 import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
 import { useTheme } from '@/components/ThemeProvider';
 
@@ -283,24 +281,6 @@ const MapNavigationControls = ({ centerLat, centerLng }: { centerLat: number; ce
 };
 
 const MapComponent = (props: MapProps) => {
-  const [vectorMode, setVectorMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return typeof mapboxgl !== 'undefined' && Boolean(mapboxgl.supported && mapboxgl.supported());
-    } catch {
-      return false;
-    }
-  });
-
-  const handleVectorError = React.useCallback((err: Error) => {
-    console.warn('Mapbox GL Vector Map fallback to Leaflet:', err.message);
-    setVectorMode(false);
-  }, []);
-
-  if (vectorMode) {
-    return <MapboxGLMap {...props} onError={handleVectorError} />;
-  }
-
   const { 
     pickupLat, 
     pickupLng, 
