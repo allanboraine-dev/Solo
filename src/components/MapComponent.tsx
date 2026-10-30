@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Plus, Minus, Crosshair } from 'lucide-react';
 import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
 import { useTheme } from '@/components/ThemeProvider';
 
@@ -245,37 +246,49 @@ const MapClickHandler = ({
 const MapNavigationControls = ({ centerLat, centerLng }: { centerLat: number; centerLng: number }) => {
   const map = useMap();
   return (
-    <div className="leaflet-top leaflet-right" style={{ pointerEvents: 'auto', marginTop: '76px', marginRight: '14px', zIndex: 1000 }}>
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => map.zoomIn()}
-          aria-label="Zoom In"
-          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={() => map.zoomOut()}
-          aria-label="Zoom Out"
-          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-xl flex items-center justify-center font-bold text-lg hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
-        >
-          −
-        </button>
-        <button
-          type="button"
-          onClick={() => map.setView([centerLat, centerLng], 15, { animate: true })}
-          aria-label="Recenter Map"
-          title="Recenter"
-          className="w-10 h-10 bg-white/95 dark:bg-zinc-800/95 backdrop-blur-md text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-700 active:scale-95 transition border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>
-          </svg>
-        </button>
-      </div>
+    <div
+      className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 md:top-24 md:translate-y-0 md:right-5 z-[1000] pointer-events-auto flex flex-col gap-2 select-none"
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          map.zoomIn();
+        }}
+        aria-label="Zoom In"
+        title="Zoom In"
+        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+      >
+        <Plus size={20} className="stroke-[2.5]" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          map.zoomOut();
+        }}
+        aria-label="Zoom Out"
+        title="Zoom Out"
+        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+      >
+        <Minus size={20} className="stroke-[2.5]" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          map.setView([centerLat, centerLng], 15, { animate: true });
+        }}
+        aria-label="Recenter Map"
+        title="Recenter Map"
+        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-blue-600 dark:text-blue-400 rounded-2xl sm:rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+      >
+        <Crosshair size={18} className="stroke-[2.5]" />
+      </button>
     </div>
   );
 };
