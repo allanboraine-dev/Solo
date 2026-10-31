@@ -77,7 +77,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 lg:gap-8 pt-2 sm:pt-6 text-left max-w-5xl mx-auto">
           {/* Rider App Card */}
           <div className="group relative flex flex-col p-6 sm:p-8 lg:p-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl shadow-2xl dark:shadow-none border border-gray-200/70 dark:border-white/10 rounded-3xl sm:rounded-[2.25rem] lg:rounded-[2.5rem] hover:border-blue-500/50 hover:shadow-blue-500/20 hover:-translate-y-1.5 transition-all duration-300">
-            <Link href="/rider" className="block mb-6 flex-1">
+            <div className="block mb-6 flex-1">
               <div className="flex items-center justify-between mb-5 sm:mb-6">
                 <div className="relative p-1 rounded-[1.5rem] bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-xl shadow-blue-500/25 group-hover:scale-105 transition-all duration-300">
                   <img
@@ -94,23 +94,25 @@ export default function Home() {
               <p className="text-gray-700 dark:text-gray-300 text-base sm:text-lg leading-relaxed font-normal">
                 Book a ride instantly anywhere in South Africa. Pay your driver directly via their in-car <strong>Speedpoint machine</strong> (Card/Tap) or <strong>Cash</strong> with 0% platform markup.
               </p>
-            </Link>
+            </div>
             
-            <div className="mt-auto space-y-3">
-              <Link 
-                href="/rider" 
-                className="flex items-center justify-center gap-3 w-full py-4 min-h-[54px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-2xl shadow-lg shadow-blue-500/25 active:scale-95 transition-all text-base sm:text-lg"
-              >
-                <img src="/rider-icon-192.png" alt="" className="w-6 h-6 rounded-md object-cover border border-white/30" />
-                <span>Book a Ride Now</span>
-              </Link>
-              {!isStandalone && (
+            <div className="mt-auto">
+              {isStandalone ? (
+                <Link 
+                  href="/rider" 
+                  className="flex items-center justify-center gap-3 w-full py-4 min-h-[54px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-2xl shadow-lg shadow-blue-500/25 active:scale-95 transition-all text-base sm:text-lg"
+                >
+                  <img src="/rider-icon-192.png" alt="" className="w-6 h-6 rounded-md object-cover border border-white/30" />
+                  <span>Open Rider App</span>
+                </Link>
+              ) : (
                 <button 
                   type="button"
                   onClick={() => installApp('rider')} 
-                  className="flex items-center justify-center gap-2.5 w-full py-3.5 min-h-[48px] bg-white dark:bg-zinc-800/90 text-blue-600 dark:text-blue-400 font-bold rounded-2xl shadow-sm hover:shadow border border-gray-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-sm sm:text-base active:scale-95"
+                  className="flex items-center justify-center gap-3 w-full py-4 min-h-[54px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-2xl shadow-lg shadow-blue-500/25 active:scale-95 transition-all text-base sm:text-lg"
                 >
-                  <Download size={18} /> Install Rider App (PWA)
+                  <Download size={20} />
+                  <span>Install Rider App (PWA)</span>
                 </button>
               )}
             </div>

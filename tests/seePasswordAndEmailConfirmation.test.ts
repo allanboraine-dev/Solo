@@ -121,4 +121,19 @@ describe('SOLO See Password & Email Confirmation Suite', () => {
       'Driver page must explain that drivers receive fares directly via Cash or Speedpoint'
     );
   });
+
+  it('verifies landing page removed "Book a Ride Now" in favor of PWA app installation first', () => {
+    const filePath = path.join(process.cwd(), 'src/app/page.tsx');
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    assert.strictEqual(
+      content.includes('Book a Ride Now'),
+      false,
+      'Landing page must not display "Book a Ride Now" button'
+    );
+    assert.ok(
+      content.includes('Install Rider App (PWA)'),
+      'Landing page must feature "Install Rider App (PWA)" as primary action'
+    );
+  });
 });
