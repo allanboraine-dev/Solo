@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, CheckCircle2, ShieldAlert, Clock } from "lucide-react";
+import { ShieldCheck, Lock, Key, ArrowRight, AlertCircle, CheckCircle2, ShieldAlert, Clock, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { isPlatformOwner, isOwnerPassword } from "@/utils/owner";
 import { setAdminSession, clearAdminSession, verifyManagerPasscode, isOwnerPasscode, createOwnerAdminSession } from "@/utils/adminAuth";
@@ -17,6 +17,8 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [securityPin, setSecurityPin] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -245,7 +247,7 @@ export default function AdminLoginPage() {
             </label>
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="solo_admin_secret_token"
                 autoComplete="new-password"
                 autoCorrect="off"
@@ -258,9 +260,17 @@ export default function AdminLoginPage() {
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50"
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50"
               />
-              <Lock size={16} className="absolute right-3.5 top-3 text-zinc-500" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 
@@ -270,7 +280,7 @@ export default function AdminLoginPage() {
             </label>
             <div className="relative">
               <input
-                type="password"
+                type={showPin ? "text" : "password"}
                 name="solo_admin_master_pin"
                 autoComplete="new-password"
                 autoCorrect="off"
@@ -283,9 +293,17 @@ export default function AdminLoginPage() {
                 placeholder="•••••"
                 value={securityPin}
                 onChange={(e) => setSecurityPin(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50 font-mono tracking-widest"
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition disabled:opacity-50 font-mono tracking-widest"
               />
-              <Key size={16} className="absolute right-3.5 top-3 text-zinc-500" />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
+                tabIndex={-1}
+                aria-label={showPin ? "Hide PIN" : "Show PIN"}
+              >
+                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
             <p className="text-[11px] text-zinc-500 mt-1.5 flex items-center gap-1.5">
               <Lock size={12} className="text-emerald-500 shrink-0" />

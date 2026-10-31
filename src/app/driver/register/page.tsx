@@ -24,7 +24,9 @@ import {
   Sparkles,
   Zap,
   ArrowRight,
-  Download
+  Download,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { usePWA } from '@/lib/PWAContext'
 import Link from 'next/link'
@@ -42,6 +44,7 @@ export default function DriverRegistration() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [phone, setPhone] = useState('')
 
   // Step 2: Vehicle & Payment Equipment Details
@@ -292,10 +295,15 @@ export default function DriverRegistration() {
     // 1. Sign up the user in Supabase Auth (strict: reject already registered)
     if (!driverId) {
       setUploadProgressText('Creating your driver account...')
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback?next=/driver`
+        : undefined
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
             phone: phone,
@@ -590,7 +598,7 @@ export default function DriverRegistration() {
                 } catch {}
 
                 alert(`🎉 R1.00 card test successful!\n\nYour 14-day free trial has begun. You keep 100% of your rider fares with 0% platform commission.\n\nYour first R499.00 monthly subscription billing is scheduled for the 15th day (${billingDateStr}).\n\nWelcome to SOLO!`)
-                router.push(hasSession ? '/driver' : '/driver/login')
+                router.push(hasSession ? '/driver' : `/driver/login?registered=pending_confirmation&email=${encodeURIComponent(email)}`)
               } else {
                 setSubmitError(trialData.error || 'Failed to verify trial card with Paystack.')
                 setIsSubmitting(false)
@@ -796,7 +804,28 @@ export default function DriverRegistration() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Create Password</label>
-                <input required type="password" name="driver_reg_password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="••••••••" minLength={6} />
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? 'text' : 'password'}
+                    name="driver_reg_password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full p-3.5 pr-11 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                    placeholder="At least 6 characters"
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition p-1"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number (South Africa)</label>
