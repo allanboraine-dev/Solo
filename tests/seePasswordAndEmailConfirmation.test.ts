@@ -97,4 +97,28 @@ describe('SOLO See Password & Email Confirmation Suite', () => {
       'Auth callback must handle confirmation failures with distinct reason'
     );
   });
+
+  it('verifies Driver Portal has removed bank settlement payouts in favor of 100% direct cash & speedpoint', () => {
+    const filePath = path.join(process.cwd(), 'src/app/driver/page.tsx');
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    assert.strictEqual(
+      content.includes('DriverBankSettlementModal'),
+      false,
+      'Driver page must not import or render DriverBankSettlementModal'
+    );
+    assert.strictEqual(
+      content.includes('showBankModal'),
+      false,
+      'Driver page must not maintain showBankModal state'
+    );
+    assert.ok(
+      content.includes('Direct Rider Fares'),
+      'Driver page must display Direct Rider Fares card'
+    );
+    assert.ok(
+      content.includes('Speedpoint machine'),
+      'Driver page must explain that drivers receive fares directly via Cash or Speedpoint'
+    );
+  });
 });

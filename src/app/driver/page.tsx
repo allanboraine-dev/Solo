@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -14,7 +14,6 @@ import { DriverDocument, KycDocType } from '@/types/kyc'
 import { fetchDriverKycDocuments } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
-import { DriverBankSettlementModal } from '@/components/DriverBankSettlementModal'
 import { isPlatformOwner, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner'
 import { checkVehicleFleetCoverage } from '@/utils/fleetStore'
 import { audioAlert } from '@/utils/audioAlert'
@@ -115,7 +114,6 @@ export default function DriverPage() {
   const [showFareCollection, setShowFareCollection] = useState(false)
   const [isAwaitingRiderPayment, setIsAwaitingRiderPayment] = useState(false)
   const [isTrialExpired, setIsTrialExpired] = useState(false)
-  const [showBankModal, setShowBankModal] = useState(false)
   const [completionNotice, setCompletionNotice] = useState<string | null>(null)
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -1950,29 +1948,28 @@ export default function DriverPage() {
                   )}
                 </div>
 
-                {/* Bank Settlement & Direct Payouts Card */}
+                {/* Direct Fares: Cash & Speedpoint (0% Commission) */}
                 <div className="mt-5 text-left bg-gray-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-gray-100 dark:border-white/5">
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-2">
-                      <Building2 size={18} className="text-emerald-500" />
-                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">Bank Settlement & Payouts</h3>
+                      <Banknote size={18} className="text-emerald-500" />
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100">Direct Rider Fares</h3>
                     </div>
-                    <button
-                      onClick={() => setShowBankModal(true)}
-                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                    >
-                      Configure
-                    </button>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-0.5 rounded-full">
+                      0% Commission
+                    </span>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-                    Link your South African bank account (FNB, Standard Bank, Capitec, Nedbank, ABSA, etc.) to receive 100% fare payouts directly with zero commission deductions.
+                    You receive 100% of all trip earnings directly from riders via <strong>Cash</strong> or your in-car <strong>Speedpoint machine</strong> (Yoco, iKhokha, Vodapay, or bank POS). No bank settlement delays or payout deductions.
                   </p>
-                  <button
-                    onClick={() => setShowBankModal(true)}
-                    className="w-full py-3 px-4 min-h-[44px] bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition active:scale-98 touch-manipulation"
-                  >
-                    <Building2 size={15} /> Link / Update Bank Details
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold">
+                    <div className="p-2.5 bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 text-gray-800 dark:text-gray-200 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <Banknote size={14} className="text-emerald-600" /> Cash Accepted
+                    </div>
+                    <div className="p-2.5 bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 text-gray-800 dark:text-gray-200 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <CreditCard size={14} className="text-blue-600" /> Speedpoint / Tap
+                    </div>
+                  </div>
                 </div>
 
                 {/* KYC Compliance & Document Verification Card */}
@@ -2519,14 +2516,6 @@ export default function DriverPage() {
           </div>
         </div>
       )}
-
-      {/* South African Bank Settlement Modal */}
-      <DriverBankSettlementModal
-        driverId={profile?.id || ''}
-        driverFullName={profile?.fullName || 'Driver'}
-        isOpen={showBankModal}
-        onClose={() => setShowBankModal(false)}
-      />
 
       {/* Rider PIN Verification Modal */}
       {showPinModal && activeTrip && (
