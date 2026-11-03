@@ -92,7 +92,7 @@ export default function PrivacyPolicyPage() {
               How to Request Immediate Account Deletion:
             </p>
             <p className="text-sm text-zinc-300">
-              Submit an erasure request via email to <strong>compliance@soloride.co.za</strong> with the subject line <em>&quot;Account Deletion Request&quot;</em> specifying your registered phone number or email address, or submit a deletion ticket directly via the in-app Support &amp; Lost Item Centre.
+              Submit an erasure request via email to <strong>allanboraine@gmail.com</strong> with the subject line <em>&quot;Account Deletion Request&quot;</em> specifying your registered phone number or email address, or submit a deletion ticket directly via the in-app Support &amp; Lost Item Centre.
             </p>
             <p className="text-xs text-zinc-400">
               Account data, active dispatch sessions, and uploaded driver KYC documents will be permanently purged within 30 statutory business days, subject only to mandatory legal record-keeping requirements under the NLTA and SARS tax directives.
@@ -113,7 +113,7 @@ export default function PrivacyPolicyPage() {
             <p><strong>Boraine Tech (Pty) Ltd</strong></p>
             <p>Attention: Allan Boraine (Information Officer &amp; Founder)</p>
             <p>Cape Town / Kimberley, Republic of South Africa</p>
-            <p>Email: <a href="mailto:compliance@soloride.co.za" className="text-emerald-400 hover:underline">compliance@soloride.co.za</a></p>
+            <p>Email: <a href="mailto:allanboraine@gmail.com" className="text-emerald-400 hover:underline">allanboraine@gmail.com</a></p>
           </div>
         </section>
       </div>

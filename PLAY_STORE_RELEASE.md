@@ -132,7 +132,7 @@ When completing the **Data Safety** questionnaire in Google Play Console:
    - *Driver KYC Documents:* **Yes** (Driver license, PrDP, selfie for safety compliance).
 5. **Security Practices:**
    - *Data encrypted in transit:* **Yes** (TLS/HTTPS).
-   - *Request data deletion:* **Yes** (Via `compliance@soloride.co.za` or in-app ticket).
+   - *Request data deletion:* **Yes** (Via `allanboraine@gmail.com` or in-app ticket).
 
 ---
 
