@@ -539,15 +539,14 @@ export const getTrips = async (): Promise<MockTrip[]> => {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
         if (t && t.id) {
-          // Sanitize any previously cached Burgundy Hills Estate trip with old Kimberley coordinates
+          // Purge Burgundy Hills Estate trip and any unaccepted requests that have expired (> 1 hour)
           if (
-            (t.pickup_location?.toLowerCase().includes('burgandy hills') ||
-             t.pickup_location?.toLowerCase().includes('burgundy hills')) &&
-            (t.pickup_lat !== undefined && t.pickup_lat !== null && t.pickup_lat < -28)
+            t.id === 'fe854637-e49c-402c-80fc-9ab03de8f41c' ||
+            t.pickup_location?.toLowerCase().includes('burgandy hills') ||
+            t.pickup_location?.toLowerCase().includes('burgundy hills') ||
+            isStaleRequestedTrip(t)
           ) {
-            t.pickup_lat = -26.1542;
-            t.pickup_lng = 27.9354;
-            t.fare_amount = 195;
+            return;
           }
           const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, overrides, t);
           const resolvedDriverId = t.driver_id || overrides[t.id]?.driver_id;
@@ -611,8 +610,15 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     });
   }
 
-  // Remove cancelled trips that have exceeded the 1-hour retention window
-  const result = Array.from(mergedMap.values()).filter(t => !isStaleCancelledTrip(t));
+  // Remove expired trips (unaccepted requests > 1 hour, stale cancelled trips > 1 hour) and purged Burgandy Hills trip
+  const result = Array.from(mergedMap.values()).filter(
+    t =>
+      !isTripExpired(t) &&
+      !isStaleRequestedTrip(t) &&
+      !t.pickup_location?.toLowerCase().includes('burgandy hills') &&
+      !t.pickup_location?.toLowerCase().includes('burgundy hills') &&
+      t.id !== 'fe854637-e49c-402c-80fc-9ab03de8f41c'
+  );
   try {
     localStorage.setItem('mock_trips', JSON.stringify(result.slice(0, 100)));
   } catch {
@@ -1371,6 +1377,13 @@ export const getNearbyRequestedTrips = async (
       const rpcTrips: MockTrip[] = data
         .filter((t: any) => {
           if (!t?.id) return false;
+          if (
+            t.id === 'fe854637-e49c-402c-80fc-9ab03de8f41c' ||
+            t.pickup_location?.toLowerCase().includes('burgandy hills') ||
+            t.pickup_location?.toLowerCase().includes('burgundy hills')
+          ) {
+            return false;
+          }
           if (declinedIds.has(t.id) || completedIds.has(t.id)) return false;
           const knownStatus = knownStatusMap.get(t.id);
           if (knownStatus && knownStatus !== 'requested') return false;

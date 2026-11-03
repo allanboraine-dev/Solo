@@ -2,11 +2,9 @@
  * Trip Expiration & Lifecycle Engine for SOLO
  * 
  * Rules:
- * - Unclaimed ride requests older than 1 hour (60 minutes) automatically expire from SOLO.
+ * - Unaccepted ride requests older than 1 hour (60 minutes) automatically expire from SOLO.
  * - Riders must book again once a request expires.
  * - Cancelled trips are also removed from the dashboard after 1 hour (60 minutes).
- * - Scheduled trips: if scheduled in the future, they do not expire;
- *   if scheduled in the past, they expire 1 hour after the scheduled time.
  * - In-progress, accepted, arrived, or completed trips never expire via this rule.
  */
 
@@ -22,17 +20,24 @@ export interface ExpirableTrip {
 
 export const isStaleRequestedTrip = (trip: ExpirableTrip): boolean => {
   if (trip.status !== 'requested') return false;
-  if (trip.scheduled_time) {
-    const schedMs = new Date(trip.scheduled_time).getTime();
-    if (!Number.isNaN(schedMs)) {
-      if (schedMs > Date.now()) return false;
-      return Date.now() - schedMs > TRIP_EXPIRATION_MS;
+
+  // 1. Any unaccepted trip request created > 1 hour ago must expire and be removed
+  if (trip.created_at) {
+    const createdMs = new Date(trip.created_at).getTime();
+    if (!Number.isNaN(createdMs) && Date.now() - createdMs > TRIP_EXPIRATION_MS) {
+      return true;
     }
   }
-  if (!trip.created_at) return false;
-  const createdMs = new Date(trip.created_at).getTime();
-  if (Number.isNaN(createdMs)) return false;
-  return Date.now() - createdMs > TRIP_EXPIRATION_MS;
+
+  // 2. If scheduled time exists and is past by more than 1 hour, it also expires
+  if (trip.scheduled_time) {
+    const schedMs = new Date(trip.scheduled_time).getTime();
+    if (!Number.isNaN(schedMs) && schedMs <= Date.now() && Date.now() - schedMs > TRIP_EXPIRATION_MS) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 /**

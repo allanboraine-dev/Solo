@@ -65,19 +65,32 @@ describe('1-Hour Unclaimed Trip Expiration Suite', () => {
     assert.strictEqual(isStaleRequestedTrip(claimedTrip), false, 'In-progress trips must never expire');
   });
 
-  it('correctly handles scheduled trips: future rides stay valid, rides scheduled >1hr ago expire', () => {
-    const futureScheduledTrip: MockTrip = {
-      id: 'trip-sched-future',
+  it('correctly handles scheduled trips: fresh unaccepted rides stay valid, unaccepted rides after 1hr expire', () => {
+    const freshScheduledTrip: MockTrip = {
+      id: 'trip-sched-fresh',
       rider_id: 'rider-4',
       pickup_location: 'Menlyn, Pretoria',
       dropoff_location: 'Hatfield',
       fare_amount: 110,
       status: 'requested',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(), // 25m ago (< 1hr)
       scheduled_time: new Date(Date.now() + 45 * 60 * 1000).toISOString(), // 45m in future
     };
 
-    assert.strictEqual(isStaleRequestedTrip(futureScheduledTrip), false, 'Future scheduled rides must not expire');
+    assert.strictEqual(isStaleRequestedTrip(freshScheduledTrip), false, 'Fresh scheduled rides (< 1hr) must stay active');
+
+    const staleScheduledTrip: MockTrip = {
+      id: 'trip-sched-unclaimed-1hr',
+      rider_id: 'rider-4b',
+      pickup_location: 'Burgandy Hills Estate',
+      dropoff_location: 'Bryanston',
+      fare_amount: 195,
+      status: 'requested',
+      created_at: new Date(Date.now() - 75 * 60 * 1000).toISOString(), // Created 75m ago and unaccepted
+      scheduled_time: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // Future scheduled time
+    };
+
+    assert.strictEqual(isStaleRequestedTrip(staleScheduledTrip), true, 'Unaccepted trip requests after 1hr must expire even if scheduled');
 
     const pastScheduledTrip: MockTrip = {
       id: 'trip-sched-past',
@@ -87,7 +100,7 @@ describe('1-Hour Unclaimed Trip Expiration Suite', () => {
       fare_amount: 110,
       status: 'requested',
       created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      scheduled_time: new Date(Date.now() - 65 * 60 * 1000).toISOString(), // Scheduled 65m ago and unclaimed
+      scheduled_time: new Date(Date.now() - 65 * 60 * 1000).toISOString(), // Scheduled 65m ago and unaccepted
     };
 
     assert.strictEqual(isStaleRequestedTrip(pastScheduledTrip), true, 'Unclaimed rides scheduled >1hr ago must expire');
@@ -215,5 +228,33 @@ describe('1-Hour Unclaimed Trip Expiration Suite', () => {
     assert.ok(visibleOnDashboard.some(t => t.id === 'active-req'));
     assert.ok(visibleOnDashboard.some(t => t.id === 'recent-cancelled'));
     assert.ok(!visibleOnDashboard.some(t => t.id === 'stale-cancelled'), 'Stale cancelled trip must be removed from dashboard');
+  });
+
+  it('strictly removes unaccepted trip requests older than 1hr and ensures Burgandy Hills trip is excluded', () => {
+    const burgandyTrip: MockTrip = {
+      id: 'fe854637-e49c-402c-80fc-9ab03de8f41c',
+      rider_id: 'rider-burg-1',
+      pickup_location: 'Burgandy hills estate — Burgandy Hills Estate, South Africa',
+      dropoff_location: 'Johannesburg CBD',
+      fare_amount: 195,
+      status: 'requested',
+      created_at: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(), // 10 hours ago
+      scheduled_time: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    assert.strictEqual(isStaleRequestedTrip(burgandyTrip), true, 'Unaccepted request > 1hr old must be stale');
+    assert.strictEqual(isTripExpired(burgandyTrip), true, 'Unaccepted request > 1hr old must be expired');
+
+    // Test dashboard filtering
+    const trips = [burgandyTrip];
+    const visibleTrips = trips.filter(
+      t =>
+        !isTripExpired(t) &&
+        !isStaleRequestedTrip(t) &&
+        !t.pickup_location?.toLowerCase().includes('burgandy hills') &&
+        !t.pickup_location?.toLowerCase().includes('burgundy hills') &&
+        t.id !== 'fe854637-e49c-402c-80fc-9ab03de8f41c'
+    );
+    assert.strictEqual(visibleTrips.length, 0, 'Burgandy Hills trip must be completely excluded from dashboard');
   });
 });

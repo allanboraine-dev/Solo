@@ -2112,7 +2112,7 @@ export default function DriverPage() {
                   <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40">
                     <span className="block text-[10px] sm:text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Open</span>
                     <span className="text-base sm:text-xl font-black text-amber-700 dark:text-amber-300">
-                      {allNationalTrips.filter(t => t.status === 'requested').length}
+                      {allNationalTrips.filter(t => t.status === 'requested' && !isStaleRequestedTrip(t)).length}
                     </span>
                   </div>
                   <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40">
