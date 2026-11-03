@@ -152,10 +152,26 @@ const MapUpdater = ({
       ro.observe(container);
     }
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        map.invalidateSize();
+      }
+    };
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       if (ro) ro.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
     };
   }, [map]);
 
@@ -418,9 +434,18 @@ const MapComponent = (props: MapProps) => {
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus]);
 
+  const [useOsmFallback, setUseOsmFallback] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const tileConfig = getTileLayerConfig(isDark);
+  const osmFallbackConfig = {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    tileSize: 256,
+    zoomOffset: 0,
+  };
+  const activeTileConfig = useOsmFallback ? osmFallbackConfig : tileConfig;
 
   const polylineColor = tripStatus === 'accepted' ? '#10b981' : '#3b82f6';
 
@@ -440,12 +465,20 @@ const MapComponent = (props: MapProps) => {
         bounceAtZoomLimits={false}
       >
         <TileLayer
-          key={tileConfig.url}
-          attribution={tileConfig.attribution}
-          url={tileConfig.url}
-          maxZoom={tileConfig.maxZoom}
-          tileSize={tileConfig.tileSize}
-          zoomOffset={tileConfig.zoomOffset}
+          key={activeTileConfig.url}
+          attribution={activeTileConfig.attribution}
+          url={activeTileConfig.url}
+          maxZoom={activeTileConfig.maxZoom}
+          tileSize={activeTileConfig.tileSize}
+          zoomOffset={activeTileConfig.zoomOffset}
+          eventHandlers={{
+            tileerror: () => {
+              if (!useOsmFallback && tileConfig.url.includes('api.mapbox.com')) {
+                console.warn('Mapbox tile load failure detected; seamlessly falling back to OpenStreetMap tiles.');
+                setUseOsmFallback(true);
+              }
+            },
+          }}
         />
         
         <MapClickHandler 

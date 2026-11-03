@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
@@ -1106,6 +1107,20 @@ export default function RiderPage() {
                       }}
                       mapPickedLocation={mapPickedLocation}
                     />
+
+                    <div className="pt-3 mt-2 border-t border-gray-100 dark:border-zinc-800/80 flex flex-wrap items-center justify-center gap-2.5 text-[11px] text-gray-400 dark:text-zinc-500">
+                      <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+                        Privacy Policy &amp; POPIA
+                      </Link>
+                      <span>•</span>
+                      <Link href="/manual" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+                        Operational SOP
+                      </Link>
+                      <span>•</span>
+                      <Link href="/lost-phone" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+                        Lost Phone Recovery
+                      </Link>
+                    </div>
                   </>
                 )}
               </div>

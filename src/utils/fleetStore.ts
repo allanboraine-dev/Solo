@@ -84,6 +84,9 @@ export function calculateFleetMonthlyBilling(vehicleCount: number): FleetPricing
     vatAmountZar,
     totalMonthlyZar,
     savingsVsUberBoltZar,
+    benchmarkGrossPerVehicleZar: FLEET_PRICING.UBER_BOLT_MONTHLY_BENCHMARK_GROSS_ZAR,
+    legacyTakeRatePercent: FLEET_PRICING.UBER_BOLT_TAKE_RATE * 100,
+    benchmarkLegacyCommissionZar: totalLegacyCommission,
   };
 }
 

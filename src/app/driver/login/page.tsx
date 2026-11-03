@@ -283,7 +283,7 @@ function DriverLoginForm() {
         )}
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm space-y-2">
+          <div id="driver-login-error" role="alert" aria-live="polite" className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl mb-6 font-medium text-sm space-y-2">
             <div>{error}</div>
             {(error.toLowerCase().includes('not confirmed') || error.toLowerCase().includes('confirm')) && (
               <div className="pt-2 border-t border-red-200 dark:border-red-900/40">
@@ -315,19 +315,23 @@ function DriverLoginForm() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold mb-2">Email</label>
+            <label htmlFor="driver-login-email" className="block text-sm font-bold mb-2">Email</label>
             <input 
+              id="driver-login-email"
               required 
               type="email" 
               value={email} 
               onChange={e => setEmail(e.target.value)} 
+              aria-required="true"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? 'driver-login-error' : undefined}
               className="w-full p-4 bg-gray-100 dark:bg-zinc-900 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-black rounded-xl transition-all outline-none" 
               placeholder="nelson@example.com" 
             />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-bold">Password</label>
+              <label htmlFor="driver-login-password" className="block text-sm font-bold">Password</label>
               <Link 
                 href="/driver/forgot-password" 
                 className="text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 transition"
@@ -337,10 +341,14 @@ function DriverLoginForm() {
             </div>
             <div className="relative">
               <input 
+                id="driver-login-password"
                 required 
                 type={showPassword ? 'text' : 'password'} 
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
+                aria-required="true"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? 'driver-login-error' : undefined}
                 className="w-full p-4 pr-12 bg-gray-100 dark:bg-zinc-900 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-black rounded-xl transition-all outline-none" 
                 placeholder="••••••••" 
               />
@@ -365,9 +373,24 @@ function DriverLoginForm() {
           </button>
         </form>
 
-        <p className="text-center mt-6 text-gray-500 font-medium">
-          Don&apos;t have an account? <Link href="/driver/register" className="text-blue-600 dark:text-blue-400">Register</Link>
-        </p>
+        <div className="text-center mt-6 space-y-2 text-xs text-gray-500 font-medium">
+          <p>
+            Don&apos;t have an account? <Link href="/driver/register" className="text-blue-600 dark:text-blue-400 font-bold">Register</Link>
+          </p>
+          <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-gray-400 dark:text-zinc-500 border-t border-gray-100 dark:border-zinc-800">
+            <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Privacy Policy &amp; POPIA
+            </Link>
+            <span>•</span>
+            <Link href="/manual" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Operational SOP
+            </Link>
+            <span>•</span>
+            <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Home
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   )

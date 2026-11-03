@@ -12,8 +12,50 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "SOLO | Zero-Commission E-Hailing",
-  description: "Zero-Commission E-Hailing Platform built for South Africa. Connecting riders directly with verified drivers.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://solo-lemon.vercel.app'),
+  title: {
+    default: "SOLO | Zero-Commission E-Hailing Platform",
+    template: "%s | SOLO",
+  },
+  description: "Zero-Commission E-Hailing Platform built for South Africa. Connecting riders directly with verified drivers with 100% fare retention.",
+  keywords: [
+    "e-hailing",
+    "South Africa",
+    "zero commission",
+    "rideshare",
+    "meter taxi",
+    "fleet management",
+    "verified drivers",
+    "SOLO",
+    "Kimberley",
+    "Johannesburg",
+    "Cape Town",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "SOLO | Zero-Commission E-Hailing Platform",
+    description: "South Africa's first true zero-commission mobility platform. Drivers keep 100% of their fare. Riders pay fair, transparent rates.",
+    url: "https://solo-lemon.vercel.app",
+    siteName: "SOLO",
+    locale: "en_ZA",
+    type: "website",
+    images: [
+      {
+        url: "/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "SOLO Zero-Commission E-Hailing",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "SOLO | Zero-Commission E-Hailing Platform",
+    description: "South Africa's first true zero-commission mobility platform. Drivers keep 100% of their fare.",
+    images: ["/icon-512.png"],
+  },
   manifest: "/manifest.json",
   icons: {
     icon: [

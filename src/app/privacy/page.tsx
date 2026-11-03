@@ -4,6 +4,17 @@ import { ShieldCheck, ArrowLeft, Mail, FileText, Lock, UserX } from "lucide-reac
 export const metadata = {
   title: "Privacy Policy & POPIA Statement | SOLO",
   description: "Official Privacy Policy and POPIA statutory compliance disclosure for the SOLO Zero-Commission E-Hailing Platform by Boraine Tech (Pty) Ltd.",
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title: "Privacy Policy & POPIA Statement | SOLO",
+    description: "Protection of Personal Information Act (POPIA Act 4 of 2013) compliance, data minimization, operator rights, and telemetry governance by Boraine Tech (Pty) Ltd.",
+    url: "https://solo-lemon.vercel.app/privacy",
+    siteName: "SOLO",
+    locale: "en_ZA",
+    type: "article",
+  },
 };
 
 export default function PrivacyPolicyPage() {

@@ -32,6 +32,7 @@ import {
   Check,
   Lock,
   RotateCcw,
+  AlertCircle,
 } from "lucide-react";
 import {
   FleetProfile,
@@ -91,6 +92,9 @@ export default function FleetPage() {
   const [regAccountNumber, setRegAccountNumber] = useState("");
   const [regBranchCode, setRegBranchCode] = useState("250655");
   const [regEstimatedVehicles, setRegEstimatedVehicles] = useState(5);
+  const [regPopiaConsent, setRegPopiaConsent] = useState(false);
+  const [showBankDetails, setShowBankDetails] = useState(false);
+  const [showSavingsBreakdown, setShowSavingsBreakdown] = useState(false);
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
 
@@ -201,6 +205,9 @@ export default function FleetPage() {
     setRegAccountNumber("");
     setRegBranchCode("250655");
     setRegEstimatedVehicles(5);
+    setRegPopiaConsent(false);
+    setShowBankDetails(false);
+    setShowSavingsBreakdown(false);
     setRegError(null);
   };
 
@@ -218,6 +225,8 @@ export default function FleetPage() {
     setRegAccountNumber("62948201948");
     setRegBranchCode("250655");
     setRegEstimatedVehicles(5);
+    setRegPopiaConsent(true);
+    setShowBankDetails(true);
     setRegError(null);
   };
 
@@ -228,6 +237,11 @@ export default function FleetPage() {
 
     if (!regCompanyName.trim() || !regContactPerson.trim() || !regEmail.trim() || !regPhone.trim()) {
       setRegError("Please complete company name, contact person, email, and mobile number.");
+      return;
+    }
+
+    if (!regPopiaConsent) {
+      setRegError("You must review and accept the POPIA Privacy Policy and Terms of Service to register.");
       return;
     }
 
@@ -690,10 +704,16 @@ export default function FleetPage() {
 
           {/* Form: Register New Fleet */}
           {authMode === "register" && (
-            <form onSubmit={handleRegisterFleet} className="space-y-4 text-xs">
+            <form onSubmit={handleRegisterFleet} className="space-y-4 text-xs" noValidate={false}>
               {regError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-semibold">
-                  {regError}
+                <div
+                  id="fleet-reg-error"
+                  role="alert"
+                  aria-live="polite"
+                  className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-semibold flex items-start gap-2"
+                >
+                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-500" />
+                  <span>{regError}</span>
                 </div>
               )}
 
@@ -739,58 +759,85 @@ export default function FleetPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Company / Entity Name *</label>
+                    <label htmlFor="fleet-reg-company-name" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      Company / Entity Name <span className="text-red-500">*</span>
+                    </label>
                     <input
+                      id="fleet-reg-company-name"
                       type="text"
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(regError && !regCompanyName.trim())}
+                      aria-describedby={regError ? "fleet-reg-error" : undefined}
                       value={regCompanyName}
                       onChange={(e) => setRegCompanyName(e.target.value)}
                       placeholder="e.g. Mzansi Fleet Partners (Pty) Ltd"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl outline-none transition"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Contact Person (Manager) *</label>
+                    <label htmlFor="fleet-reg-contact-person" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      Contact Person (Manager) <span className="text-red-500">*</span>
+                    </label>
                     <input
+                      id="fleet-reg-contact-person"
                       type="text"
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(regError && !regContactPerson.trim())}
+                      aria-describedby={regError ? "fleet-reg-error" : undefined}
                       value={regContactPerson}
                       onChange={(e) => setRegContactPerson(e.target.value)}
                       placeholder="e.g. Kagiso Molefe"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl outline-none transition"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Company Email *</label>
+                    <label htmlFor="fleet-reg-email" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      Company Email <span className="text-red-500">*</span>
+                    </label>
                     <input
+                      id="fleet-reg-email"
                       type="email"
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(regError && !regEmail.trim())}
+                      aria-describedby={regError ? "fleet-reg-error" : undefined}
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       placeholder="fleet@company.co.za"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl outline-none transition"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Mobile / WhatsApp *</label>
+                    <label htmlFor="fleet-reg-phone" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      Mobile / WhatsApp <span className="text-red-500">*</span>
+                    </label>
                     <input
+                      id="fleet-reg-phone"
                       type="tel"
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(regError && !regPhone.trim())}
+                      aria-describedby={regError ? "fleet-reg-error" : undefined}
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       placeholder="+27 82 123 4567"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl outline-none transition"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Operating City</label>
+                    <label htmlFor="fleet-reg-city" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      Primary Operating City
+                    </label>
                     <select
+                      id="fleet-reg-city"
                       value={regCity}
                       onChange={(e) => setRegCity(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl outline-none transition"
                     >
                       <option value="Johannesburg">Johannesburg / Gauteng</option>
                       <option value="Pretoria">Pretoria / Tshwane</option>
@@ -805,120 +852,151 @@ export default function FleetPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">CIPRO / CIPC Registration No. (Optional)</label>
+                    <label htmlFor="fleet-reg-cipro" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      CIPC Company Reg. No. <span className="text-xs text-gray-400 font-normal">(Optional for Verification)</span>
+                    </label>
                     <input
+                      id="fleet-reg-cipro"
                       type="text"
                       value={regCipro}
                       onChange={(e) => setRegCipro(e.target.value)}
                       placeholder="2023/123456/07"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl font-mono outline-none transition"
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">SARS VAT Number (Optional for Tax Invoice)</label>
+                    <label htmlFor="fleet-reg-vat" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                      SARS VAT Number <span className="text-xs text-gray-400 font-normal">(Optional for Tax Invoicing)</span>
+                    </label>
                     <input
+                      id="fleet-reg-vat"
                       type="text"
                       value={regVat}
                       onChange={(e) => setRegVat(e.target.value)}
                       placeholder="4991238910"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl font-mono outline-none transition"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Settlement Bank Details */}
-              <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+              {/* Data Minimization: Settlement Bank Details (Optional & Collapsed by Default) */}
+              <div className="pt-3 border-t border-gray-100 dark:border-zinc-800 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <CreditCard size={15} className="text-emerald-500" />
-                    2. Speedpoint Settlement Banking (For Digital Card Fares)
-                  </h4>
+                    <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                      2. Speedpoint Settlement Banking
+                    </h4>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400">
+                      Optional
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setRegAccountHolder("");
-                      setRegAccountNumber("");
-                      setRegBranchCode("250655");
-                    }}
-                    className="text-[11px] text-gray-400 hover:text-red-500 transition inline-flex items-center gap-1 cursor-pointer"
-                    title="Clear banking fields"
+                    onClick={() => setShowBankDetails(!showBankDetails)}
+                    className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
                   >
-                    <RotateCcw size={11} /> Clear Bank
+                    {showBankDetails ? "Hide Banking" : "+ Add Banking (Optional)"}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Settlement Bank</label>
-                    <select
-                      value={regBankName}
-                      onChange={(e) => setRegBankName(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
-                    >
-                      <option value="First National Bank (FNB)">First National Bank (FNB)</option>
-                      <option value="Standard Bank">Standard Bank</option>
-                      <option value="Capitec Bank">Capitec Bank</option>
-                      <option value="Nedbank">Nedbank</option>
-                      <option value="ABSA Bank">ABSA Bank</option>
-                      <option value="Investec Bank">Investec Bank</option>
-                      <option value="TymeBank">TymeBank</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Account Holder Name</label>
-                    <input
-                      type="text"
-                      value={regAccountHolder}
-                      onChange={(e) => setRegAccountHolder(e.target.value)}
-                      placeholder="Matching company bank account"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Account Number</label>
-                    <input
-                      type="text"
-                      value={regAccountNumber}
-                      onChange={(e) => setRegAccountNumber(e.target.value)}
-                      placeholder="62849102948"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
-                    />
+                <p className="text-[11px] text-gray-500 dark:text-zinc-400 leading-relaxed">
+                  <strong>Data Minimization Notice:</strong> Banking details are never required to explore the platform or activate your 7-day trial. Only provide this if you wish to record bank settlement details for driver cash/speedpoint remittances. You can add or modify this anytime in Fleet Settings.
+                </p>
+
+                {showBankDetails && (
+                  <div className="p-3.5 bg-gray-50/80 dark:bg-zinc-800/40 rounded-2xl border border-gray-200/80 dark:border-zinc-700/60 space-y-3 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="fleet-reg-bank-name" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                          Settlement Bank
+                        </label>
+                        <select
+                          id="fleet-reg-bank-name"
+                          value={regBankName}
+                          onChange={(e) => setRegBankName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                        >
+                          <option value="First National Bank (FNB)">First National Bank (FNB)</option>
+                          <option value="Standard Bank">Standard Bank</option>
+                          <option value="Capitec Bank">Capitec Bank</option>
+                          <option value="Nedbank">Nedbank</option>
+                          <option value="ABSA Bank">ABSA Bank</option>
+                          <option value="Investec Bank">Investec Bank</option>
+                          <option value="TymeBank">TymeBank</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="fleet-reg-account-holder" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                          Account Holder Name
+                        </label>
+                        <input
+                          id="fleet-reg-account-holder"
+                          type="text"
+                          value={regAccountHolder}
+                          onChange={(e) => setRegAccountHolder(e.target.value)}
+                          placeholder="Matching company bank account"
+                          className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="fleet-reg-account-number" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                          Account Number
+                        </label>
+                        <input
+                          id="fleet-reg-account-number"
+                          type="text"
+                          value={regAccountNumber}
+                          onChange={(e) => setRegAccountNumber(e.target.value)}
+                          placeholder="62849102948"
+                          className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="fleet-reg-branch-code" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                          Universal Branch Code
+                        </label>
+                        <input
+                          id="fleet-reg-branch-code"
+                          type="text"
+                          value={regBranchCode}
+                          onChange={(e) => setRegBranchCode(e.target.value)}
+                          placeholder="250655"
+                          className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Universal Branch Code</label>
-                    <input
-                      type="text"
-                      value={regBranchCode}
-                      onChange={(e) => setRegBranchCode(e.target.value)}
-                      placeholder="250655"
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-mono"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Estimated Fleet Size & Pricing Calculator */}
+              {/* Substantiated Fleet Pricing Calculator */}
               <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">3. Fleet Size & Monthly SaaS Calculator</h4>
+                  <label htmlFor="fleet-reg-vehicles-slider" className="font-extrabold text-sm text-gray-900 dark:text-white block cursor-pointer">
+                    3. Fleet Size &amp; Monthly SaaS Calculator
+                  </label>
                   <span className="font-bold text-purple-600 dark:text-purple-400">
                     {regEstimatedVehicles} Vehicles
                   </span>
                 </div>
 
                 <input
+                  id="fleet-reg-vehicles-slider"
                   type="range"
                   min="1"
                   max="30"
+                  aria-label="Estimated Fleet Size Slider"
                   value={regEstimatedVehicles}
                   onChange={(e) => setRegEstimatedVehicles(Number(e.target.value))}
                   className="w-full accent-purple-600 cursor-pointer"
                 />
 
-                <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 rounded-2xl border border-purple-200/60 dark:border-purple-800/40 space-y-1.5">
+                <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 rounded-2xl border border-purple-200/60 dark:border-purple-800/40 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-zinc-400">Base Operations Hub License:</span>
                     <strong className="text-gray-900 dark:text-white">R770 / month</strong>
@@ -933,10 +1011,82 @@ export default function FleetPage() {
                       R{registrationBillingPreview.subtotalZar.toLocaleString()} / mo
                     </span>
                   </div>
-                  <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 pt-0.5">
-                    <CheckCircle2 size={12} />
-                    Saves approx. +R{registrationBillingPreview.savingsVsUberBoltZar.toLocaleString()}/mo vs 25% Uber/Bolt take-rate!
+
+                  <div className="flex items-center justify-between text-xs text-gray-600 dark:text-zinc-400">
+                    <span>15% South African VAT:</span>
+                    <span>R{registrationBillingPreview.vatAmountZar.toLocaleString()} / mo</span>
                   </div>
+                  <div className="flex items-center justify-between text-xs font-semibold text-gray-800 dark:text-zinc-200">
+                    <span>Total Inclusive of VAT:</span>
+                    <span>R{registrationBillingPreview.totalMonthlyZar.toLocaleString()} / mo</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-800/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={13} />
+                        Estimated Savings: +R{registrationBillingPreview.savingsVsUberBoltZar.toLocaleString()}/mo vs 25% Uber/Bolt take-rate!
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSavingsBreakdown(!showSavingsBreakdown)}
+                        className="text-[10px] text-purple-700 dark:text-purple-300 underline font-semibold cursor-pointer"
+                      >
+                        {showSavingsBreakdown ? "Hide Breakdown" : "How is this calculated?"}
+                      </button>
+                    </div>
+
+                    {showSavingsBreakdown && (
+                      <div className="p-3 bg-white/80 dark:bg-zinc-900/80 rounded-xl text-[11px] text-gray-700 dark:text-zinc-300 space-y-1.5 border border-purple-200 dark:border-purple-900/50">
+                        <p className="font-bold text-gray-900 dark:text-white">Substantiation of Estimated Savings:</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                          <li><strong>Turnover Benchmark:</strong> Assumes a standard metropolitan full-time gross turnover of R25,000 per vehicle per month in South Africa (based on 22–26 working days).</li>
+                          <li><strong>Legacy Aggregator Commission:</strong> At a 25% take-rate (Uber/Bolt standard commission), aggregators deduct R6,250/car/mo. For {regEstimatedVehicles} vehicles, deductions equal <strong>R{(regEstimatedVehicles * 6250).toLocaleString()}/month</strong>.</li>
+                          <li><strong>SOLO Pure SaaS Model:</strong> SOLO charges a flat fee of R770 + ({regEstimatedVehicles} × R499) = <strong>R{registrationBillingPreview.subtotalZar.toLocaleString()}/month</strong>. Drivers and fleet partners retain 100% of rider fares with 0% trip commission.</li>
+                          <li><strong>Net Difference:</strong> R{(regEstimatedVehicles * 6250).toLocaleString()} (legacy deductions) − R{registrationBillingPreview.subtotalZar.toLocaleString()} (SOLO SaaS fee) = <strong>approx. R{registrationBillingPreview.savingsVsUberBoltZar.toLocaleString()} preserved monthly</strong>.</li>
+                        </ul>
+                        <p className="text-[10px] text-gray-500 dark:text-zinc-400 pt-1 border-t border-gray-100 dark:border-zinc-800">
+                          * <strong>Operational Qualification:</strong> Represents platform software fee differentials only. Actual net profits depend on driver operating hours, ride volume, fuel/energy costs, vehicle maintenance, and merchant transaction fees (~2.5% to 3.0% standard acquiring bank fee on in-vehicle card terminals like Yoco/Speedpoints, settled directly to your bank account).
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Privacy Disclosure & POPIA Section */}
+              <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/40 rounded-2xl border border-blue-200/60 dark:border-blue-800/40 space-y-2.5 text-xs">
+                <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200 font-extrabold text-xs">
+                  <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span>Privacy Notice &amp; POPIA Compliance (Act No. 4 of 2013)</span>
+                </div>
+                <p className="text-[11px] text-blue-900/80 dark:text-blue-300/80 leading-relaxed">
+                  <strong>Responsible Party:</strong> Boraine Tech (Pty) Ltd collects and processes your company details, vehicle inventory, and manager contact information solely to provision your fleet software account, enable dispatch matching, generate SARS-compliant tax invoices, and maintain regulatory dispatch logs required under the National Land Transport Act (Act No. 5 of 2009).
+                </p>
+                <p className="text-[11px] text-blue-900/80 dark:text-blue-300/80 leading-relaxed">
+                  Subscription card billing is tokenized securely via <strong>Paystack (PCI-DSS Level 1 certified)</strong>. We never sell, rent, or commercialize your fleet telematics or driver data. You retain the right to access, rectify, or request erasure of your data at any time by contacting our Information Officer at <a href="mailto:privacy@solo-app.co.za" className="underline font-bold">privacy@solo-app.co.za</a>.
+                </p>
+
+                <div className="pt-2 border-t border-blue-200/60 dark:border-blue-800/40">
+                  <label htmlFor="fleet-reg-popia-consent" className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      id="fleet-reg-popia-consent"
+                      type="checkbox"
+                      required
+                      aria-required="true"
+                      aria-invalid={Boolean(regError && !regPopiaConsent)}
+                      aria-describedby={regError ? "fleet-reg-error" : undefined}
+                      checked={regPopiaConsent}
+                      onChange={(e) => setRegPopiaConsent(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-medium text-gray-800 dark:text-zinc-200">
+                      I confirm that I am authorized to register this fleet entity and agree to SOLO&apos;s{" "}
+                      <Link href="/manual" className="underline font-bold text-purple-600 dark:text-purple-400">Terms of Service</Link>{" "}
+                      and{" "}
+                      <Link href="/privacy" className="underline font-bold text-purple-600 dark:text-purple-400">POPIA Privacy Policy</Link>.
+                    </span>
+                  </label>
                 </div>
               </div>
 
@@ -958,7 +1108,8 @@ export default function FleetPage() {
                 <button
                   type="submit"
                   disabled={regSubmitting}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
+                  aria-busy={regSubmitting}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {regSubmitting ? (
                     <span>Registering Fleet Partner...</span>
@@ -975,30 +1126,40 @@ export default function FleetPage() {
 
           {/* Form: Sign In to Existing Fleet */}
           {authMode === "login" && (
-            <form onSubmit={handleLoginFleet} className="space-y-4 text-xs">
+            <form onSubmit={handleLoginFleet} className="space-y-4 text-xs" noValidate={false}>
               {loginError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-semibold">
-                  {loginError}
+                <div
+                  id="fleet-login-error"
+                  role="alert"
+                  aria-live="polite"
+                  className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-semibold flex items-start gap-2"
+                >
+                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-500" />
+                  <span>{loginError}</span>
                 </div>
               )}
 
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
-                  Registered Company Email, Mobile, or Name
+                <label htmlFor="fleet-login-identifier" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                  Registered Company Email, Mobile, or Name <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="fleet-login-identifier"
                   type="text"
                   required
+                  aria-required="true"
+                  aria-invalid={Boolean(loginError)}
+                  aria-describedby={loginError ? "fleet-login-error" : undefined}
                   value={loginIdentifier}
                   onChange={(e) => setLoginIdentifier(e.target.value)}
                   placeholder="e.g. fleet@apexlogistics.co.za or +27 82 555 0199"
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl text-xs md:text-sm"
+                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:border-purple-500 rounded-xl text-xs md:text-sm outline-none transition"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Access Fleet Dashboard</span>
                 <ArrowRight size={16} />
@@ -1650,6 +1811,40 @@ export default function FleetPage() {
               );
             })}
           </div>
+
+          {/* Qualified Legal & Statutory Compliance Disclosures */}
+          <div className="p-5 bg-gray-50 dark:bg-zinc-950/80 rounded-2xl border border-gray-200 dark:border-zinc-800 space-y-3 text-xs">
+            <h3 className="font-extrabold text-sm text-gray-900 dark:text-white flex items-center gap-2">
+              <ShieldCheck className="text-emerald-500" size={16} />
+              <span>Statutory Compliance &amp; Legal Regulatory Disclosures</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600 dark:text-zinc-400 text-xs leading-relaxed">
+              <div className="space-y-1.5">
+                <p className="font-bold text-gray-900 dark:text-white">1. National Land Transport Act (Act No. 5 of 2009)</p>
+                <p>
+                  Fleet partners and vehicle owners operate as independent public transport providers. Securing and maintaining valid operating licences issued by the Provincial Regulatory Entity (PRE) or municipal transport planning authority remains the sole legal responsibility of the operator. SOLO provides digital communications and dispatch matching technology and does not act as a common carrier or transport operator.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-bold text-gray-900 dark:text-white">2. Driver PrDP &amp; Vehicle Roadworthiness (CoF)</p>
+                <p>
+                  Every dispatched vehicle must hold an authentic, unexpired Certificate of Fitness (CoF / Roadworthy) and annual municipal licence disc. Dispatched drivers must hold a valid South African Driver&apos;s Licence with Professional Driving Permit (PrDP Category P - Passengers) endorsed in terms of the National Road Traffic Act (Act No. 93 of 1996).
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-bold text-gray-900 dark:text-white">3. Taxation &amp; SARS Statutory Obligations</p>
+                <p>
+                  Fleet partners are independent legal entities responsible for their own provisional tax, corporate income tax, driver shift remuneration, and Value-Added Tax (VAT Act No. 89 of 1991). SOLO issues official monthly SaaS software tax invoices with 15% VAT for subscription fees.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="font-bold text-gray-900 dark:text-white">4. Reserve Bank (SARB) Direct In-Car Settlement</p>
+                <p>
+                  In compliance with South African Reserve Bank National Payment System directives, all rider fares are paid directly to drivers in the vehicle via legal tender Rand banknotes or acquiring bank speedpoints (e.g. Yoco, iKhokha, Nedbank). SOLO holds 0.0% passenger funds in platform escrow.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1854,10 +2049,12 @@ export default function FleetPage() {
             <form onSubmit={handleAddVehicle} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Make</label>
+                  <label htmlFor="fleet-add-veh-make" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Make <span className="text-red-500">*</span></label>
                   <input
+                    id="fleet-add-veh-make"
                     type="text"
                     required
+                    aria-required="true"
                     value={newVehMake}
                     onChange={(e) => setNewVehMake(e.target.value)}
                     placeholder="Toyota, Suzuki, etc."
@@ -1865,10 +2062,12 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Model</label>
+                  <label htmlFor="fleet-add-veh-model" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Model <span className="text-red-500">*</span></label>
                   <input
+                    id="fleet-add-veh-model"
                     type="text"
                     required
+                    aria-required="true"
                     value={newVehModel}
                     onChange={(e) => setNewVehModel(e.target.value)}
                     placeholder="Corolla Quest, Ertiga, etc."
@@ -1879,8 +2078,9 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Year</label>
+                  <label htmlFor="fleet-add-veh-year" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Year</label>
                   <input
+                    id="fleet-add-veh-year"
                     type="number"
                     value={newVehYear}
                     onChange={(e) => setNewVehYear(Number(e.target.value))}
@@ -1888,8 +2088,9 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Color</label>
+                  <label htmlFor="fleet-add-veh-color" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Color</label>
                   <input
+                    id="fleet-add-veh-color"
                     type="text"
                     value={newVehColor}
                     onChange={(e) => setNewVehColor(e.target.value)}
@@ -1898,10 +2099,12 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">License Plate</label>
+                  <label htmlFor="fleet-add-veh-plate" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">License Plate <span className="text-red-500">*</span></label>
                   <input
+                    id="fleet-add-veh-plate"
                     type="text"
                     required
+                    aria-required="true"
                     value={newVehPlate}
                     onChange={(e) => setNewVehPlate(e.target.value)}
                     placeholder="CA 123-456"
@@ -1911,9 +2114,10 @@ export default function FleetPage() {
               </div>
 
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">In-Vehicle Speedpoint Device</label>
+                <label htmlFor="fleet-add-veh-speedpoint" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">In-Vehicle Speedpoint Device</label>
                 <div className="grid grid-cols-2 gap-2">
                   <select
+                    id="fleet-add-veh-speedpoint"
                     value={newVehSpeedpoint}
                     onChange={(e) => setNewVehSpeedpoint(e.target.value as any)}
                     className="px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
@@ -1925,7 +2129,9 @@ export default function FleetPage() {
                     <option value="cash_only">Cash Only</option>
                   </select>
                   <input
+                    id="fleet-add-veh-terminal"
                     type="text"
+                    aria-label="Speedpoint Terminal / Merchant ID"
                     value={newVehTerminalId}
                     onChange={(e) => setNewVehTerminalId(e.target.value)}
                     placeholder="Terminal / Merchant ID"
@@ -1936,8 +2142,9 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">CoF (Roadworthy) Expiry</label>
+                  <label htmlFor="fleet-add-veh-cof" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">CoF (Roadworthy) Expiry</label>
                   <input
+                    id="fleet-add-veh-cof"
                     type="date"
                     value={newVehCoFExpiry}
                     onChange={(e) => setNewVehCoFExpiry(e.target.value)}
@@ -1945,8 +2152,9 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">License Disc Expiry</label>
+                  <label htmlFor="fleet-add-veh-disc" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">License Disc Expiry</label>
                   <input
+                    id="fleet-add-veh-disc"
                     type="date"
                     value={newVehDiscExpiry}
                     onChange={(e) => setNewVehDiscExpiry(e.target.value)}
@@ -2012,10 +2220,14 @@ export default function FleetPage() {
 
             <form onSubmit={handleAssignDriver} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Driver Full Name</label>
+                <label htmlFor="fleet-assign-driver-name" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                  Driver Full Name <span className="text-red-500">*</span>
+                </label>
                 <input
+                  id="fleet-assign-driver-name"
                   type="text"
                   required
+                  aria-required="true"
                   value={assignDriverName}
                   onChange={(e) => setAssignDriverName(e.target.value)}
                   placeholder="e.g. Sipho Mthembu"
@@ -2024,10 +2236,14 @@ export default function FleetPage() {
               </div>
 
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Driver Phone (WhatsApp)</label>
+                <label htmlFor="fleet-assign-driver-phone" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                  Driver Phone (WhatsApp) <span className="text-red-500">*</span>
+                </label>
                 <input
+                  id="fleet-assign-driver-phone"
                   type="tel"
                   required
+                  aria-required="true"
                   value={assignDriverPhone}
                   onChange={(e) => setAssignDriverPhone(e.target.value)}
                   placeholder="+27 82 123 4567"
@@ -2037,8 +2253,9 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Shift Type</label>
+                  <label htmlFor="fleet-assign-shift-type" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Shift Type</label>
                   <select
+                    id="fleet-assign-shift-type"
                     value={assignShiftType}
                     onChange={(e) => setAssignShiftType(e.target.value as any)}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl"
@@ -2050,8 +2267,9 @@ export default function FleetPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Weekly Rental (ZAR)</label>
+                  <label htmlFor="fleet-assign-weekly-rent" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Weekly Rental (ZAR)</label>
                   <input
+                    id="fleet-assign-weekly-rent"
                     type="number"
                     value={assignWeeklyRent}
                     onChange={(e) => setAssignWeeklyRent(Number(e.target.value))}
@@ -2069,13 +2287,13 @@ export default function FleetPage() {
                 <button
                   type="button"
                   onClick={() => setIsAssignDriverOpen(false)}
-                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold rounded-xl"
+                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-xs"
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
                 >
                   Confirm Pairing
                 </button>
@@ -2103,8 +2321,11 @@ export default function FleetPage() {
 
             <form onSubmit={handleRecordAudit} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Select Fleet Vehicle</label>
+                <label htmlFor="fleet-audit-vehicle" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                  Select Fleet Vehicle <span className="text-red-500">*</span>
+                </label>
                 <select
+                  id="fleet-audit-vehicle"
                   value={auditVehId}
                   onChange={(e) => {
                     setAuditVehId(e.target.value);
@@ -2122,8 +2343,11 @@ export default function FleetPage() {
               </div>
 
               <div>
-                <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Driver Name</label>
+                <label htmlFor="fleet-audit-driver-name" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                  Driver Name
+                </label>
                 <input
+                  id="fleet-audit-driver-name"
                   type="text"
                   value={auditDriverName}
                   onChange={(e) => setAuditDriverName(e.target.value)}
@@ -2134,18 +2358,25 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Total Gross Fares (ZAR)</label>
+                  <label htmlFor="fleet-audit-gross-zar" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Total Gross Fares (ZAR) <span className="text-red-500">*</span>
+                  </label>
                   <input
+                    id="fleet-audit-gross-zar"
                     type="number"
                     required
+                    aria-required="true"
                     value={auditGrossZar}
                     onChange={(e) => setAuditGrossZar(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Trips Completed</label>
+                  <label htmlFor="fleet-audit-trips" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Trips Completed
+                  </label>
                   <input
+                    id="fleet-audit-trips"
                     type="number"
                     value={auditTrips}
                     onChange={(e) => setAuditTrips(Number(e.target.value))}
@@ -2156,8 +2387,11 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Cash In Hand (ZAR)</label>
+                  <label htmlFor="fleet-audit-cash-zar" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Cash In Hand (ZAR)
+                  </label>
                   <input
+                    id="fleet-audit-cash-zar"
                     type="number"
                     value={auditCashZar}
                     onChange={(e) => setAuditCashZar(Number(e.target.value))}
@@ -2165,8 +2399,11 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Speedpoint Card Swipes (ZAR)</label>
+                  <label htmlFor="fleet-audit-speedpoint-zar" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Speedpoint Card Swipes (ZAR)
+                  </label>
                   <input
+                    id="fleet-audit-speedpoint-zar"
                     type="number"
                     value={auditSpeedpointZar}
                     onChange={(e) => setAuditSpeedpointZar(Number(e.target.value))}
@@ -2177,8 +2414,11 @@ export default function FleetPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Distance Driven (km)</label>
+                  <label htmlFor="fleet-audit-distance" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Distance Driven (km)
+                  </label>
                   <input
+                    id="fleet-audit-distance"
                     type="number"
                     value={auditDistance}
                     onChange={(e) => setAuditDistance(Number(e.target.value))}
@@ -2186,8 +2426,11 @@ export default function FleetPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">Shift Duration (hours)</label>
+                  <label htmlFor="fleet-audit-hours" className="font-bold text-gray-700 dark:text-zinc-300 block mb-1">
+                    Shift Duration (hours)
+                  </label>
                   <input
+                    id="fleet-audit-hours"
                     type="number"
                     value={auditHours}
                     onChange={(e) => setAuditHours(Number(e.target.value))}
@@ -2200,13 +2443,13 @@ export default function FleetPage() {
                 <button
                   type="button"
                   onClick={() => setIsRecordAuditOpen(false)}
-                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold rounded-xl"
+                  className="px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 font-bold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-xs cursor-pointer"
                 >
                   Save Shift Record
                 </button>

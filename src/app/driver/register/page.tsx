@@ -782,7 +782,12 @@ export default function DriverRegistration() {
         {/* Form Steps */}
         <div className="p-6 sm:p-8">
           {submitError && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+            <div
+              id="driver-reg-error"
+              role="alert"
+              aria-live="polite"
+              className="mb-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2"
+            >
               <AlertCircle size={18} className="shrink-0" />
               <span>{submitError}</span>
             </div>
@@ -790,23 +795,64 @@ export default function DriverRegistration() {
 
           {/* STEP 1: Personal Info */}
           {step === 1 && (
-            <form onSubmit={handleStep1Next} autoComplete="off" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <form onSubmit={handleStep1Next} autoComplete="off" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300" noValidate={false}>
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
                 <User className="text-blue-500" /> Personal Details
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input required type="text" name="driver_reg_fullname" autoComplete="off" autoCorrect="off" spellCheck={false} value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Sipho Khumalo" />
+                <label htmlFor="driver-reg-fullname" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="driver-reg-fullname"
+                  required
+                  aria-required="true"
+                  aria-invalid={Boolean(submitError && !fullName.trim())}
+                  aria-describedby={submitError ? "driver-reg-error" : undefined}
+                  type="text"
+                  name="driver_reg_fullname"
+                  autoComplete="name"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                  placeholder="Sipho Khumalo"
+                />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email Address</label>
-                <input required type="email" name="driver_reg_email" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="sipho@example.co.za" />
+                <label htmlFor="driver-reg-email" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="driver-reg-email"
+                  required
+                  aria-required="true"
+                  aria-invalid={Boolean(submitError && !email.trim())}
+                  aria-describedby={submitError ? "driver-reg-error" : undefined}
+                  type="email"
+                  name="driver_reg_email"
+                  autoComplete="email"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                  placeholder="sipho@example.co.za"
+                />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Create Password</label>
+                <label htmlFor="driver-reg-password" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Create Password <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <input
+                    id="driver-reg-password"
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(submitError && password.length < 6)}
+                    aria-describedby={submitError ? "driver-reg-error" : undefined}
                     type={showPassword ? 'text' : 'password'}
                     name="driver_reg_password"
                     autoComplete="new-password"
@@ -819,7 +865,7 @@ export default function DriverRegistration() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition p-1"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition p-1 cursor-pointer"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -828,10 +874,29 @@ export default function DriverRegistration() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number (South Africa)</label>
-                <input required type="tel" name="driver_reg_phone" autoComplete="off" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="+27 82 123 4567" />
+                <label htmlFor="driver-reg-phone" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Phone Number (South Africa) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="driver-reg-phone"
+                  required
+                  aria-required="true"
+                  aria-invalid={Boolean(submitError && !phone.trim())}
+                  aria-describedby={submitError ? "driver-reg-error" : undefined}
+                  type="tel"
+                  name="driver_reg_phone"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                  placeholder="+27 82 123 4567"
+                />
               </div>
-              <button type="submit" disabled={isCheckingDuplicate} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
+              <button
+                type="submit"
+                disabled={isCheckingDuplicate}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20 cursor-pointer"
+              >
                 {isCheckingDuplicate ? 'Checking Availability...' : 'Continue to Vehicle & Payment Setup'} <ChevronRight size={18} />
               </button>
             </form>
@@ -839,25 +904,51 @@ export default function DriverRegistration() {
 
           {/* STEP 2: Vehicle & Speedpoint */}
           {step === 2 && (
-            <form onSubmit={handleStep2Next} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+            <form onSubmit={handleStep2Next} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300" noValidate={false}>
               <div className="flex items-center gap-3 mb-6 text-xl font-bold border-b border-gray-100 dark:border-gray-800 pb-4">
                 <Car className="text-blue-500" /> Vehicle &amp; Payment Equipment
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle Make</label>
-                  <input required type="text" value={vehicleMake} onChange={e => setVehicleMake(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Toyota" />
+                  <label htmlFor="driver-reg-make" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Vehicle Make <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="driver-reg-make"
+                    required
+                    aria-required="true"
+                    type="text"
+                    value={vehicleMake}
+                    onChange={e => setVehicleMake(e.target.value)}
+                    className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                    placeholder="Toyota"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle Model</label>
-                  <input required type="text" value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Corolla Quest" />
+                  <label htmlFor="driver-reg-model" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Vehicle Model <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="driver-reg-model"
+                    required
+                    aria-required="true"
+                    type="text"
+                    value={vehicleModel}
+                    onChange={e => setVehicleModel(e.target.value)}
+                    className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                    placeholder="Corolla Quest"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Model Year</label>
+                  <label htmlFor="driver-reg-year" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Model Year <span className="text-red-500">*</span>
+                  </label>
                   <input 
+                    id="driver-reg-year"
                     required 
+                    aria-required="true"
                     type="number" 
                     min="2000" 
                     max={new Date().getFullYear() + 1} 
@@ -868,9 +959,13 @@ export default function DriverRegistration() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle Color</label>
+                  <label htmlFor="driver-reg-color" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Vehicle Color <span className="text-red-500">*</span>
+                  </label>
                   <input 
+                    id="driver-reg-color"
                     required 
+                    aria-required="true"
                     type="text" 
                     value={vehicleColor} 
                     onChange={e => setVehicleColor(e.target.value)} 
@@ -880,12 +975,34 @@ export default function DriverRegistration() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">License Plate Number</label>
-                <input required type="text" value={licensePlate} onChange={e => setLicensePlate(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm uppercase" placeholder="CA 123-456" />
+                <label htmlFor="driver-reg-plate" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  License Plate Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="driver-reg-plate"
+                  required
+                  aria-required="true"
+                  type="text"
+                  value={licensePlate}
+                  onChange={e => setLicensePlate(e.target.value)}
+                  className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm uppercase"
+                  placeholder="CA 123-456"
+                />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">PrDP Number</label>
-                <input required type="text" value={prdpNumber} onChange={e => setPrdpNumber(e.target.value)} className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm" placeholder="Professional Driving Permit Number" />
+                <label htmlFor="driver-reg-prdp" className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                  PrDP Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="driver-reg-prdp"
+                  required
+                  aria-required="true"
+                  type="text"
+                  value={prdpNumber}
+                  onChange={e => setPrdpNumber(e.target.value)}
+                  className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
+                  placeholder="Professional Driving Permit Number"
+                />
               </div>
 
               {/* Mandatory Speedpoint Machine & Cash Payment Requirement Card */}
@@ -909,13 +1026,15 @@ export default function DriverRegistration() {
                   </div>
                 </div>
 
-                <label className="flex items-start gap-3 pt-2 border-t border-emerald-200/70 dark:border-emerald-800/50 cursor-pointer select-none">
+                <label htmlFor="driver-reg-speedpoint" className="flex items-start gap-3 pt-2 border-t border-emerald-200/70 dark:border-emerald-800/50 cursor-pointer select-none">
                   <input
+                    id="driver-reg-speedpoint"
                     required
+                    aria-required="true"
                     type="checkbox"
                     checked={hasSpeedpointConfirmed}
                     onChange={(e) => setHasSpeedpointConfirmed(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded accent-emerald-600 shrink-0"
+                    className="mt-0.5 w-4 h-4 rounded accent-emerald-600 shrink-0 cursor-pointer"
                   />
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-snug">
                     I confirm I have a working Speedpoint / card machine in my vehicle to accept card payments, and I also accept Cash payments from riders.
@@ -924,10 +1043,10 @@ export default function DriverRegistration() {
               </div>
 
               <div className="flex gap-4 mt-6">
-                <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition">
+                <button type="button" onClick={() => setStep(1)} className="w-1/3 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 font-bold p-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-zinc-700 transition cursor-pointer">
                   Back
                 </button>
-                <button type="submit" disabled={isCheckingDuplicate} className="w-2/3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20">
+                <button type="submit" disabled={isCheckingDuplicate} className="w-2/3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20 cursor-pointer">
                   {isCheckingDuplicate ? 'Verifying Details...' : 'Continue to KYC Documents'} <ChevronRight size={18} />
                 </button>
               </div>

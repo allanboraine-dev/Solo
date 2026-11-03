@@ -633,6 +633,24 @@ export default function RiderSupportModal({
             </div>
           )}
         </div>
+
+        {/* Modal Footer with Mandatory Compliance & Privacy Links */}
+        <div className="p-3.5 bg-gray-50 dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-zinc-400 px-6 shrink-0">
+          <div className="flex items-center gap-3">
+            <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+              Privacy &amp; POPIA
+            </Link>
+            <span>•</span>
+            <Link href="/manual" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+              Operational SOP
+            </Link>
+            <span>•</span>
+            <Link href="/lost-phone" className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2">
+              Lost Phone Recovery
+            </Link>
+          </div>
+          <span className="font-semibold text-gray-400 dark:text-zinc-500">&copy; Boraine Tech (Pty) Ltd</span>
+        </div>
       </div>
     </div>
   );

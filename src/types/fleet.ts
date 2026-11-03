@@ -118,4 +118,7 @@ export interface FleetPricingCalculation {
   vatAmountZar: number;
   totalMonthlyZar: number;
   savingsVsUberBoltZar: number; // Estimated savings vs 25% take-rate (based on R25k/mo benchmark)
+  benchmarkGrossPerVehicleZar?: number;
+  legacyTakeRatePercent?: number;
+  benchmarkLegacyCommissionZar?: number;
 }

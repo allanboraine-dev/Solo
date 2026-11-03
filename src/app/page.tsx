@@ -27,8 +27,12 @@ export default function Home() {
           <div className="flex justify-center mb-4 sm:mb-6">
             <div className="relative p-1.5 rounded-[2rem] bg-gradient-to-br from-emerald-500/40 via-teal-500/20 to-blue-600/40 shadow-2xl shadow-emerald-500/20">
               <img
-                src="/icon-512.png"
+                src="/icon-192.png"
                 alt="SOLO Official App Icon"
+                width={96}
+                height={96}
+                fetchPriority="high"
+                decoding="async"
                 className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-[1.7rem] object-cover shadow-inner border border-white/15"
               />
             </div>
@@ -104,8 +108,12 @@ export default function Home() {
               <div className="flex items-center justify-between mb-5 sm:mb-6">
                 <div className="relative p-1 rounded-[1.5rem] bg-gradient-to-br from-blue-500 via-cyan-400 to-indigo-600 shadow-xl shadow-blue-500/25 group-hover:scale-105 transition-all duration-300">
                   <img
-                    src="/rider-icon-512.png"
+                    src="/rider-icon-192.png"
                     alt="SOLO Rider Portal Icon"
+                    width={80}
+                    height={80}
+                    loading="lazy"
+                    decoding="async"
                     className="w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 rounded-[1.25rem] object-cover border border-white/20"
                   />
                 </div>
@@ -167,8 +175,12 @@ export default function Home() {
               <div className="flex items-center justify-between mb-5 sm:mb-6">
                 <div className="relative p-1 rounded-[1.5rem] bg-gradient-to-br from-emerald-500 via-teal-400 to-green-600 shadow-xl shadow-emerald-500/25 group-hover:scale-105 transition-all duration-300">
                   <img
-                    src="/driver-icon-512.png"
+                    src="/driver-icon-192.png"
                     alt="SOLO Driver Portal Icon"
+                    width={80}
+                    height={80}
+                    loading="lazy"
+                    decoding="async"
                     className="w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 rounded-[1.25rem] object-cover border border-white/20"
                   />
                 </div>
@@ -245,16 +257,39 @@ export default function Home() {
           </div>
         </div>
 
-        <footer className="pt-8 border-t border-gray-200/60 dark:border-white/10 text-center space-y-1.5">
-          <p className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-gray-600 dark:text-gray-400">
-            Designed, Built & Maintained by{" "}
-            <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
-              Boraine Tech (Pty) Ltd
-            </span>
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            &copy; {new Date().getFullYear()} Boraine Tech (Pty) Ltd • All Rights Reserved
-          </p>
+        <footer className="pt-8 border-t border-gray-200/60 dark:border-white/10 text-center space-y-4">
+          <nav aria-label="Legal and Platform Links" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-300">
+            <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-4">
+              Privacy Policy &amp; POPIA
+            </Link>
+            <Link href="/manual" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-4">
+              Operational Manual (SOP)
+            </Link>
+            <Link href="/lost-phone" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-4">
+              Lost Phone Recovery
+            </Link>
+            <Link href="/fleet" className="hover:text-purple-600 dark:hover:text-purple-400 transition underline underline-offset-4">
+              Fleet Partner Hub
+            </Link>
+            <Link href="/driver/register" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition underline underline-offset-4">
+              Driver Registration
+            </Link>
+            <Link href="/rider" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-4">
+              Rider Portal
+            </Link>
+          </nav>
+
+          <div className="space-y-1">
+            <p className="text-xs sm:text-sm font-semibold tracking-wider uppercase text-gray-600 dark:text-gray-400">
+              Designed, Built &amp; Maintained by{" "}
+              <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600">
+                Boraine Tech (Pty) Ltd
+              </span>
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              &copy; {new Date().getFullYear()} Boraine Tech (Pty) Ltd • All Rights Reserved • South Africa
+            </p>
+          </div>
         </footer>
       </main>
     </div>
