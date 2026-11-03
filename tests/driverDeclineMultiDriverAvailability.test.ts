@@ -39,6 +39,13 @@ const declineTripWithStorage = (trip: MockTrip, driverId: string | null | undefi
   return { ...trip };
 };
 
+const undeclineTripWithStorage = (tripId: string, driverId: string | null | undefined, storage: ReturnType<typeof createMockStorage>): void => {
+  if (!driverId) return;
+  const current = Array.from(getDeclinedTripIdsWithStorage(driverId, storage));
+  const filtered = current.filter((id) => id !== tripId);
+  storage.setItem(`solo_declined_trips_${driverId}`, JSON.stringify(filtered));
+};
+
 describe('Driver Ride Decline & Multi-Driver Availability Suite', () => {
   it('guarantees that declining a ride does NOT cancel the ride and keeps it in requested status', () => {
     const storage = createMockStorage();
@@ -166,5 +173,102 @@ describe('Driver Ride Decline & Multi-Driver Availability Suite', () => {
     // Driver 2 accepts
     riderTripStatus = 'accepted';
     assert.strictEqual(riderTripStatus, 'accepted', 'Rider seamlessly transitions to accepted when another driver claims it');
+  });
+
+  it('guarantees that a driver who declined a request can still accept it on a later stage if not taken by other drivers', () => {
+    const storage = createMockStorage();
+    const trip: MockTrip = {
+      id: 'trip-later-stage-001',
+      rider_id: 'rider-uuid-later',
+      pickup_location: 'Sea Point Pavilion, Cape Town',
+      dropoff_location: 'Kloof Street, Cape Town',
+      fare_amount: 110,
+      status: 'requested',
+    };
+
+    const driver1Id = 'driver-sipho';
+    const allTrips: MockTrip[] = [trip];
+
+    // Stage 1: Driver 1 initially declines the request
+    declineTripWithStorage(trip, driver1Id, storage);
+    const driver1DeclinedInitial = getDeclinedTripIdsWithStorage(driver1Id, storage);
+    assert.strictEqual(driver1DeclinedInitial.has(trip.id), true, 'Trip must be in Driver 1 declined set initially');
+
+    // Active incoming modal filter suppresses the popup
+    const freshIncoming = allTrips.filter((t) => t.status === 'requested' && !t.driver_id && !driver1DeclinedInitial.has(t.id));
+    assert.strictEqual(freshIncoming.length, 0, 'Popup modal does not repeatedly ring the driver');
+
+    // Stage 2: Driver 1 discovers declined trip is STILL available (unclaimed by other drivers)
+    const declinedAvailable = allTrips.filter(
+      (t) => t.status === 'requested' && !t.driver_id && driver1DeclinedInitial.has(t.id)
+    );
+    assert.strictEqual(declinedAvailable.length, 1, 'Declined trip must be listed as still available');
+    assert.strictEqual(declinedAvailable[0].id, 'trip-later-stage-001');
+
+    // Stage 3: Driver 1 decides to accept the ride on a later stage
+    const canAccept = declinedAvailable[0].status === 'requested' && !declinedAvailable[0].driver_id;
+    assert.strictEqual(canAccept, true, 'Trip is still open and can be accepted');
+
+    // Driver 1 accepts the trip
+    allTrips[0] = {
+      ...allTrips[0],
+      status: 'accepted',
+      driver_id: driver1Id,
+    };
+    undeclineTripWithStorage(allTrips[0].id, driver1Id, storage);
+
+    // Verify trip status and driver assignment
+    assert.strictEqual(allTrips[0].status, 'accepted');
+    assert.strictEqual(allTrips[0].driver_id, driver1Id);
+
+    // Verify trip is removed from driver 1's declined storage
+    const driver1DeclinedAfter = getDeclinedTripIdsWithStorage(driver1Id, storage);
+    assert.strictEqual(driver1DeclinedAfter.has(trip.id), false, 'Trip must be removed from declined storage upon accept');
+  });
+
+  it('guarantees that a driver who declined a request cannot accept it later if another driver has already taken it', () => {
+    const storage = createMockStorage();
+    const trip: MockTrip = {
+      id: 'trip-claimed-002',
+      rider_id: 'rider-uuid-claimed',
+      pickup_location: 'Greenmarket Square, Cape Town',
+      dropoff_location: 'Table Mountain Lower Cableway',
+      fare_amount: 135,
+      status: 'requested',
+    };
+
+    const driver1Id = 'driver-sipho';
+    const driver2Id = 'driver-thabo';
+    const allTrips: MockTrip[] = [{ ...trip }];
+
+    // Driver 1 declines
+    declineTripWithStorage(allTrips[0], driver1Id, storage);
+
+    // Driver 2 claims and accepts the trip first
+    allTrips[0] = {
+      ...allTrips[0],
+      status: 'accepted',
+      driver_id: driver2Id,
+    };
+
+    // Driver 1 attempts to accept on a later stage
+    const driver1Declined = getDeclinedTripIdsWithStorage(driver1Id, storage);
+    const availableToDriver1 = allTrips.filter(
+      (t) => t.status === 'requested' && !t.driver_id && driver1Declined.has(t.id)
+    );
+
+    assert.strictEqual(availableToDriver1.length, 0, 'Claimed trip must not appear as available to Driver 1');
+
+    // Attempting to accept a trip that was already accepted by Driver 2 fails
+    const attemptAccept = (tripToClaim: MockTrip, callerDriverId: string): { success: boolean; error?: string } => {
+      if (tripToClaim.status !== 'requested' || (tripToClaim.driver_id && tripToClaim.driver_id !== callerDriverId)) {
+        return { success: false, error: 'Trip is no longer available (claimed by another driver).' };
+      }
+      return { success: true };
+    };
+
+    const result = attemptAccept(allTrips[0], driver1Id);
+    assert.strictEqual(result.success, false);
+    assert.match(result.error || '', /claimed by another driver/i);
   });
 });

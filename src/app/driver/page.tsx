@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, getDeclinedTripIds, isTripDeclined, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -42,6 +42,9 @@ export default function DriverPage() {
   
   const [request, setRequest] = useState<MockTrip | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
+  const [declinedAvailableTrips, setDeclinedAvailableTrips] = useState<MockTrip[]>([])
+  const [acceptingTripId, setAcceptingTripId] = useState<string | null>(null)
+  const [selectedDeclinedTripId, setSelectedDeclinedTripId] = useState<string | null>(null)
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
   const activeTripRef = useRef<MockTrip | null>(null)
   const driverCoordsRef = useRef<{lat: number, lng: number} | null>(null)
@@ -328,8 +331,20 @@ export default function DriverPage() {
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
 
+      // Update declined but still available trips for this driver (unclaimed by other drivers)
+      const declinedAvailable = trips.filter(
+        t =>
+          t.status === 'requested' &&
+          !t.driver_id &&
+          declinedIds.has(t.id) &&
+          !completedIds.has(t.id) &&
+          !isTripDismissed(t.id) &&
+          !isStaleRequestedTrip(t)
+      );
+      setDeclinedAvailableTrips(declinedAvailable);
+
       if (currentActive) {
-        if (completedIds.has(currentActive.id) || declinedIds.has(currentActive.id) || isTripDismissed(currentActive.id)) {
+        if (completedIds.has(currentActive.id) || (declinedIds.has(currentActive.id) && currentActive.driver_id !== driverId) || isTripDismissed(currentActive.id)) {
           updateActiveTripState(null);
           setShowFareCollection(false);
           return;
@@ -363,13 +378,13 @@ export default function DriverPage() {
             ? t.driver_id === driverId ||
               (driverId === FOUNDER_DRIVER_UUID && t.driver_id === 'owner-allan-boraine')
             : false) &&
-          !declinedIds.has(t.id) &&
           !completedIds.has(t.id) &&
           !isTripDismissed(t.id)
       );
 
       if (active) {
         if (!activeTripRef.current) {
+          undeclineTrip(active.id, driverId);
           updateActiveTripState(active);
           setRequest(null);
         }
@@ -479,6 +494,19 @@ export default function DriverPage() {
 
         if (trip.status === 'completed') {
           markTripCompleted(trip.id);
+        }
+
+        // Realtime update for declined trips still available to accept
+        if (trip.status !== 'requested' || (trip.driver_id && trip.driver_id !== driverId) || isTripCompleted(trip.id) || isTripDismissed(trip.id)) {
+          setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== trip.id));
+        } else if (trip.status === 'requested' && !trip.driver_id && isTripDeclined(trip.id, driverId) && !isStaleRequestedTrip(trip)) {
+          setDeclinedAvailableTrips(prev => {
+            const exists = prev.some(t => t.id === trip.id);
+            if (exists) {
+              return prev.map(t => (t.id === trip.id ? trip : t));
+            }
+            return [trip, ...prev];
+          });
         }
 
         if (
@@ -785,14 +813,26 @@ export default function DriverPage() {
     }
   };
 
-  const handleAccept = async () => {
-    if (request) {
-      const tripToAccept = request;
+  const handleAcceptTrip = async (tripToAccept: MockTrip) => {
+    if (!tripToAccept) return;
+    setAcceptingTripId(tripToAccept.id);
+    try {
       const rawDriverId =
         profile?.id ||
         getSafeLocalStorageItem('driver_id') ||
         generateUuid();
       const driverId = resolveDriverUuid(rawDriverId);
+
+      // Execute atomic database reservation to prevent race conditions
+      const rpcResult = await acceptTripAtomic(tripToAccept.id, driverId);
+      if (!rpcResult.success) {
+        alert("Trip is no longer available: " + (rpcResult.error || "Claimed by another driver."));
+        setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== tripToAccept.id));
+        return;
+      }
+
+      // Successfully accepted! Remove from driver's declined list so it transitions cleanly to active trip
+      undeclineTrip(tripToAccept.id, driverId);
 
       const updated: MockTrip = {
         ...tripToAccept,
@@ -805,15 +845,12 @@ export default function DriverPage() {
       updateActiveTripState(updated);
       setRequest(null);
       lastAlertedTripIdRef.current = null;
+      setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== tripToAccept.id));
 
-      // Execute atomic database reservation to prevent race conditions
-      const rpcResult = await acceptTripAtomic(tripToAccept.id, driverId);
-      if (!rpcResult.success) {
-        alert("Trip is no longer available: " + (rpcResult.error || "Claimed by another driver."));
-        updateActiveTripState(null);
-        return;
-      }
       await saveTrip(updated);
+      try {
+        audioAlert.playStatusChime();
+      } catch {}
 
       if (driverCoordsRef.current) {
         fetch('/api/trips/tracking', {
@@ -827,8 +864,16 @@ export default function DriverPage() {
           }),
         }).catch(() => {});
       }
+    } finally {
+      setAcceptingTripId(null);
     }
-  }
+  };
+
+  const handleAccept = async () => {
+    if (request) {
+      await handleAcceptTrip(request);
+    }
+  };
 
   const handleDecline = async () => {
     if (!request) return;
@@ -840,7 +885,17 @@ export default function DriverPage() {
     setRequest(null);
     lastAlertedTripIdRef.current = null;
     await declineTrip(tripToDecline, driverId);
-  }
+    // Add to declinedAvailableTrips so driver can still accept it on a later stage if not taken by other drivers!
+    setDeclinedAvailableTrips(prev => {
+      if (prev.some(t => t.id === tripToDecline.id)) return prev;
+      return [tripToDecline, ...prev];
+    });
+  };
+
+  const handleDismissDeclinedTrip = (tripId: string) => {
+    markTripDismissed(tripId);
+    setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== tripId));
+  };
 
   const handleDriverArrived = async () => {
     const current = activeTripRef.current || activeTrip;
@@ -974,6 +1029,8 @@ export default function DriverPage() {
     }
   };
 
+  const selectedDeclinedTrip = declinedAvailableTrips.find(t => t.id === selectedDeclinedTripId);
+
   // Define map pins and routing for pending request or active trip
   const mapProps = activeTrip 
     ? {
@@ -988,6 +1045,8 @@ export default function DriverPage() {
       }
     : request
       ? { pickupLat: request.pickup_lat, pickupLng: request.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+      : selectedDeclinedTrip
+      ? { pickupLat: selectedDeclinedTrip.pickup_lat, pickupLng: selectedDeclinedTrip.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
@@ -1185,7 +1244,7 @@ export default function DriverPage() {
                 <div className="w-9 h-1.5 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
                 <span className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 break-words">
                   {isHomeSheetMinimized 
-                    ? (activeTrip ? `${activeTrip.status.replace('_', ' ').toUpperCase()} • PIN: ${activeTrip.verification_pin || '----'} • R${activeTrip.fare_amount}` : isOnline ? "Online • Searching (Tap to expand)" : "Offline • Tap to expand")
+                    ? (activeTrip ? `${activeTrip.status.replace('_', ' ').toUpperCase()} • PIN: ${activeTrip.verification_pin || '----'} • R${activeTrip.fare_amount}` : isOnline ? (declinedAvailableTrips.length > 0 ? `Online • ${declinedAvailableTrips.length} Available Ride${declinedAvailableTrips.length > 1 ? 's' : ''} (Tap to view)` : "Online • Searching (Tap to expand)") : "Offline • Tap to expand")
                     : "Driver Controls"}
                 </span>
               </div>
@@ -1797,6 +1856,125 @@ export default function DriverPage() {
                             : '0 DB Poll Drain'}
                         </span>
                       </div>
+
+                      {/* Declined Requests Still Open & Available to Accept */}
+                      {declinedAvailableTrips.length > 0 && !activeTrip && (
+                        <div className="mt-4 pt-1 text-left space-y-3">
+                          <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                              <h3 className="text-sm sm:text-base font-black tracking-tight text-gray-900 dark:text-gray-100">
+                                Declined Requests ({declinedAvailableTrips.length})
+                              </h3>
+                            </div>
+                            <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/70 px-2.5 py-0.5 rounded-full border border-amber-300/80 dark:border-amber-700/60">
+                              Still Open to Accept
+                            </span>
+                          </div>
+
+                          <div className="space-y-3">
+                            {declinedAvailableTrips.map((declinedTrip) => {
+                              const isAccepting = acceptingTripId === declinedTrip.id;
+                              const isSelected = selectedDeclinedTripId === declinedTrip.id;
+                              return (
+                                <div
+                                  key={declinedTrip.id}
+                                  className={`p-4 rounded-2xl bg-amber-50/70 dark:bg-zinc-900/90 border-2 transition-all space-y-3 shadow-md ${
+                                    isSelected
+                                      ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                                      : 'border-amber-300/80 dark:border-amber-600/50'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-1.5 min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-200/90 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200">
+                                          Declined Earlier
+                                        </span>
+                                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-300/60 dark:border-emerald-800/60">
+                                          Unclaimed by other drivers
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <div className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Pickup</div>
+                                        <div className="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 leading-snug break-words">
+                                          {declinedTrip.pickup_location}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Dropoff</div>
+                                        <div className="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 leading-snug break-words">
+                                          {declinedTrip.dropoff_location}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <span className="font-black text-2xl sm:text-3xl text-emerald-600 dark:text-emerald-400 block leading-tight">
+                                        R{declinedTrip.fare_amount}
+                                      </span>
+                                      <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                                        Estimated Fare
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-amber-200/70 dark:border-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    <span className="inline-flex items-center gap-1">
+                                      {declinedTrip.payment_method === 'paystack'
+                                        ? '💳 Paystack Card'
+                                        : declinedTrip.payment_method === 'speedpoint'
+                                        ? '💳 Speedpoint'
+                                        : '💵 Cash'}
+                                    </span>
+                                    <span>
+                                      {declinedTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setSelectedDeclinedTripId(prev => (prev === declinedTrip.id ? null : declinedTrip.id))
+                                      }
+                                      className="px-3 py-2.5 rounded-xl bg-white dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-xs font-bold border border-gray-200 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-700 transition active:scale-95 touch-manipulation"
+                                    >
+                                      {isSelected ? 'Hide Pin' : 'Preview Pin'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDismissDeclinedTrip(declinedTrip.id)}
+                                      disabled={isAccepting}
+                                      className="px-3 py-2.5 rounded-xl bg-gray-200/80 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-300 dark:hover:bg-zinc-700 transition active:scale-95 touch-manipulation disabled:opacity-50"
+                                    >
+                                      Dismiss
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAcceptTrip(declinedTrip)}
+                                      disabled={isAccepting}
+                                      className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-600/30 transition active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                      {isAccepting ? (
+                                        <>
+                                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                          <span>Accepting...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 size={16} />
+                                          <span>Accept Ride (R{declinedTrip.fare_amount})</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

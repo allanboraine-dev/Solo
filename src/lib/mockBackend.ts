@@ -734,6 +734,9 @@ export const saveTrip = async (trip: MockTrip) => {
         created_at: data.created_at || enrichedTrip.created_at,
       };
       const finalSynced = syncTripToLocalStorage(synced);
+      if (finalSynced.status === 'accepted' && resolvedDriverId) {
+        undeclineTrip(finalSynced.id, resolvedDriverId);
+      }
       broadcastEvent('trip_updated', finalSynced);
     }
   } catch (e) {
@@ -755,6 +758,7 @@ export const acceptTripAtomic = async (
   const result = await soloDispatchService.acceptRideAtomic(tripId, localDriverId);
   if (result.success) {
     recordTripStatusOverride(tripId, 'accepted', localDriverId);
+    undeclineTrip(tripId, localDriverId);
     return { success: true };
   }
 
@@ -785,6 +789,51 @@ export const getDeclinedTripIds = (driverId?: string | null): Set<string> => {
 
 export const isTripDeclined = (tripId: string, driverId?: string | null): boolean => {
   return getDeclinedTripIds(driverId).has(tripId);
+};
+
+/**
+ * Removes a trip from the driver's declined list so they can accept it
+ * if it remains unfulfilled and hasn't been claimed by another driver.
+ */
+export const undeclineTrip = (tripId: string, driverId?: string | null): void => {
+  if (typeof window === 'undefined' || !tripId) return;
+  try {
+    const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+    if (resolvedDriverId) {
+      const current = Array.from(getDeclinedTripIds(resolvedDriverId));
+      const filtered = current.filter(id => id !== tripId);
+      localStorage.setItem(`solo_declined_trips_${resolvedDriverId}`, JSON.stringify(filtered));
+    }
+  } catch (e) {
+    console.error('Error removing declined trip locally:', e);
+  }
+};
+
+/**
+ * Retrieves trips previously declined by THIS driver that are STILL available
+ * (status === 'requested', no driver_id, and not expired, dismissed, or completed).
+ */
+export const getDeclinedAvailableTrips = async (
+  driverId?: string | null,
+  prefetchedTrips?: MockTrip[]
+): Promise<MockTrip[]> => {
+  if (typeof window === 'undefined') return [];
+  const resolvedDriverId = driverId || localStorage.getItem('driver_id');
+  const declinedIds = getDeclinedTripIds(resolvedDriverId);
+  if (declinedIds.size === 0) return [];
+
+  const completedIds = getCompletedTripIds();
+  const allTrips = prefetchedTrips ?? (await getTrips());
+
+  return allTrips.filter(
+    t =>
+      t.status === 'requested' &&
+      !t.driver_id &&
+      declinedIds.has(t.id) &&
+      !completedIds.has(t.id) &&
+      !isTripDismissed(t.id) &&
+      !isStaleRequestedTrip(t)
+  );
 };
 
 /**
