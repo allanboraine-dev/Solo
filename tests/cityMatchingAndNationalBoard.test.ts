@@ -47,9 +47,40 @@ describe('City Matching & Driver Pool Isolation Suite', () => {
 
     assert.strictEqual(resolveCityFromAddress('Sandton City Mall, Sandhurst, Sandton'), 'Johannesburg');
     assert.strictEqual(resolveCityFromAddress('Rosebank Mall, 50 Bath Ave, Rosebank'), 'Johannesburg');
+    assert.strictEqual(resolveCityFromAddress('Burgandy Hills Estate'), 'Johannesburg');
+    assert.strictEqual(resolveCityFromAddress('Burgundy Hills Estate, Bergbron'), 'Johannesburg');
+    assert.strictEqual(resolveCityFromAddress('123 Hendrik Potgieter Rd, Roodepoort, Gauteng'), 'Johannesburg');
+    assert.strictEqual(resolveCityFromAddress('Unit 14, Bergbron, GP'), 'Johannesburg');
+    assert.strictEqual(resolveCityFromAddress('Random Suburb, Western Cape'), 'Cape Town');
+    assert.strictEqual(resolveCityFromAddress('Midlands Estate, Pretoria'), 'Pretoria');
 
     assert.strictEqual(resolveCityFromAddress('Menlyn Park Shopping Centre, Atterbury Rd, Pretoria'), 'Pretoria');
     assert.strictEqual(resolveCityFromAddress('Gateway Theatre of Shopping, 1 Palm Blvd, Umhlanga'), 'Durban');
+  });
+
+  it('correctly resolves Burgandy Hills Estate and Gauteng locations', () => {
+    // Exact user test case: "burgandy hills estate"
+    assert.strictEqual(
+      resolveCityFromLocation(undefined, undefined, 'burgandy hills estate'),
+      'Johannesburg',
+      'burgandy hills estate must resolve to Johannesburg'
+    );
+    assert.strictEqual(
+      resolveCityFromLocation(undefined, undefined, 'Burgandy Hills Estate'),
+      'Johannesburg',
+      'Burgandy Hills Estate (capitalized) must resolve to Johannesburg'
+    );
+    assert.strictEqual(
+      resolveCityFromLocation(-26.155, 27.935, 'Burgundy Hills Estate'),
+      'Johannesburg',
+      'Burgundy Hills Estate with coordinates must resolve to Johannesburg'
+    );
+    // Unidentified address must return 'Other' and NEVER default to 'Kimberley'
+    assert.strictEqual(
+      resolveCityFromLocation(undefined, undefined, 'Unknown Location XYZ 99999'),
+      'Other',
+      'Unidentified location must return Other and NEVER default to Kimberley'
+    );
   });
 
   it('strictly isolates push requests: Kimberley driver receives Kimberley trips ONLY', () => {
@@ -91,6 +122,37 @@ describe('City Matching & Driver Pool Isolation Suite', () => {
       isTripInDriverCity(joburgTrip, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
       false,
       'Kimberley driver MUST NOT be pushed Johannesburg trip'
+    );
+
+    // EXACT USER INCIDENT TEST: "burgandy hills estate" MUST NEVER enter Kimberley driver pool:
+    const burgandyHillsTripNoCoords = {
+      pickup_location: 'burgandy hills estate',
+    };
+    assert.strictEqual(
+      isTripInDriverCity(burgandyHillsTripNoCoords, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
+      false,
+      'Kimberley driver MUST NOT receive Burgandy Hills Estate trip (address only)'
+    );
+
+    const burgandyHillsTripWithCoords = {
+      pickup_lat: -26.155,
+      pickup_lng: 27.935,
+      pickup_location: 'burgandy hills estate',
+    };
+    assert.strictEqual(
+      isTripInDriverCity(burgandyHillsTripWithCoords, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
+      false,
+      'Kimberley driver MUST NOT receive Burgandy Hills Estate trip (with GPS coords ~450km away)'
+    );
+
+    // An unknown location without GPS must NOT match Kimberley driver pool:
+    const unknownTrip = {
+      pickup_location: 'Completely Unregistered Place 404',
+    };
+    assert.strictEqual(
+      isTripInDriverCity(unknownTrip, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
+      false,
+      'Kimberley driver MUST NOT receive unverified/other trips'
     );
   });
 

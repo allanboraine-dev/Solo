@@ -86,6 +86,9 @@ export const SOUTH_AFRICAN_CITIES: SouthAfricanCity[] = [
     aliases: [
       'johannesburg',
       'joburg',
+      'jhb',
+      'gauteng',
+      'gp',
       'sandton',
       'rosebank',
       'randburg',
@@ -97,6 +100,58 @@ export const SOUTH_AFRICAN_CITIES: SouthAfricanCity[] = [
       'braamfontein',
       'balfour park',
       'highlands north',
+      'bergbron',
+      'burgundy',
+      'burgandy',
+      'burgundy hills',
+      'burgandy hills',
+      'burgundy hills estate',
+      'burgandy hills estate',
+      'hills estate',
+      'florida',
+      'florida glen',
+      'northcliff',
+      'linden',
+      'cresta',
+      'krugersdorp',
+      'alberton',
+      'germiston',
+      'boksburg',
+      'benoni',
+      'kempton park',
+      'bedfordview',
+      'edenvale',
+      'sandringham',
+      'parkhurst',
+      'parktown',
+      'greenside',
+      'bryanston',
+      'rivonia',
+      'sunninghill',
+      'woodmead',
+      'kyalami',
+      'waterfall',
+      'illovo',
+      'houghton',
+      'norwood',
+      'orange grove',
+      'alexandra',
+      'randfontein',
+      'ruimsig',
+      'constantia kloof',
+      'honeydew',
+      'weltevredenpark',
+      'weltevreden park',
+      'boskruin',
+      'bromhof',
+      'northgate',
+      'olivedale',
+      'douglasdale',
+      'lonehill',
+      'paulshof',
+      'morningside',
+      'brakpan',
+      'springs',
     ],
   },
   {
@@ -240,12 +295,37 @@ export function resolveCityFromCoords(lat?: number | null, lng?: number | null):
 }
 
 /**
+ * Maps South African provinces to their central metropolitan hub.
+ */
+export const PROVINCE_TO_CITY: Record<string, string> = {
+  'gauteng': 'Johannesburg',
+  'gp': 'Johannesburg',
+  'western cape': 'Cape Town',
+  'wc': 'Cape Town',
+  'kwazulu-natal': 'Durban',
+  'kwazulu natal': 'Durban',
+  'kzn': 'Durban',
+  'free state': 'Bloemfontein',
+  'fs': 'Bloemfontein',
+  'eastern cape': 'Gqeberha',
+  'ec': 'Gqeberha',
+  'northern cape': 'Kimberley',
+  'nc': 'Kimberley',
+  'limpopo': 'Polokwane',
+  'mpumalanga': 'Nelspruit',
+  'north west': 'Rustenburg',
+  'north-west': 'Rustenburg',
+  'nw': 'Rustenburg',
+};
+
+/**
  * Resolves the city from textual addresses or pickup strings.
  */
 export function resolveCityFromAddress(address?: string | null): string | null {
   if (!address || typeof address !== 'string') return null;
   const lower = address.toLowerCase();
 
+  // 1. Direct city and suburb alias matching
   for (const city of SOUTH_AFRICAN_CITIES) {
     for (const alias of city.aliases) {
       const regex = new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
@@ -255,12 +335,20 @@ export function resolveCityFromAddress(address?: string | null): string | null {
     }
   }
 
+  // 2. Province-level mapping
+  for (const [province, cityName] of Object.entries(PROVINCE_TO_CITY)) {
+    const regex = new RegExp(`\\b${province.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (regex.test(lower)) {
+      return cityName;
+    }
+  }
+
   return null;
 }
 
 /**
  * Combines coordinates and address text to reliably identify the city.
- * Defaults to Kimberley if completely undetermined.
+ * Returns 'Other' if completely undetermined (strictly avoids defaulting to Kimberley).
  */
 export function resolveCityFromLocation(
   lat?: number | null,
@@ -273,12 +361,13 @@ export function resolveCityFromLocation(
   const fromAddress = resolveCityFromAddress(address);
   if (fromAddress) return fromAddress;
 
-  return 'Kimberley';
+  return 'Other';
 }
 
 /**
  * Checks whether a given trip belongs to the driver's active city pool.
  * If driver is in Kimberley, only Kimberley requests return true.
+ * Distant requests (>50km) and unassigned/other province requests are strictly excluded.
  */
 export function isTripInDriverCity(
   trip: {
@@ -295,34 +384,45 @@ export function isTripInDriverCity(
     resolveCityFromCoords(driverLat, driverLng) ||
     'Kimberley';
 
-  // 1. If GPS coordinates exist for both, verify physical proximity (within 45km)
-  if (
+  const hasDriverCoords =
     driverLat !== undefined &&
     driverLat !== null &&
+    !Number.isNaN(driverLat) &&
     driverLng !== undefined &&
     driverLng !== null &&
+    !Number.isNaN(driverLng);
+
+  const hasTripCoords =
     trip.pickup_lat !== undefined &&
     trip.pickup_lat !== null &&
+    !Number.isNaN(trip.pickup_lat) &&
     trip.pickup_lng !== undefined &&
     trip.pickup_lng !== null &&
-    !Number.isNaN(driverLat) &&
-    !Number.isNaN(driverLng) &&
-    !Number.isNaN(trip.pickup_lat) &&
-    !Number.isNaN(trip.pickup_lng)
-  ) {
-    const distanceKm = calculateDistanceKm(driverLat, driverLng, trip.pickup_lat, trip.pickup_lng);
-    // If within urban radius of driver, it is in driver pool
+    !Number.isNaN(trip.pickup_lng);
+
+  // 1. If GPS coordinates exist for both, physical proximity is ground truth
+  if (hasDriverCoords && hasTripCoords) {
+    const distanceKm = calculateDistanceKm(driverLat, driverLng, trip.pickup_lat!, trip.pickup_lng!);
+    // If within urban radius of driver (<= 45km), it is in driver pool
     if (distanceKm <= 45) {
       return true;
     }
+    // If beyond 50km, it can NEVER belong to this driver's local city pool
+    // (Prevents a Gauteng trip ~450km away from ever reaching a Kimberley driver)
+    return false;
   }
 
-  // 2. Check resolved city of the trip
+  // 2. If coordinates are missing on either side, check resolved city of the trip
   const tripCity = resolveCityFromLocation(
     trip.pickup_lat,
     trip.pickup_lng,
     trip.pickup_location
   );
+
+  // Unidentified ('Other') or missing trips do NOT match any local city pool
+  if (!tripCity || tripCity.toLowerCase() === 'other' || tripCity.toLowerCase() === 'unknown') {
+    return false;
+  }
 
   return tripCity.toLowerCase() === resolvedDriverCity.toLowerCase();
 }

@@ -115,7 +115,10 @@ export default function DriverPage() {
   useEffect(() => {
     driverCoordsRef.current = driverCoords;
     if (driverCoords) {
-      setDriverCity(resolveCityFromLocation(driverCoords.lat, driverCoords.lng));
+      const resolved = resolveCityFromLocation(driverCoords.lat, driverCoords.lng);
+      if (resolved && resolved !== 'Other') {
+        setDriverCity(resolved);
+      }
     }
   }, [driverCoords]);
 
@@ -342,9 +345,11 @@ export default function DriverPage() {
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
       const coords = driverCoordsRef.current;
-      const currentDriverCity = coords
-        ? resolveCityFromLocation(coords.lat, coords.lng)
-        : (profile?.city || 'Kimberley');
+      const detectedCity = coords ? resolveCityFromLocation(coords.lat, coords.lng) : null;
+      const currentDriverCity =
+        detectedCity && detectedCity !== 'Other'
+          ? detectedCity
+          : (profile?.city || 'Kimberley');
       setDriverCity(currentDriverCity);
 
       // Update declined but still available trips strictly in this driver's city pool
