@@ -23,6 +23,7 @@ export type MockTrip = {
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   verification_pin?: string;
   driver_name?: string;
+  rider_name?: string;
   vehicle_plate?: string;
   scheduled_time?: string;
   created_at?: string;
@@ -41,6 +42,7 @@ export type MockDriverProfile = {
   fullName: string;
   email: string;
   phone: string;
+  city?: string;
   vehicleMake: string;
   vehicleModel: string;
   vehicleYear?: number;

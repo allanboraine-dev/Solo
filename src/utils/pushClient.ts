@@ -27,7 +27,8 @@ export function getPushPermissionStatus(): PushPermissionStatus {
 
 export async function registerForPushNotifications(
   role: 'driver' | 'rider',
-  userId?: string
+  userId?: string,
+  city?: string | null
 ): Promise<{ success: boolean; error?: string; subscription?: PushSubscription }> {
   try {
     const status = getPushPermissionStatus();
@@ -67,6 +68,7 @@ export async function registerForPushNotifications(
         subscription: subscription.toJSON(),
         role,
         userId: userId || null,
+        city: city || null,
         userAgent: navigator.userAgent,
       }),
     });
@@ -109,6 +111,9 @@ export async function dispatchRideRequestPush(params: {
   pickupAddress: string;
   dropoffAddress: string;
   fareZar: number;
+  pickupLat?: number;
+  pickupLng?: number;
+  city?: string;
 }): Promise<boolean> {
   try {
     const payload = {
@@ -118,6 +123,7 @@ export async function dispatchRideRequestPush(params: {
       icon: '/driver-icon-192.png',
       url: `/driver?tripId=${params.tripId}`,
       tripId: params.tripId,
+      city: params.city,
       tag: `trip-request-${params.tripId}`,
     };
 
@@ -126,6 +132,7 @@ export async function dispatchRideRequestPush(params: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         role: 'driver',
+        city: params.city,
         payload,
       }),
     });

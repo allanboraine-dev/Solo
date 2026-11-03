@@ -6,6 +6,7 @@ import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type 
 import { generateUuid } from '@/utils/session'
 import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, type SearchResultPlace, type TariffTier, type CompetitorFareComparison } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
+import { resolveCityFromLocation } from '@/utils/cityMatching'
 import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
@@ -223,12 +224,16 @@ export default function BookingForm({
       await saveTrip(tripData);
       setActiveTripId(tripData.id);
 
-      // Trigger Web Push alert to all online/subscribed drivers across mobile and desktop
+      // Trigger Web Push alert to online drivers in the trip's city pool
+      const tripCity = resolveCityFromLocation(tripData.pickup_lat, tripData.pickup_lng, tripData.pickup_location);
       dispatchRideRequestPush({
         tripId: tripData.id,
         pickupAddress: tripData.pickup_location,
         dropoffAddress: tripData.dropoff_location,
         fareZar: tripData.fare_amount,
+        pickupLat: tripData.pickup_lat,
+        pickupLng: tripData.pickup_lng,
+        city: tripCity,
       }).catch(err => console.warn('[BookingForm] Web push dispatch non-blocking error:', err));
 
       if (onTripCreated) {

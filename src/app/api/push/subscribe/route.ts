@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { subscription, role, userId, userAgent } = body;
+    const { subscription, role, userId, userAgent, city } = body;
 
     if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
       return NextResponse.json(
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       role,
       user_id: userId || null,
       user_agent: userAgent || null,
+      city: city || null,
       updated_at: new Date().toISOString(),
     });
 
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
           role,
           user_id: userId || null,
           user_agent: userAgent || null,
+          city: city || null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'endpoint' }

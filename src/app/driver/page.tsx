@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
-import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote } from 'lucide-react'
+import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote, Globe, Search, Filter } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -37,14 +38,20 @@ export default function DriverPage() {
   const router = useRouter()
   const { installApp, isStandalone } = usePWA()
   const [isOnline, setIsOnline] = useState(false)
-  const [activeTab, setActiveTab] = useState<'home' | 'earnings' | 'profile' | 'help'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'earnings' | 'profile' | 'help'>('home')
   const [isHomeSheetMinimized, setIsHomeSheetMinimized] = useState(false)
   
   const [request, setRequest] = useState<MockTrip | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
   const [declinedAvailableTrips, setDeclinedAvailableTrips] = useState<MockTrip[]>([])
+  const [allNationalTrips, setAllNationalTrips] = useState<MockTrip[]>([])
+  const [nationalCityFilter, setNationalCityFilter] = useState<string>('all')
+  const [nationalStatusFilter, setNationalStatusFilter] = useState<'all' | 'requested' | 'in_progress' | 'completed'>('all')
+  const [nationalSearchQuery, setNationalSearchQuery] = useState<string>('')
+  const [driverCity, setDriverCity] = useState<string>('Kimberley')
   const [acceptingTripId, setAcceptingTripId] = useState<string | null>(null)
   const [selectedDeclinedTripId, setSelectedDeclinedTripId] = useState<string | null>(null)
+  const [previewNationalTripId, setPreviewNationalTripId] = useState<string | null>(null)
   const [driverCoords, setDriverCoords] = useState<{lat: number, lng: number} | null>(null)
   const activeTripRef = useRef<MockTrip | null>(null)
   const driverCoordsRef = useRef<{lat: number, lng: number} | null>(null)
@@ -106,8 +113,11 @@ export default function DriverPage() {
   }, [activeTrip])
 
   useEffect(() => {
-    driverCoordsRef.current = driverCoords
-  }, [driverCoords])
+    driverCoordsRef.current = driverCoords;
+    if (driverCoords) {
+      setDriverCity(resolveCityFromLocation(driverCoords.lat, driverCoords.lng));
+    }
+  }, [driverCoords]);
 
   const [profile, setProfile] = useState<MockDriverProfile | null>(null)
   const [completedTrips, setCompletedTrips] = useState<MockTrip[]>([])
@@ -327,11 +337,17 @@ export default function DriverPage() {
       }
 
       const trips = await getTrips();
+      setAllNationalTrips(trips);
       const declinedIds = getDeclinedTripIds(driverId);
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
+      const coords = driverCoordsRef.current;
+      const currentDriverCity = coords
+        ? resolveCityFromLocation(coords.lat, coords.lng)
+        : (profile?.city || 'Kimberley');
+      setDriverCity(currentDriverCity);
 
-      // Update declined but still available trips for this driver (unclaimed by other drivers)
+      // Update declined but still available trips strictly in this driver's city pool
       const declinedAvailable = trips.filter(
         t =>
           t.status === 'requested' &&
@@ -339,7 +355,8 @@ export default function DriverPage() {
           declinedIds.has(t.id) &&
           !completedIds.has(t.id) &&
           !isTripDismissed(t.id) &&
-          !isStaleRequestedTrip(t)
+          !isStaleRequestedTrip(t) &&
+          isTripInDriverCity(t, coords?.lat, coords?.lng, currentDriverCity)
       );
       setDeclinedAvailableTrips(declinedAvailable);
 
@@ -389,11 +406,13 @@ export default function DriverPage() {
           setRequest(null);
         }
       } else {
-        // Find requested trips (excluding any declined, completed, or stale requests)
+        // Find requested trips strictly for THIS driver's city pool (e.g. Kimberley requests only for Kimberley drivers)
         let nearbyRequested: MockTrip[] = [];
-        const coords = driverCoordsRef.current;
         if (coords) {
-          nearbyRequested = await getNearbyRequestedTrips(coords.lat, coords.lng, 15, driverId, trips);
+          nearbyRequested = await getNearbyRequestedTrips(coords.lat, coords.lng, 25, driverId, trips);
+          nearbyRequested = nearbyRequested.filter(t =>
+            isTripInDriverCity(t, coords.lat, coords.lng, currentDriverCity)
+          );
         }
         if (nearbyRequested.length === 0) {
           nearbyRequested = trips.filter(
@@ -402,7 +421,8 @@ export default function DriverPage() {
               !t.driver_id &&
               !declinedIds.has(t.id) &&
               !completedIds.has(t.id) &&
-              !isStaleRequestedTrip(t)
+              !isStaleRequestedTrip(t) &&
+              isTripInDriverCity(t, coords?.lat, coords?.lng, currentDriverCity)
           );
         }
         // Re-check activeTripRef after any async work so we never pop up a request while on a trip
@@ -496,10 +516,27 @@ export default function DriverPage() {
           markTripCompleted(trip.id);
         }
 
-        // Realtime update for declined trips still available to accept
+        // Live update for the SOLO National Trip Board
+        setAllNationalTrips(prev => {
+          const idx = prev.findIndex(t => t.id === trip.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = trip;
+            return copy;
+          }
+          return [trip, ...prev];
+        });
+
+        // Realtime update for declined trips still available to accept (restricted to driver city pool)
         if (trip.status !== 'requested' || (trip.driver_id && trip.driver_id !== driverId) || isTripCompleted(trip.id) || isTripDismissed(trip.id)) {
           setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== trip.id));
-        } else if (trip.status === 'requested' && !trip.driver_id && isTripDeclined(trip.id, driverId) && !isStaleRequestedTrip(trip)) {
+        } else if (
+          trip.status === 'requested' &&
+          !trip.driver_id &&
+          isTripDeclined(trip.id, driverId) &&
+          !isStaleRequestedTrip(trip) &&
+          isTripInDriverCity(trip, driverCoordsRef.current?.lat, driverCoordsRef.current?.lng, driverCity)
+        ) {
           setDeclinedAvailableTrips(prev => {
             const exists = prev.some(t => t.id === trip.id);
             if (exists) {
@@ -509,12 +546,14 @@ export default function DriverPage() {
           });
         }
 
+        // Live alert & popup modal: pushed strictly to drivers within the matching city pool!
         if (
           trip.status === 'requested' &&
           !currentActive &&
           !isTripDeclined(trip.id, driverId) &&
           !isTripCompleted(trip.id) &&
-          !isStaleRequestedTrip(trip)
+          !isStaleRequestedTrip(trip) &&
+          isTripInDriverCity(trip, driverCoordsRef.current?.lat, driverCoordsRef.current?.lng, driverCity)
         ) {
           setRequest(prev => (prev?.id === trip.id ? prev : trip));
           if (trip.id !== lastAlertedTripIdRef.current) {
@@ -851,6 +890,9 @@ export default function DriverPage() {
       setRequest(null);
       lastAlertedTripIdRef.current = null;
       setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== tripToAccept.id));
+      setPreviewNationalTripId(null);
+      setActiveTab('home');
+      setIsHomeSheetMinimized(false);
 
       await saveTrip(updated);
       try {
@@ -1035,8 +1077,39 @@ export default function DriverPage() {
   };
 
   const selectedDeclinedTrip = declinedAvailableTrips.find(t => t.id === selectedDeclinedTripId);
+  const previewNationalTrip = previewNationalTripId ? allNationalTrips.find(t => t.id === previewNationalTripId) : null;
 
-  // Define map pins and routing for pending request or active trip
+  const filteredNationalTrips = allNationalTrips.filter((trip) => {
+    // City filter
+    if (nationalCityFilter !== 'all') {
+      const tripCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location);
+      if (tripCity.toLowerCase() !== nationalCityFilter.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Status filter
+    if (nationalStatusFilter === 'requested' && trip.status !== 'requested') return false;
+    if (nationalStatusFilter === 'in_progress' && !['accepted', 'arrived', 'in_progress'].includes(trip.status)) return false;
+    if (nationalStatusFilter === 'completed' && trip.status !== 'completed') return false;
+
+    // Search query
+    if (nationalSearchQuery.trim()) {
+      const q = nationalSearchQuery.toLowerCase();
+      const inPickup = trip.pickup_location?.toLowerCase().includes(q);
+      const inDropoff = trip.dropoff_location?.toLowerCase().includes(q);
+      const inRider = trip.rider_name?.toLowerCase().includes(q);
+      const inCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location).toLowerCase().includes(q);
+      const inId = trip.id?.toLowerCase().includes(q);
+      if (!inPickup && !inDropoff && !inRider && !inCity && !inId) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Define map pins and routing for pending request, active trip, or map preview
   const mapProps = activeTrip 
     ? {
         pickupLat: activeTrip.pickup_lat,
@@ -1052,6 +1125,8 @@ export default function DriverPage() {
       ? { pickupLat: request.pickup_lat, pickupLng: request.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : selectedDeclinedTrip
       ? { pickupLat: selectedDeclinedTrip.pickup_lat, pickupLng: selectedDeclinedTrip.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+      : previewNationalTrip
+      ? { pickupLat: previewNationalTrip.pickup_lat, pickupLng: previewNationalTrip.pickup_lng, dropoffLat: previewNationalTrip.dropoff_lat, dropoffLng: previewNationalTrip.dropoff_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
@@ -1705,9 +1780,26 @@ export default function DriverPage() {
                   <h2 className="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
                     {isOnline ? "You're Online" : "You're Offline"}
                   </h2>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/60">
+                      <MapPin size={12} />
+                      <span>Pool: {driverCity}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('trips');
+                        setIsHomeSheetMinimized(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 hover:bg-blue-200 dark:bg-blue-950/70 dark:hover:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-300/80 dark:border-blue-700/60 transition active:scale-95"
+                    >
+                      <Globe size={12} />
+                      <span>National Board ({allNationalTrips.length})</span>
+                    </button>
+                  </div>
                   <p className="text-gray-500 text-sm sm:text-base mb-5 sm:mb-6 font-medium">
                     {isOnline 
-                      ? "Waiting for ride requests in your area..." 
+                      ? `Waiting for ride requests in ${driverCity} & surrounds...` 
                       : "Go online to start receiving ride requests."}
                   </p>
                   
@@ -2013,6 +2105,323 @@ export default function DriverPage() {
                   </div>
                 </div>
               )
+            )}
+
+            {activeTab === 'trips' && (
+              <div className="animate-in fade-in slide-in-from-right-4 duration-500 text-left space-y-4">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-2.5 rounded-2xl bg-blue-100 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400 shrink-0">
+                      <Globe size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-xl sm:text-2xl font-black tracking-tight text-gray-900 dark:text-gray-100 leading-snug">
+                        National Trip Board
+                      </h2>
+                      <p className="text-[11px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        Live view of all trips booked on SOLO South Africa
+                      </p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/60 shrink-0">
+                    <MapPin size={12} />
+                    <span>{driverCity} Pool</span>
+                  </span>
+                </div>
+
+                {/* Key Metrics Strip */}
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="p-2.5 rounded-2xl bg-gray-50 dark:bg-zinc-900/60 border border-gray-100 dark:border-white/5">
+                    <span className="block text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</span>
+                    <span className="text-base sm:text-xl font-black text-gray-900 dark:text-gray-100">
+                      {allNationalTrips.length}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40">
+                    <span className="block text-[10px] sm:text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Open</span>
+                    <span className="text-base sm:text-xl font-black text-amber-700 dark:text-amber-300">
+                      {allNationalTrips.filter(t => t.status === 'requested').length}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40">
+                    <span className="block text-[10px] sm:text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider">Active</span>
+                    <span className="text-base sm:text-xl font-black text-blue-700 dark:text-blue-300">
+                      {allNationalTrips.filter(t => ['accepted', 'arrived', 'in_progress'].includes(t.status)).length}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
+                    <span className="block text-[10px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Done</span>
+                    <span className="text-base sm:text-xl font-black text-emerald-700 dark:text-emerald-300">
+                      {allNationalTrips.filter(t => t.status === 'completed').length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={nationalSearchQuery}
+                    onChange={(e) => setNationalSearchQuery(e.target.value)}
+                    placeholder="Search trips, addresses, rider name..."
+                    className="w-full pl-10 pr-9 py-2.5 bg-gray-50 dark:bg-zinc-900 text-xs sm:text-sm font-medium rounded-2xl border border-gray-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                  />
+                  {nationalSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setNationalSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* City Filter Chips */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Filter size={12} />
+                      <span>Filter by City Pool</span>
+                    </span>
+                    {nationalCityFilter !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setNationalCityFilter('all')}
+                        className="text-emerald-600 dark:text-emerald-400 font-bold lowercase text-[11px] hover:underline"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      type="button"
+                      onClick={() => setNationalCityFilter('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
+                        nationalCityFilter === 'all'
+                          ? 'bg-black dark:bg-white text-white dark:text-black shadow-xs'
+                          : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                      }`}
+                    >
+                      All Cities ({allNationalTrips.length})
+                    </button>
+                    {SOUTH_AFRICAN_CITIES.map((c) => {
+                      const countInCity = allNationalTrips.filter(t => {
+                        const tripCity = resolveCityFromLocation(t.pickup_lat, t.pickup_lng, t.pickup_location);
+                        return tripCity.toLowerCase() === c.name.toLowerCase();
+                      }).length;
+                      if (countInCity === 0 && c.name.toLowerCase() !== driverCity.toLowerCase()) return null;
+                      return (
+                        <button
+                          key={c.name}
+                          type="button"
+                          onClick={() => setNationalCityFilter(c.name.toLowerCase())}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 ${
+                            nationalCityFilter === c.name.toLowerCase()
+                              ? 'bg-black dark:bg-white text-white dark:text-black shadow-xs'
+                              : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                          }`}
+                        >
+                          <span>{c.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                            nationalCityFilter === c.name.toLowerCase()
+                              ? 'bg-white/20 dark:bg-black/20 text-white dark:text-black'
+                              : 'bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-400'
+                          }`}>
+                            {countInCity}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Status Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  {[
+                    { id: 'all', label: 'All Statuses' },
+                    { id: 'requested', label: 'Open Requests' },
+                    { id: 'in_progress', label: 'In Transit' },
+                    { id: 'completed', label: 'Completed' },
+                  ].map((filterTab) => (
+                    <button
+                      key={filterTab.id}
+                      type="button"
+                      onClick={() => setNationalStatusFilter(filterTab.id as any)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
+                        nationalStatusFilter === filterTab.id
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-gray-100 dark:bg-zinc-800/80 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-zinc-700'
+                      }`}
+                    >
+                      {filterTab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Trips List */}
+                <div className="space-y-3 pt-1">
+                  {filteredNationalTrips.length === 0 ? (
+                    <div className="p-8 text-center bg-gray-50 dark:bg-zinc-900/40 rounded-2xl border border-gray-100 dark:border-white/5 space-y-2">
+                      <Globe size={32} className="mx-auto text-gray-400 opacity-60" />
+                      <p className="font-bold text-sm text-gray-700 dark:text-gray-300">
+                        No trips match the current filter
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Try resetting your city filter or search query.
+                      </p>
+                      {(nationalCityFilter !== 'all' || nationalStatusFilter !== 'all' || nationalSearchQuery) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNationalCityFilter('all');
+                            setNationalStatusFilter('all');
+                            setNationalSearchQuery('');
+                          }}
+                          className="mt-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 underline"
+                        >
+                          Clear all filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    filteredNationalTrips.map((trip) => {
+                      const tripCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location);
+                      const isMyCity = tripCity.toLowerCase() === driverCity.toLowerCase();
+                      const isAccepting = acceptingTripId === trip.id;
+                      const isPreviewing = previewNationalTripId === trip.id;
+
+                      return (
+                        <div
+                          key={trip.id}
+                          className={`p-4 rounded-2xl bg-white dark:bg-zinc-900 border transition-all space-y-3 shadow-sm ${
+                            isPreviewing
+                              ? 'border-blue-500 ring-2 ring-blue-500/30'
+                              : isMyCity && trip.status === 'requested'
+                              ? 'border-emerald-300 dark:border-emerald-700/60'
+                              : 'border-gray-200 dark:border-white/10'
+                          }`}
+                        >
+                          {/* Card Top Row: City Badge, Status Badge */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] font-black px-2.5 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-900 dark:text-blue-200 flex items-center gap-1">
+                                <MapPin size={11} />
+                                <span>{tripCity}</span>
+                              </span>
+                              {isMyCity && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60">
+                                  Your Pool
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              {trip.status === 'requested' ? (
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/70 dark:border-amber-700/60">
+                                  🟡 Open Request
+                                </span>
+                              ) : trip.status === 'accepted' || trip.status === 'arrived' ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300 border border-blue-300/70 dark:border-blue-700/60">
+                                  🔵 Assigned
+                                </span>
+                              ) : trip.status === 'in_progress' ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-teal-100 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-300/70 dark:border-teal-700/60">
+                                  🟢 In Transit
+                                </span>
+                              ) : trip.status === 'completed' ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
+                                  ✅ Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400">
+                                  {trip.status}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Pickup & Dropoff */}
+                          <div className="space-y-1.5">
+                            <div>
+                              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pickup</div>
+                              <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-snug break-words">
+                                {trip.pickup_location}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Dropoff</div>
+                              <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-snug break-words">
+                                {trip.dropoff_location}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Trip Meta: Fare, Payment, Passengers */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-white/5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            <span className="font-black text-lg sm:text-xl text-emerald-600 dark:text-emerald-400">
+                              R{trip.fare_amount}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-[11px]">
+                              {trip.payment_method === 'paystack'
+                                ? '💳 Card'
+                                : trip.payment_method === 'speedpoint'
+                                ? '💳 Speedpoint'
+                                : '💵 Cash'}
+                            </span>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {trip.passenger_count === 2 ? '👥 2 Riders' : '👤 1 Rider'}
+                            </span>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isPreviewing) {
+                                  setPreviewNationalTripId(null);
+                                } else {
+                                  setPreviewNationalTripId(trip.id);
+                                  setIsHomeSheetMinimized(true);
+                                  setActiveTab('home');
+                                }
+                              }}
+                              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-200 dark:hover:bg-zinc-700 transition active:scale-95 touch-manipulation flex items-center gap-1"
+                            >
+                              <Compass size={13} />
+                              <span>{isPreviewing ? 'Hide Map' : 'View on Map'}</span>
+                            </button>
+
+                            {trip.status === 'requested' && !activeTrip && (
+                              <button
+                                type="button"
+                                onClick={() => handleAcceptTrip(trip)}
+                                disabled={isAccepting}
+                                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-md shadow-emerald-600/25 transition active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              >
+                                {isAccepting ? (
+                                  <>
+                                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <span>Accepting...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 size={15} />
+                                    <span>Accept Ride (R{trip.fare_amount})</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             )}
 
             {activeTab === 'earnings' && (
@@ -2414,6 +2823,16 @@ export default function DriverPage() {
         >
           <Car size={22} className="shrink-0" />
           <span className="text-[11px] sm:text-xs mt-0.5 uppercase tracking-wider font-bold">Home</span>
+        </button>
+        <button 
+          onClick={() => {
+            setActiveTab('trips')
+            setIsHomeSheetMinimized(false)
+          }}
+          className={`flex flex-col items-center justify-center flex-1 py-2 px-1 min-h-[52px] rounded-xl sm:rounded-2xl transition-all touch-manipulation active:scale-95 ${activeTab === 'trips' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+        >
+          <Globe size={22} className="shrink-0" />
+          <span className="text-[11px] sm:text-xs mt-0.5 uppercase tracking-wider font-bold">Trips</span>
         </button>
         <button 
           onClick={() => setActiveTab('earnings')}

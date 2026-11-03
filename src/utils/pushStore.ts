@@ -10,6 +10,7 @@ export interface StoredPushSubscription {
   role: 'driver' | 'rider';
   user_id?: string | null;
   user_agent?: string | null;
+  city?: string | null;
   updated_at: string;
 }
 
@@ -21,11 +22,16 @@ export const saveMemorySubscription = (sub: StoredPushSubscription): void => {
   }
 };
 
-export const getMemorySubscriptions = (role?: 'driver' | 'rider', userId?: string): StoredPushSubscription[] => {
+export const getMemorySubscriptions = (
+  role?: 'driver' | 'rider',
+  userId?: string,
+  city?: string
+): StoredPushSubscription[] => {
   const all = Array.from(memorySubscriptions.values());
   return all.filter((sub) => {
     if (role && sub.role !== role) return false;
     if (userId && sub.user_id !== userId) return false;
+    if (city && sub.city && sub.city.toLowerCase() !== city.toLowerCase()) return false;
     return true;
   });
 };

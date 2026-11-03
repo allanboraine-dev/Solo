@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { target, role, userId, subscription, payload } = body;
+    const { target, role, userId, subscription, payload, city: targetCity } = body;
+    const resolvedCity = targetCity || payload?.city || null;
 
     if (!payload || !payload.title || !payload.body) {
       return NextResponse.json(
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Retrieve matching subscriptions from in-memory fallback store
-    const memSubscriptions = getMemorySubscriptions(role, userId);
+    const memSubscriptions = getMemorySubscriptions(role, userId, resolvedCity || undefined);
 
     // Merge and deduplicate by endpoint
     const subscriptionMap = new Map<string, any>();
@@ -63,7 +64,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const subscriptions = Array.from(subscriptionMap.values());
+    let subscriptions = Array.from(subscriptionMap.values());
+
+    // If a city pool is targeted for driver dispatch, only push to drivers in that city
+    if (role === 'driver' && resolvedCity) {
+      const cityFiltered = subscriptions.filter(sub => {
+        if (!sub.city) return true; // Include unanchored drivers as fallback
+        return sub.city.toLowerCase() === resolvedCity.toLowerCase();
+      });
+      if (cityFiltered.length > 0) {
+        subscriptions = cityFiltered;
+      }
+    }
 
     if (subscriptions.length === 0) {
       return NextResponse.json({
