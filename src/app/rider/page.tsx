@@ -14,7 +14,7 @@ import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
 import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { reverseGeocode } from '@/utils/mapService'
-import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle, Download } from 'lucide-react'
+import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle, Download, Clock } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
 import { audioAlert } from '@/utils/audioAlert'
 import { usePWA } from '@/lib/PWAContext'
@@ -478,6 +478,20 @@ export default function RiderPage() {
           transitionToTripCompleted(currentActive);
           return;
         }
+
+        // Expire unclaimed requested trip if older than 1 hour
+        if (currentActive.status === 'requested' && isStaleRequestedTrip(currentActive)) {
+          markTripDismissed(currentActive.id);
+          setRiderActiveTripId(null);
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was not claimed by drivers within 1 hour and has expired. Please book again.');
+          try {
+            audioAlert.alertRiderOfTripStatus('cancelled', currentActive);
+          } catch {}
+          return;
+        }
+
         const matched = trips.find(t => t.id === currentActive.id);
         if (matched) {
           if (matched.status === 'cancelled') {
@@ -489,6 +503,17 @@ export default function RiderPage() {
           }
           if (matched.status === 'completed') {
             transitionToTripCompleted(matched);
+            return;
+          }
+          if (matched.status === 'requested' && isStaleRequestedTrip(matched)) {
+            markTripDismissed(matched.id);
+            setRiderActiveTripId(null);
+            updateActiveTripState(null);
+            setDriverCoords(null);
+            setDeclineNotice('Your ride request was not claimed by drivers within 1 hour and has expired. Please book again.');
+            try {
+              audioAlert.alertRiderOfTripStatus('cancelled', matched);
+            } catch {}
             return;
           }
           const matchedPrio = STATUS_PRIORITY[matched.status] || 0;
@@ -537,6 +562,15 @@ export default function RiderPage() {
           !isStaleRequestedTrip(t) &&
           (t.id === storedActiveTripId || (t.rider_id === myRiderId && myRiderId !== '00000000-0000-0000-0000-000000000000'))
       );
+      if (!active && storedActiveTripId) {
+        const stored = trips.find(t => t.id === storedActiveTripId);
+        if (stored && stored.status === 'requested' && isStaleRequestedTrip(stored)) {
+          markTripDismissed(stored.id);
+          setRiderActiveTripId(null);
+          setDeclineNotice('Your ride request was not claimed by drivers within 1 hour and has expired. Please book again.');
+        }
+      }
+
       if (active && !activeTripRef.current) {
         updateActiveTripState(active);
       }
@@ -619,6 +653,15 @@ export default function RiderPage() {
           updateActiveTripState(null);
           setDriverCoords(null);
           setDeclineNotice('Your ride request was cancelled. You can request another ride below.');
+        } else if (trip.status === 'requested' && isStaleRequestedTrip(trip)) {
+          markTripDismissed(trip.id);
+          setRiderActiveTripId(null);
+          updateActiveTripState(null);
+          setDriverCoords(null);
+          setDeclineNotice('Your ride request was not claimed by drivers within 1 hour and has expired. Please book again.');
+          try {
+            audioAlert.alertRiderOfTripStatus('cancelled', trip);
+          } catch {}
         } else if (!isTripCompleted(trip.id) && !isTripDismissed(trip.id) && !isStaleRequestedTrip(trip)) {
           if (!currentActive) {
             setDeclineNotice(null);
@@ -1033,7 +1076,7 @@ export default function RiderPage() {
                       <div className="mb-3 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-amber-800 dark:text-amber-300 text-sm font-medium">
                         <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                         <div className="flex-1">
-                          <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">Ride Request Declined</p>
+                          <p className="font-bold text-amber-900 dark:text-amber-200 mb-0.5">{declineNotice.toLowerCase().includes('expire') ? 'Ride Request Expired (1hr Unclaimed)' : 'Ride Request Notice'}</p>
                           <p>{declineNotice}</p>
                         </div>
                         <button
@@ -1232,6 +1275,13 @@ export default function RiderPage() {
                           {activeTrip.status === 'arrived' && 'Your driver has arrived! Confirm PIN with driver to board.'}
                           {activeTrip.status === 'in_progress' && 'Trip active: on your way to destination.'}
                         </p>
+
+                        {activeTrip.status === 'requested' && (
+                          <div className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                            <Clock size={13} className="shrink-0 text-amber-500" />
+                            <span>Unclaimed ride requests automatically expire after 1 hour.</span>
+                          </div>
+                        )}
 
                         {/* Route Summary */}
                         <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-blue-800/40 space-y-2 text-sm text-gray-700 dark:text-gray-300">

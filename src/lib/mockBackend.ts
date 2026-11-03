@@ -339,21 +339,18 @@ export const recordTripStatusOverride = (
   }
 };
 
-// Unscheduled ride requests older than 30 minutes are treated as expired so stale DB rows never loop
-const STALE_REQUEST_MAX_AGE_MS = 30 * 60 * 1000;
+import {
+  TRIP_EXPIRATION_MS,
+  STALE_REQUEST_MAX_AGE_MS,
+  isStaleRequestedTrip,
+  isTripExpired,
+} from '@/utils/tripExpiration';
 
-export const isStaleRequestedTrip = (trip: Pick<MockTrip, 'status' | 'created_at' | 'scheduled_time'>): boolean => {
-  if (trip.status !== 'requested') return false;
-  if (trip.scheduled_time) {
-    const schedMs = new Date(trip.scheduled_time).getTime();
-    if (!Number.isNaN(schedMs) && schedMs > Date.now() - STALE_REQUEST_MAX_AGE_MS) {
-      return false;
-    }
-  }
-  if (!trip.created_at) return false;
-  const createdMs = new Date(trip.created_at).getTime();
-  if (Number.isNaN(createdMs)) return false;
-  return Date.now() - createdMs > STALE_REQUEST_MAX_AGE_MS;
+export {
+  TRIP_EXPIRATION_MS,
+  STALE_REQUEST_MAX_AGE_MS,
+  isStaleRequestedTrip,
+  isTripExpired,
 };
 
 export {
@@ -754,6 +751,20 @@ export const acceptTripAtomic = async (
   const rawDriverId =
     driverIdOverride || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
   const localDriverId = resolveDriverUuid(rawDriverId);
+
+  // Validate that the trip has not expired (> 1 hour unclaimed)
+  if (typeof window !== 'undefined') {
+    try {
+      const all = await getTrips();
+      const existing = all.find(t => t.id === tripId);
+      if (existing && isStaleRequestedTrip(existing)) {
+        return {
+          success: false,
+          error: 'Trip request has expired after 1 hour without being claimed. The rider must book again.',
+        };
+      }
+    } catch {}
+  }
 
   const result = await soloDispatchService.acceptRideAtomic(tripId, localDriverId);
   if (result.success) {

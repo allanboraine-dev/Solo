@@ -815,6 +815,11 @@ export default function DriverPage() {
 
   const handleAcceptTrip = async (tripToAccept: MockTrip) => {
     if (!tripToAccept) return;
+    if (isStaleRequestedTrip(tripToAccept)) {
+      alert("This trip request has expired (unclaimed after 1 hour). The rider must book again.");
+      setDeclinedAvailableTrips(prev => prev.filter(t => t.id !== tripToAccept.id));
+      return;
+    }
     setAcceptingTripId(tripToAccept.id);
     try {
       const rawDriverId =
