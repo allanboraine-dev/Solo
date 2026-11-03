@@ -5,6 +5,7 @@ import {
   resolveCityFromAddress,
   resolveCityFromLocation,
   isTripInDriverCity,
+  areCitiesMatching,
   SOUTH_AFRICAN_CITIES,
 } from '../src/utils/cityMatching.ts';
 
@@ -81,6 +82,23 @@ describe('City Matching & Driver Pool Isolation Suite', () => {
       'Other',
       'Unidentified location must return Other and NEVER default to Kimberley'
     );
+    // Explicit address takes precedence over mismatched coordinates (e.g. phone in Kimberley during test)
+    assert.strictEqual(
+      resolveCityFromLocation(-28.7282, 24.7623, 'Burgandy hills estate — Burgandy Hills Estate, South Africa'),
+      'Johannesburg',
+      'Burgandy hills estate address must override mismatched Kimberley coordinates'
+    );
+  });
+
+  it('validates areCitiesMatching handles metro-provincial synonyms', () => {
+    assert.strictEqual(areCitiesMatching('Johannesburg', 'Gauteng'), true);
+    assert.strictEqual(areCitiesMatching('gauteng', 'johannesburg'), true);
+    assert.strictEqual(areCitiesMatching('Pretoria', 'Gauteng'), true);
+    assert.strictEqual(areCitiesMatching('Cape Town', 'Western Cape'), true);
+    assert.strictEqual(areCitiesMatching('Kimberley', 'Northern Cape'), true);
+    assert.strictEqual(areCitiesMatching('Kimberley', 'Gauteng'), false);
+    assert.strictEqual(areCitiesMatching('Kimberley', 'Johannesburg'), false);
+    assert.strictEqual(areCitiesMatching('Cape Town', 'Johannesburg'), false);
   });
 
   it('strictly isolates push requests: Kimberley driver receives Kimberley trips ONLY', () => {
@@ -143,6 +161,31 @@ describe('City Matching & Driver Pool Isolation Suite', () => {
       isTripInDriverCity(burgandyHillsTripWithCoords, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
       false,
       'Kimberley driver MUST NOT receive Burgandy Hills Estate trip (with GPS coords ~450km away)'
+    );
+
+    // EVEN WITH STALE KIMBERLEY COORDS in trip object, Kimberley driver MUST NOT receive Burgandy Hills Estate:
+    const burgandyHillsTripWithStaleKimberleyCoords = {
+      pickup_lat: -28.7282,
+      pickup_lng: 24.7623,
+      pickup_location: 'Burgandy hills estate — Burgandy Hills Estate, South Africa',
+    };
+    assert.strictEqual(
+      isTripInDriverCity(burgandyHillsTripWithStaleKimberleyCoords, kimberleyDriverCoords.lat, kimberleyDriverCoords.lng, driverCity),
+      false,
+      'Kimberley driver MUST NOT receive Burgandy Hills Estate trip even if coordinates were mistakenly logged in Kimberley'
+    );
+
+    // Conversely, Johannesburg and Gauteng drivers MUST receive the trip:
+    const joburgDriverCoords = { lat: -26.2041, lng: 28.0473 };
+    assert.strictEqual(
+      isTripInDriverCity(burgandyHillsTripWithCoords, joburgDriverCoords.lat, joburgDriverCoords.lng, 'Johannesburg'),
+      true,
+      'Johannesburg driver MUST receive Burgandy Hills Estate trip'
+    );
+    assert.strictEqual(
+      isTripInDriverCity(burgandyHillsTripWithCoords, joburgDriverCoords.lat, joburgDriverCoords.lng, 'Gauteng'),
+      true,
+      'Gauteng driver MUST receive Burgandy Hills Estate trip'
     );
 
     // An unknown location without GPS must NOT match Kimberley driver pool:

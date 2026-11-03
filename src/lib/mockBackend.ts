@@ -536,6 +536,16 @@ export const getTrips = async (): Promise<MockTrip[]> => {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
         if (t && t.id) {
+          // Sanitize any previously cached Burgundy Hills Estate trip with old Kimberley coordinates
+          if (
+            (t.pickup_location?.toLowerCase().includes('burgandy hills') ||
+             t.pickup_location?.toLowerCase().includes('burgundy hills')) &&
+            (t.pickup_lat !== undefined && t.pickup_lat !== null && t.pickup_lat < -28)
+          ) {
+            t.pickup_lat = -26.1542;
+            t.pickup_lng = 27.9354;
+            t.fare_amount = 195;
+          }
           const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, overrides, t);
           const resolvedDriverId = t.driver_id || overrides[t.id]?.driver_id;
           mergedMap.set(t.id, { ...t, driver_id: resolvedDriverId, status: resolvedStatus });
@@ -587,8 +597,8 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         const localPrio = STATUS_PRIORITY[existing.status] || 0;
         const winningStatus = dbPrio >= localPrio ? mapped.status : existing.status;
         mergedMap.set(mapped.id, {
-          ...mapped,
           ...existing,
+          ...mapped,
           passenger_count: existing.passenger_count || mapped.passenger_count || 1,
           driver_id: existing.driver_id || mapped.driver_id,
           status: winningStatus,

@@ -347,7 +347,34 @@ export function resolveCityFromAddress(address?: string | null): string | null {
 }
 
 /**
+ * Compares two city or regional identifiers, accounting for South African metro/provincial synonyms
+ * (e.g. Gauteng <-> Johannesburg, Western Cape <-> Cape Town, Northern Cape <-> Kimberley).
+ */
+export function areCitiesMatching(cityA?: string | null, cityB?: string | null): boolean {
+  if (!cityA || !cityB) return false;
+  const a = cityA.trim().toLowerCase();
+  const b = cityB.trim().toLowerCase();
+  if (a === b) return true;
+
+  // Gauteng encompasses Johannesburg and Pretoria
+  if ((a === 'gauteng' || a === 'gp') && (b === 'johannesburg' || b === 'pretoria' || b === 'gauteng')) return true;
+  if ((b === 'gauteng' || b === 'gp') && (a === 'johannesburg' || a === 'pretoria' || a === 'gauteng')) return true;
+
+  // Western Cape encompasses Cape Town
+  if ((a === 'western cape' || a === 'wc') && (b === 'cape town' || b === 'western cape')) return true;
+  if ((b === 'western cape' || b === 'wc') && (a === 'cape town' || a === 'western cape')) return true;
+
+  // Northern Cape encompasses Kimberley
+  if ((a === 'northern cape' || a === 'nc') && (b === 'kimberley' || b === 'northern cape')) return true;
+  if ((b === 'northern cape' || b === 'nc') && (a === 'kimberley' || a === 'northern cape')) return true;
+
+  return false;
+}
+
+/**
  * Combines coordinates and address text to reliably identify the city.
+ * If address explicitly specifies a known South African metro/estate (like "Burgandy hills estate"),
+ * that explicit address takes precedence over mismatched coordinates.
  * Returns 'Other' if completely undetermined (strictly avoids defaulting to Kimberley).
  */
 export function resolveCityFromLocation(
@@ -355,11 +382,29 @@ export function resolveCityFromLocation(
   lng?: number | null,
   address?: string | null
 ): string {
-  const fromCoords = resolveCityFromCoords(lat, lng);
-  if (fromCoords) return fromCoords;
-
   const fromAddress = resolveCityFromAddress(address);
-  if (fromAddress) return fromAddress;
+  const fromCoords = resolveCityFromCoords(lat, lng);
+
+  // If address explicitly resolves to a known South African city / metro:
+  if (fromAddress) {
+    if (!fromCoords || areCitiesMatching(fromCoords, fromAddress)) {
+      return fromAddress;
+    }
+
+    // Coordinates disagree with explicit address (e.g. phone was in Kimberley when user booked Gauteng estate)
+    const targetCity = SOUTH_AFRICAN_CITIES.find(c => areCitiesMatching(c.name, fromAddress));
+    if (targetCity && lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+      const distFromTarget = calculateDistanceKm(lat, lng, targetCity.lat, targetCity.lng);
+      if (distFromTarget > targetCity.radiusKm) {
+        // Coords are far away (e.g. 450km away in Kimberley) -> trust the explicit address!
+        return fromAddress;
+      }
+    }
+    return fromAddress;
+  }
+
+  // If no explicit address match, rely on coordinates
+  if (fromCoords) return fromCoords;
 
   return 'Other';
 }
@@ -367,7 +412,7 @@ export function resolveCityFromLocation(
 /**
  * Checks whether a given trip belongs to the driver's active city pool.
  * If driver is in Kimberley, only Kimberley requests return true.
- * Distant requests (>50km) and unassigned/other province requests are strictly excluded.
+ * Trips in Gauteng/Johannesburg or other distant regions are strictly excluded.
  */
 export function isTripInDriverCity(
   trip: {
@@ -384,6 +429,24 @@ export function isTripInDriverCity(
     resolveCityFromCoords(driverLat, driverLng) ||
     'Kimberley';
 
+  // 1. Resolve trip city first
+  const tripCity = resolveCityFromLocation(
+    trip.pickup_lat,
+    trip.pickup_lng,
+    trip.pickup_location
+  );
+
+  // Unidentified ('Other') or missing trips do NOT match any local city pool
+  if (!tripCity || tripCity.toLowerCase() === 'other' || tripCity.toLowerCase() === 'unknown') {
+    return false;
+  }
+
+  // Trip city and driver city MUST match (e.g. Johannesburg/Gauteng vs Kimberley)
+  if (!areCitiesMatching(tripCity, resolvedDriverCity)) {
+    return false;
+  }
+
+  // 2. If both have GPS coordinates, verify they are within reasonable urban proximity (<= 50km)
   const hasDriverCoords =
     driverLat !== undefined &&
     driverLat !== null &&
@@ -400,29 +463,12 @@ export function isTripInDriverCity(
     trip.pickup_lng !== null &&
     !Number.isNaN(trip.pickup_lng);
 
-  // 1. If GPS coordinates exist for both, physical proximity is ground truth
   if (hasDriverCoords && hasTripCoords) {
     const distanceKm = calculateDistanceKm(driverLat, driverLng, trip.pickup_lat!, trip.pickup_lng!);
-    // If within urban radius of driver (<= 45km), it is in driver pool
-    if (distanceKm <= 45) {
-      return true;
+    if (distanceKm > 50) {
+      return false;
     }
-    // If beyond 50km, it can NEVER belong to this driver's local city pool
-    // (Prevents a Gauteng trip ~450km away from ever reaching a Kimberley driver)
-    return false;
   }
 
-  // 2. If coordinates are missing on either side, check resolved city of the trip
-  const tripCity = resolveCityFromLocation(
-    trip.pickup_lat,
-    trip.pickup_lng,
-    trip.pickup_location
-  );
-
-  // Unidentified ('Other') or missing trips do NOT match any local city pool
-  if (!tripCity || tripCity.toLowerCase() === 'other' || tripCity.toLowerCase() === 'unknown') {
-    return false;
-  }
-
-  return tripCity.toLowerCase() === resolvedDriverCity.toLowerCase();
+  return true;
 }

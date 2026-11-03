@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote, Globe, Search, Filter } from 'lucide-react'
 import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
-import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
+import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, areCitiesMatching, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
 import { createClient } from '@/utils/supabase/client'
@@ -1088,7 +1088,7 @@ export default function DriverPage() {
     // City filter
     if (nationalCityFilter !== 'all') {
       const tripCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location);
-      if (tripCity.toLowerCase() !== nationalCityFilter.toLowerCase()) {
+      if (!areCitiesMatching(tripCity, nationalCityFilter)) {
         return false;
       }
     }
@@ -2177,23 +2177,25 @@ export default function DriverPage() {
                     {SOUTH_AFRICAN_CITIES.map((c) => {
                       const countInCity = allNationalTrips.filter(t => {
                         const tripCity = resolveCityFromLocation(t.pickup_lat, t.pickup_lng, t.pickup_location);
-                        return tripCity.toLowerCase() === c.name.toLowerCase();
+                        return areCitiesMatching(tripCity, c.name);
                       }).length;
-                      if (countInCity === 0 && c.name.toLowerCase() !== driverCity.toLowerCase()) return null;
+                      if (countInCity === 0 && !areCitiesMatching(c.name, driverCity)) return null;
+                      const isFilterActive = areCitiesMatching(c.name, nationalCityFilter);
+                      const displayLabel = c.name === 'Johannesburg' ? 'Gauteng (Joburg)' : c.name;
                       return (
                         <button
                           key={c.name}
                           type="button"
-                          onClick={() => setNationalCityFilter(c.name.toLowerCase())}
+                          onClick={() => setNationalCityFilter(isFilterActive ? 'all' : c.name.toLowerCase())}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 ${
-                            nationalCityFilter === c.name.toLowerCase()
+                            isFilterActive
                               ? 'bg-black dark:bg-white text-white dark:text-black shadow-xs'
                               : 'bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700'
                           }`}
                         >
-                          <span>{c.name}</span>
+                          <span>{displayLabel}</span>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
-                            nationalCityFilter === c.name.toLowerCase()
+                            isFilterActive
                               ? 'bg-white/20 dark:bg-black/20 text-white dark:text-black'
                               : 'bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-400'
                           }`}>
@@ -2256,7 +2258,7 @@ export default function DriverPage() {
                   ) : (
                     filteredNationalTrips.map((trip) => {
                       const tripCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location);
-                      const isMyCity = tripCity.toLowerCase() === driverCity.toLowerCase();
+                      const isMyCity = areCitiesMatching(tripCity, driverCity);
                       const isAccepting = acceptingTripId === trip.id;
                       const isPreviewing = previewNationalTripId === trip.id;
 
@@ -2276,7 +2278,7 @@ export default function DriverPage() {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[11px] font-black px-2.5 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950/70 text-blue-900 dark:text-blue-200 flex items-center gap-1">
                                 <MapPin size={11} />
-                                <span>{tripCity}</span>
+                                <span>{tripCity === 'Johannesburg' ? 'Gauteng (Joburg)' : tripCity}</span>
                               </span>
                               {isMyCity && (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60">
