@@ -113,15 +113,12 @@ export default function RootLayout({
                   var isStandalone =
                     (window.matchMedia && (
                       window.matchMedia('(display-mode: standalone)').matches ||
-                      window.matchMedia('(display-mode: fullscreen)').matches ||
-                      window.matchMedia('(display-mode: minimal-ui)').matches ||
                       window.matchMedia('(display-mode: window-controls-overlay)').matches
                     )) ||
                     window.navigator.standalone === true ||
                     (document.referrer && document.referrer.indexOf('android-app://') !== -1) ||
                     window.location.search.indexOf('source=pwa') !== -1 ||
-                    window.location.search.indexOf('mode=standalone') !== -1 ||
-                    sessionStorage.getItem('solo_pwa_session') === 'true';
+                    window.location.search.indexOf('mode=standalone') !== -1;
 
                   if (isStandalone) {
                     sessionStorage.setItem('solo_pwa_session', 'true');
@@ -142,21 +139,6 @@ export default function RootLayout({
                     if (isStandalone) {
                       localStorage.setItem('solo_pwa_installed_rider', 'true');
                       document.cookie = 'solo_pwa_installed_rider=true; path=/; max-age=31536000; SameSite=Lax';
-                    }
-                  } else if (path === '/') {
-                    if (isStandalone) {
-                      var role = localStorage.getItem('solo_installed_app_role');
-                      if (!role) {
-                        var match = document.cookie.match(/(?:^|;\\s*)solo_installed_app_role=(driver|rider)/);
-                        if (match) role = match[1];
-                      }
-                      if (!role) {
-                        if (localStorage.getItem('solo_driver_session') || localStorage.getItem('driver_id')) role = 'driver';
-                        else if (localStorage.getItem('solo_rider_session') || localStorage.getItem('solo_verified_rider')) role = 'rider';
-                      }
-                      if (role === 'driver' || role === 'rider') {
-                        window.location.replace('/' + role + '?source=pwa');
-                      }
                     }
                   }
                 } catch (e) {}

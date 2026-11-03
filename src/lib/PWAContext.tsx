@@ -104,8 +104,6 @@ export function detectStandaloneOrInstalled(_role?: PortalRole): {
     if (window.matchMedia) {
       isDisplayStandalone =
         window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: fullscreen)').matches ||
-        window.matchMedia('(display-mode: minimal-ui)').matches ||
         window.matchMedia('(display-mode: window-controls-overlay)').matches;
     }
   } catch {}
@@ -124,12 +122,7 @@ export function detectStandaloneOrInstalled(_role?: PortalRole): {
     isPwaSource = search.includes('source=pwa') || search.includes('mode=standalone');
   } catch {}
 
-  let hasSessionFlag = false;
-  try {
-    hasSessionFlag = sessionStorage.getItem(PWA_SESSION_KEY) === 'true';
-  } catch {}
-
-  const standaloneDisplay = isDisplayStandalone || isIosStandalone || isTwa || isPwaSource || hasSessionFlag;
+  const standaloneDisplay = isDisplayStandalone || isIosStandalone || isTwa || isPwaSource;
   const alreadyInstalled = standaloneDisplay;
 
   return { standaloneDisplay, alreadyInstalled };
@@ -307,12 +300,6 @@ export function PWAProvider({ children }: { children: ReactNode }) {
     const isAndroidDevice = /android/.test(ua);
     setIsIOS(isIosDevice);
     setIsAndroid(isAndroidDevice);
-
-    // If launched in standalone mode on the root home page ('/'), immediately redirect to the installed portal!
-    if (standaloneDisplay && window.location.pathname === '/') {
-      const targetRole = savedRole || 'rider';
-      router.replace(`/${targetRole}`);
-    }
 
     // Check dismissal status in localStorage
     try {

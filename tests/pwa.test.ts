@@ -160,4 +160,34 @@ describe('PWA Mobile Installation & Offline Optimization Suite', () => {
     assert.ok(iconSizes.includes('192x192'), 'Driver manifest must include 192x192 icon');
     assert.ok(iconSizes.includes('512x512'), 'Driver manifest must include 512x512 icon');
   });
+
+  it('guarantees root landing page (/) never auto-redirects to driver or rider portals', () => {
+    const layoutPath = path.join(rootDir, 'src', 'app', 'layout.tsx');
+    const pwaContextPath = path.join(rootDir, 'src', 'lib', 'PWAContext.tsx');
+    const navbarPath = path.join(rootDir, 'src', 'components', 'Navbar.tsx');
+
+    const layoutContent = fs.readFileSync(layoutPath, 'utf8');
+    const pwaContextContent = fs.readFileSync(pwaContextPath, 'utf8');
+    const navbarContent = fs.readFileSync(navbarPath, 'utf8');
+
+    // Layout head script must not redirect on path === '/'
+    assert.strictEqual(
+      layoutContent.includes("window.location.replace('/' + role"),
+      false,
+      'layout.tsx must not hijack root landing page with window.location.replace'
+    );
+
+    // PWAContext must not auto-redirect from '/' on initial load
+    assert.strictEqual(
+      pwaContextContent.includes("standaloneDisplay && window.location.pathname === '/'"),
+      false,
+      'PWAContext must not auto-redirect away from root landing page on mount'
+    );
+
+    // Navbar brand logo must link to '/' when on root/landing page
+    assert.ok(
+      navbarContent.includes('const brandHref = isDriverApp ? "/driver" : isRiderApp ? "/rider" : "/";'),
+      'Navbar brandHref must route to "/" when not on a driver or rider subpage'
+    );
+  });
 });

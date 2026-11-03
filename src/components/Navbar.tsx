@@ -14,14 +14,8 @@ export function Navbar() {
   const isDriverApp = pathname?.startsWith("/driver");
   const isFleetApp = pathname?.startsWith("/fleet");
 
-  // In standalone / installed PWA mode, tapping the brand logo stays inside the installed portal
-  const brandHref = isStandalone
-    ? isDriverApp || installedRole === "driver"
-      ? "/driver"
-      : isRiderApp || installedRole === "rider"
-      ? "/rider"
-      : "/"
-    : "/";
+  // Brand logo navigates to active portal or home page
+  const brandHref = isDriverApp ? "/driver" : isRiderApp ? "/rider" : "/";
 
   return (
     <div className="fixed top-2 sm:top-2.5 md:top-3 pt-safe left-0 right-0 flex justify-center z-[1000] pointer-events-none px-2 sm:px-4 md:px-6">
