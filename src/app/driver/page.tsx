@@ -1146,75 +1146,58 @@ export default function DriverPage() {
         )}
       </div>
 
-      {/* Floating Header */}
-      <div className="absolute top-2 sm:top-2.5 md:top-3.5 pt-safe left-2.5 right-2.5 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto md:left-4 lg:left-6 md:right-auto md:mx-0 md:w-[390px] lg:w-[430px] md:max-w-none z-30 pointer-events-auto">
-        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-gray-200/80 dark:border-white/15 p-3 sm:p-3.5 md:p-4 flex justify-between items-center gap-2.5 transition-all">
+      {/* Floating Header - Compact Mobile-First Design */}
+      <div className="absolute top-2 sm:top-2.5 md:top-3 pt-safe left-2 right-2 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto md:left-4 lg:left-6 md:right-auto md:mx-0 md:w-[390px] lg:w-[430px] md:max-w-none z-30 pointer-events-auto">
+        <div className="bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl shadow-xl rounded-2xl md:rounded-3xl border border-gray-200/80 dark:border-white/15 p-2 sm:p-2.5 md:p-3 flex justify-between items-center gap-2 transition-all">
           <div className="relative shrink-0">
             <img
               src="/driver-icon-192.png"
               alt="SOLO Driver Portal Avatar"
-              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl object-cover shadow-md border-2 transition-all ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm border-2 transition-all ${
                 isOnline ? 'border-emerald-500 shadow-emerald-500/20' : 'border-zinc-700/50'
               }`}
             />
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-zinc-950 ${
+              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white dark:ring-zinc-950 ${
                 isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'
               }`}
             />
           </div>
           <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h1 className="text-base sm:text-lg md:text-xl font-black tracking-tight shrink-0">SOLO</h1>
-              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-2 py-0.5 rounded-full text-amber-600 dark:text-amber-400 font-bold text-xs shadow-sm shrink-0">
+            <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
+              <span className="text-sm sm:text-base font-black tracking-tight shrink-0">SOLO</span>
+              <div className="flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/40 px-1.5 py-0.2 rounded-full text-amber-600 dark:text-amber-400 font-bold text-[11px] shadow-xs shrink-0">
                 <span>★</span>
                 <span>{ratingSummary.count > 0 ? ratingSummary.average.toFixed(1) : '5.0'}</span>
-                {ratingSummary.count > 0 && <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">({ratingSummary.count})</span>}
               </div>
+              <span className="text-xs text-gray-700 dark:text-gray-300 font-bold truncate">
+                {profile?.fullName ? profile.fullName.split(' ')[0] : 'Driver'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-bold truncate">
+              <span>📍 {driverCity} Pool</span>
               {isOwner ? (
-                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700/60 uppercase tracking-wider flex items-center gap-1 shadow-sm shrink-0">
-                  <Crown size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="hidden sm:inline">Platform </span>Owner
-                </span>
+                <span className="text-amber-600 dark:text-amber-400">• Owner</span>
               ) : profile?.subscriptionPlan === 'fleet_pro' ? (
-                <span className="bg-purple-100/90 text-purple-900 border border-purple-300 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-purple-950/80 dark:text-purple-200 dark:border-purple-700/60 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
-                  <Building2 size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />
-                  <span className="hidden sm:inline">Fleet </span>Partner
-                </span>
-              ) : profile?.subscriptionPlan === 'cancelled' || (!profile?.subscriptionActive && !isTrialExpired) ? (
-                <span className="bg-red-100/90 text-red-900 border border-red-300 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-red-950/80 dark:text-red-200 dark:border-red-800 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
-                  <AlertCircle size={12} className="text-red-600 dark:text-red-400" />
-                  <span>Cancelled</span>
-                </span>
+                <span className="text-purple-600 dark:text-purple-400">• Fleet</span>
               ) : isTrialExpired ? (
-                <span className="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-800 uppercase tracking-wider flex items-center gap-1 shadow-xs shrink-0">
-                  <Lock size={12} className="text-amber-600 dark:text-amber-400" />
-                  <span>Locked (Trial Expired)</span>
-                </span>
+                <span className="text-red-600 dark:text-red-400">• Locked</span>
               ) : profile?.subscriptionPlan === 'paid' ? (
-                <span className="bg-blue-100/80 text-blue-800 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-blue-900/80 dark:text-blue-200 uppercase tracking-wider shrink-0">
-                  <span className="hidden sm:inline">Premium </span>Pro
-                </span>
+                <span className="text-blue-600 dark:text-blue-400">• Pro</span>
               ) : (
-                <span className="bg-green-100/80 text-green-800 text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full dark:bg-green-900/80 dark:text-green-200 uppercase tracking-wider shrink-0">
-                  <span className="hidden sm:inline">14-Day </span>Trial
-                </span>
+                <span className="text-emerald-600 dark:text-emerald-400">• Trial</span>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 font-semibold mt-0.5 break-words">
-              Welcome back, {profile?.fullName ? profile.fullName.split(' ')[0] : ((profile as any)?.full_name ? (profile as any).full_name.split(' ')[0] : 'Driver')}
-            </p>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {!isStandalone && (
               <button
                 type="button"
                 onClick={() => installApp('driver')}
-                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2.5 min-h-[46px] rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 text-xs sm:text-sm font-black transition active:scale-95 touch-manipulation"
+                className="hidden xs:flex items-center justify-center p-2 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 text-xs font-black transition active:scale-95"
                 title="Install SOLO Driver App"
               >
-                <Download size={16} className="shrink-0" />
-                <span className="hidden xs:inline sm:inline">Install</span>
+                <Download size={14} />
               </button>
             )}
             <button 
@@ -1248,13 +1231,13 @@ export default function DriverPage() {
                 }
               }}
               disabled={!!activeTrip}
-              className={`flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 min-h-[46px] min-w-[98px] rounded-2xl text-sm sm:text-base font-black transition-all shadow-sm touch-manipulation ${
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 min-h-[38px] rounded-xl text-xs sm:text-sm font-black transition-all shadow-sm touch-manipulation ${
                 isOnline 
-                  ? 'bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.35)]' 
-                  : 'bg-zinc-900 text-white hover:bg-black dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700'
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                  : 'bg-zinc-900 text-white hover:bg-black dark:bg-zinc-800 dark:text-zinc-100'
               } ${activeTrip ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             >
-              <Power size={18} />
+              <Power size={15} />
               <span>{isOnline ? 'Online' : 'Go Online'}</span>
             </button>
           </div>
@@ -1298,14 +1281,16 @@ export default function DriverPage() {
         </div>
       )}
 
-      {/* Floating Main Content Panel */}
+      {/* Floating Main Content Panel - Compact Height on Mobile */}
       <div 
         className={`absolute left-2.5 right-2.5 sm:left-4 sm:right-4 sm:max-w-xl sm:mx-auto md:left-4 lg:left-6 md:right-auto md:mx-0 md:w-[390px] lg:w-[430px] md:max-w-none flex flex-col z-20 pointer-events-none transition-all duration-300 ${
           activeTab === 'home'
             ? isHomeSheetMinimized
-              ? 'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-auto md:top-[88px] max-h-[56px]'
-              : 'bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-[86px] md:top-[88px] max-h-[72vh] max-h-[72dvh] md:max-h-none'
-            : 'top-[78px] sm:top-[88px] md:top-[88px] bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] md:bottom-[86px]'
+              ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-auto md:top-[68px] max-h-[46px]'
+              : activeTrip
+                ? 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-[86px] md:top-[68px] max-h-[72vh] max-h-[72dvh] md:max-h-none'
+                : 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-[86px] md:top-[68px] max-h-[36vh] sm:max-h-[42vh] md:max-h-none'
+            : 'top-[62px] sm:top-[68px] md:top-[68px] bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-[86px]'
         }`}
       >
         <div
@@ -1318,17 +1303,17 @@ export default function DriverPage() {
           {activeTab === 'home' && (
             <div 
               onClick={() => setIsHomeSheetMinimized(!isHomeSheetMinimized)}
-              className="flex items-center justify-between px-4 py-3 bg-gray-50/90 dark:bg-zinc-900/90 border-b border-gray-200/70 dark:border-white/10 cursor-pointer touch-manipulation select-none shrink-0"
+              className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50/90 dark:bg-zinc-900/90 border-b border-gray-200/70 dark:border-white/10 cursor-pointer touch-manipulation select-none shrink-0"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-1.5 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
-                <span className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-200 break-words">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-1 bg-gray-300 dark:bg-zinc-600 rounded-full shrink-0" />
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
                   {isHomeSheetMinimized 
-                    ? (activeTrip ? `${activeTrip.status.replace('_', ' ').toUpperCase()} • PIN: ${activeTrip.verification_pin || '----'} • R${activeTrip.fare_amount}` : isOnline ? (declinedAvailableTrips.length > 0 ? `Online • ${declinedAvailableTrips.length} Available Ride${declinedAvailableTrips.length > 1 ? 's' : ''} (Tap to view)` : "Online • Searching (Tap to expand)") : "Offline • Tap to expand")
-                    : "Driver Controls"}
+                    ? (activeTrip ? `${activeTrip.status.replace('_', ' ').toUpperCase()} • PIN: ${activeTrip.verification_pin || '----'} • R${activeTrip.fare_amount}` : isOnline ? (declinedAvailableTrips.length > 0 ? `Online • ${declinedAvailableTrips.length} Available Ride${declinedAvailableTrips.length > 1 ? 's' : ''}` : `Online • ${driverCity} Pool (Tap to expand)`) : "Offline (Tap to expand)")
+                    : (activeTrip ? "Active Trip Controls" : isOnline ? `Online • ${driverCity} Pool` : "Driver Status")}
                 </span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {isHomeSheetMinimized && activeTrip && (
                   <button
                     type="button"
@@ -1337,27 +1322,27 @@ export default function DriverPage() {
                       setDriverTripSubTab('chat')
                       setIsHomeSheetMinimized(false)
                     }}
-                    className="relative text-xs font-bold text-white bg-blue-600 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-2xs"
+                    className="relative text-xs font-bold text-white bg-blue-600 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs"
                   >
-                    <MessageCircle size={14} />
+                    <MessageCircle size={13} />
                     <span>Chat</span>
                     {driverUnreadChatCount > 0 && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping absolute -top-0.5 -right-0.5" />
                     )}
                   </button>
                 )}
                 <button 
                   type="button" 
-                  className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 p-1 shrink-0 touch-manipulation"
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-0.5 p-0.5 shrink-0 touch-manipulation"
                 >
                   <span>{isHomeSheetMinimized ? 'Expand' : 'Map View'}</span>
-                  {isHomeSheetMinimized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {isHomeSheetMinimized ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
               </div>
             </div>
           )}
 
-          <div className={`p-4 sm:p-5 md:p-5 lg:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
+          <div className={`p-3 sm:p-4 md:p-5 lg:p-6 overflow-y-auto overscroll-contain momentum-scroll custom-scrollbar flex-1 min-h-0 flex flex-col ${
             activeTab === 'home' && isHomeSheetMinimized
               ? 'hidden'
               : activeTab === 'home' && activeTrip
@@ -1759,49 +1744,63 @@ export default function DriverPage() {
                       </button>
                     </div>
                   )}
-                  <div className="mb-4 sm:mb-5 flex justify-center">
-                    <div className={`relative p-1.5 rounded-[1.75rem] transition-all duration-500 ${
-                      isOnline
-                        ? 'bg-gradient-to-br from-emerald-400 via-teal-500 to-green-600 shadow-2xl shadow-emerald-500/35 scale-105'
-                        : 'bg-zinc-200 dark:bg-zinc-800 opacity-75 grayscale-[35%]'
-                    }`}>
-                      <img
-                        src="/driver-icon-512.png"
-                        alt="SOLO Driver Emblem"
-                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.4rem] object-cover border border-white/20 shadow-inner"
-                      />
-                      <span
-                        className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ring-4 ring-white dark:ring-zinc-950 ${
-                          isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'
-                        }`}
-                      />
+                  {/* Modern Compact Driver Status Hub - Sleek, Low-Profile Mobile Layout */}
+                  <div className="mb-3 p-3 rounded-2xl bg-gray-50/90 dark:bg-zinc-900/90 border border-gray-200/70 dark:border-white/10 shadow-xs flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 shadow-2xs border border-gray-100 dark:border-white/5">
+                        {isOnline ? (
+                          <>
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping absolute" />
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 relative" />
+                          </>
+                        ) : (
+                          <Power size={14} className="text-gray-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black text-gray-900 dark:text-gray-100">
+                            {isOnline ? "Online & Searching" : "Driver Offline"}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
+                            {driverCity}
+                          </span>
+                        </div>
+                        <p className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                          {isOnline 
+                            ? (telemetryStatus ? `${telemetryStatus.speedKmh} km/h • 🔋${telemetryStatus.batteryLevel}% • Radar mesh active` : `Matching riders in ${driverCity} pool`) 
+                            : "Tap 'Go Online' in the top bar to start receiving rides"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isOnline && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            audioAlert.unlockMobileAudio(false);
+                            audioAlert.playAlertSequence();
+                          }}
+                          title="Test alert sound"
+                          className="p-1.5 rounded-xl bg-white dark:bg-zinc-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 text-xs font-bold transition active:scale-95 shadow-2xs"
+                        >
+                          🔊
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('trips');
+                          setIsHomeSheetMinimized(false);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-blue-100 hover:bg-blue-200 dark:bg-blue-950/70 dark:hover:bg-blue-900/60 text-blue-800 dark:text-blue-300 text-xs font-bold border border-blue-300/80 dark:border-blue-700/60 flex items-center gap-1 active:scale-95 transition"
+                      >
+                        <Globe size={11} />
+                        <span>Board ({allNationalTrips.length})</span>
+                      </button>
                     </div>
                   </div>
-                  <h2 className="text-2xl sm:text-3xl font-bold mb-2 tracking-tight">
-                    {isOnline ? "You're Online" : "You're Offline"}
-                  </h2>
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/60">
-                      <MapPin size={12} />
-                      <span>Pool: {driverCity}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('trips');
-                        setIsHomeSheetMinimized(false);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 hover:bg-blue-200 dark:bg-blue-950/70 dark:hover:bg-blue-900/60 text-blue-800 dark:text-blue-300 border border-blue-300/80 dark:border-blue-700/60 transition active:scale-95"
-                    >
-                      <Globe size={12} />
-                      <span>National Board ({allNationalTrips.length})</span>
-                    </button>
-                  </div>
-                  <p className="text-gray-500 text-sm sm:text-base mb-5 sm:mb-6 font-medium">
-                    {isOnline 
-                      ? `Waiting for ride requests in ${driverCity} & surrounds...` 
-                      : "Go online to start receiving ride requests."}
-                  </p>
                   
                   {nearbySosAlert && (
                     <div className="mb-4 p-3.5 rounded-2xl bg-red-600 text-white text-left text-xs shadow-xl shadow-red-600/30 animate-pulse space-y-2">
@@ -1918,44 +1917,8 @@ export default function DriverPage() {
                     </div>
                   )}
 
-                  {isOnline && (
-                    <div className="space-y-3">
-                      <div className="bg-blue-50/90 text-blue-900 dark:bg-blue-900/35 dark:text-blue-200 p-4 rounded-2xl flex items-center justify-between gap-2.5 animate-pulse border border-blue-200/70 dark:border-blue-800/40">
-                        <div className="flex items-center gap-2.5">
-                          <Navigation size={20} className="shrink-0" />
-                          <span className="text-sm sm:text-base font-extrabold tracking-wide">SEARCHING FOR RIDERS</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            audioAlert.unlockMobileAudio(false);
-                            audioAlert.playAlertSequence();
-                          }}
-                          className="shrink-0 px-3 py-1.5 min-h-[38px] rounded-xl bg-white dark:bg-zinc-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/60 text-xs sm:text-sm font-bold shadow-2xs active:scale-95 transition touch-manipulation"
-                        >
-                          🔊 Test Sound
-                        </button>
-                      </div>
-
-                      {/* Adaptive Battery-Aware & WebSocket Telemetry HUD */}
-                      <div className="p-3.5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/35 border border-emerald-200/80 dark:border-emerald-800/50 flex items-center justify-between gap-2 flex-wrap text-xs sm:text-sm font-bold text-emerald-900 dark:text-emerald-200">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                          <span className="break-words">
-                            {telemetryStatus
-                              ? TELEMETRY_TIER_CONFIGS[telemetryStatus.tier].label
-                              : 'WS Geohash-6 Mesh Active'}
-                          </span>
-                        </div>
-                        <span className="font-mono text-xs bg-white/90 dark:bg-zinc-900 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0">
-                          {telemetryStatus
-                            ? `${telemetryStatus.geohash6.toUpperCase()} • ${telemetryStatus.speedKmh}km/h • 🔋${telemetryStatus.batteryLevel}%`
-                            : '0 DB Poll Drain'}
-                        </span>
-                      </div>
-
-                      {/* Declined Requests Still Open & Available to Accept */}
-                      {declinedAvailableTrips.length > 0 && !activeTrip && (
+                  {/* Declined Requests Still Open & Available to Accept */}
+                  {declinedAvailableTrips.length > 0 && !activeTrip && (
                         <div className="mt-4 pt-1 text-left space-y-3">
                           <div className="flex items-center justify-between px-1">
                             <div className="flex items-center gap-2">
@@ -2072,8 +2035,6 @@ export default function DriverPage() {
                           </div>
                         </div>
                       )}
-                    </div>
-                  )}
 
                   <div className="mt-4 text-left space-y-3">
                     {!isStandalone && (
