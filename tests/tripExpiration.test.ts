@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { isStaleRequestedTrip, isTripExpired, TRIP_EXPIRATION_MS } from '../src/utils/tripExpiration.ts';
+import { isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, TRIP_EXPIRATION_MS } from '../src/utils/tripExpiration.ts';
 
 interface MockTrip {
   id: string;
@@ -11,6 +11,7 @@ interface MockTrip {
   fare_amount: number;
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
   created_at: string;
+  updated_at?: string;
   scheduled_time?: string | null;
 }
 
@@ -142,5 +143,77 @@ describe('1-Hour Unclaimed Trip Expiration Suite', () => {
     assert.strictEqual(activeRiderTrip, null, 'Active trip must be cleared on expiration');
     assert.strictEqual(storedActiveTripId, null, 'Persisted active trip pointer must be cleared');
     assert.match(riderNotice || '', /expired.*book again/i, 'Rider must be instructed to book again');
+  });
+
+  it('keeps cancelled trips visible on dashboard if cancelled under 1 hour ago', () => {
+    const freshCancelledTrip: MockTrip = {
+      id: 'trip-cancelled-fresh',
+      rider_id: 'rider-cancel-1',
+      pickup_location: 'Bloemfontein CBD',
+      dropoff_location: 'Bayswater',
+      fare_amount: 85,
+      status: 'cancelled',
+      created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(), // Cancelled 25 minutes ago
+    };
+
+    assert.strictEqual(isStaleCancelledTrip(freshCancelledTrip), false, 'Trip cancelled < 1hr ago must not be stale');
+    assert.strictEqual(isTripExpired(freshCancelledTrip), false, 'Trip cancelled < 1hr ago must not be expired');
+  });
+
+  it('expires and removes cancelled trips from dashboard once they reach 1 hour old', () => {
+    const expiredCancelledTrip: MockTrip = {
+      id: 'trip-cancelled-old',
+      rider_id: 'rider-cancel-2',
+      pickup_location: 'Gqeberha Airport',
+      dropoff_location: 'Summerstrand',
+      fare_amount: 110,
+      status: 'cancelled',
+      created_at: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+      updated_at: new Date(Date.now() - 65 * 60 * 1000).toISOString(), // Cancelled 65 minutes ago
+    };
+
+    assert.strictEqual(isStaleCancelledTrip(expiredCancelledTrip), true, 'Trip cancelled > 1hr ago must be stale');
+    assert.strictEqual(isTripExpired(expiredCancelledTrip), true, 'Trip cancelled > 1hr ago must expire');
+  });
+
+  it('simulates dashboard filtering: removes stale cancelled trips (> 1hr) while retaining recent ones (< 1hr)', () => {
+    const dashboardTrips: MockTrip[] = [
+      {
+        id: 'active-req',
+        rider_id: 'r-1',
+        pickup_location: 'Sandton',
+        dropoff_location: 'Rosebank',
+        fare_amount: 90,
+        status: 'requested',
+        created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'recent-cancelled',
+        rider_id: 'r-2',
+        pickup_location: 'Kimberley North Cape Mall',
+        dropoff_location: 'Royldene',
+        fare_amount: 60,
+        status: 'cancelled',
+        created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+        updated_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(), // Cancelled 20m ago (stays)
+      },
+      {
+        id: 'stale-cancelled',
+        rider_id: 'r-3',
+        pickup_location: 'Burgandy Hills Estate',
+        dropoff_location: 'Bryanston',
+        fare_amount: 195,
+        status: 'cancelled',
+        created_at: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+        updated_at: new Date(Date.now() - 75 * 60 * 1000).toISOString(), // Cancelled 75m ago (MUST BE REMOVED)
+      },
+    ];
+
+    const visibleOnDashboard = dashboardTrips.filter(t => !isTripExpired(t));
+    assert.strictEqual(visibleOnDashboard.length, 2, 'Dashboard must retain active request and recent cancelled trip');
+    assert.ok(visibleOnDashboard.some(t => t.id === 'active-req'));
+    assert.ok(visibleOnDashboard.some(t => t.id === 'recent-cancelled'));
+    assert.ok(!visibleOnDashboard.some(t => t.id === 'stale-cancelled'), 'Stale cancelled trip must be removed from dashboard');
   });
 });

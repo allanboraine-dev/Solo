@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote, Globe, Search, Filter } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, areCitiesMatching, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -340,7 +340,8 @@ export default function DriverPage() {
       }
 
       const trips = await getTrips();
-      setAllNationalTrips(trips);
+      // Filter out stale unclaimed requests and stale cancelled trips (> 1hr) from driver dashboard
+      setAllNationalTrips(trips.filter(t => !isTripExpired(t)));
       const declinedIds = getDeclinedTripIds(driverId);
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
@@ -1085,6 +1086,9 @@ export default function DriverPage() {
   const previewNationalTrip = previewNationalTripId ? allNationalTrips.find(t => t.id === previewNationalTripId) : null;
 
   const filteredNationalTrips = allNationalTrips.filter((trip) => {
+    // Exclude expired trips: unclaimed requests > 1hr and cancelled trips > 1hr
+    if (isTripExpired(trip)) return false;
+
     // City filter
     if (nationalCityFilter !== 'all') {
       const tripCity = resolveCityFromLocation(trip.pickup_lat, trip.pickup_lng, trip.pickup_location);
@@ -2302,6 +2306,10 @@ export default function DriverPage() {
                               ) : trip.status === 'completed' ? (
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
                                   ✅ Completed
+                                </span>
+                              ) : trip.status === 'cancelled' ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border border-rose-300/70 dark:border-rose-700/60">
+                                  ❌ Cancelled
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400">

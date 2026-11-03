@@ -27,6 +27,7 @@ export type MockTrip = {
   vehicle_plate?: string;
   scheduled_time?: string;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type MockMessage = {
@@ -345,6 +346,7 @@ import {
   TRIP_EXPIRATION_MS,
   STALE_REQUEST_MAX_AGE_MS,
   isStaleRequestedTrip,
+  isStaleCancelledTrip,
   isTripExpired,
 } from '@/utils/tripExpiration';
 
@@ -352,6 +354,7 @@ export {
   TRIP_EXPIRATION_MS,
   STALE_REQUEST_MAX_AGE_MS,
   isStaleRequestedTrip,
+  isStaleCancelledTrip,
   isTripExpired,
 };
 
@@ -588,6 +591,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         verification_pin: dbTrip.verification_pin || existing?.verification_pin,
         scheduled_time: dbTrip.scheduled_time || existing?.scheduled_time,
         created_at: dbTrip.created_at || existing?.created_at,
+        updated_at: dbTrip.updated_at || existing?.updated_at,
       };
 
       if (!existing) {
@@ -607,7 +611,8 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     });
   }
 
-  const result = Array.from(mergedMap.values());
+  // Remove cancelled trips that have exceeded the 1-hour retention window
+  const result = Array.from(mergedMap.values()).filter(t => !isStaleCancelledTrip(t));
   try {
     localStorage.setItem('mock_trips', JSON.stringify(result.slice(0, 100)));
   } catch {
@@ -630,6 +635,7 @@ export const saveTrip = async (trip: MockTrip) => {
     rider_id: ensureValidUuid(trip.rider_id),
     verification_pin: trip.verification_pin || Math.floor(1000 + Math.random() * 9000).toString(),
     created_at: trip.created_at || new Date().toISOString(),
+    updated_at: trip.updated_at || new Date().toISOString(),
   };
 
   // 1. Save locally first for instant UI response & broadcast immediately across tabs/clients
