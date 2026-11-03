@@ -24,6 +24,7 @@ import { AdaptiveTelemetryGovernor, TELEMETRY_TIER_CONFIGS, type ComputedGpsSamp
 import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
 import { updateSupportTicketStatus, type SupportTicket } from '@/utils/supportStore'
 import { usePWA } from '@/lib/PWAContext'
+import { RandIcon } from '@/components/icons/RandIcon'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -2402,7 +2403,12 @@ export default function DriverPage() {
 
             {activeTab === 'earnings' && (
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-                <h2 className="text-2xl font-bold mb-6 tracking-tight">Your Earnings</h2>
+                <div className="flex items-center gap-2.5 mb-6">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                    <RandIcon size={20} />
+                  </div>
+                  <h2 className="text-2xl font-bold tracking-tight">Your Earnings</h2>
+                </div>
                 <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-3xl p-6 text-white shadow-lg shadow-green-500/30 mb-8">
                   <p className="text-green-100 font-medium mb-1">Total Earned</p>
                   <h3 className="text-5xl font-black">R{completedTrips.reduce((sum, t) => sum + t.fare_amount, 0)}</h3>
@@ -2814,7 +2820,7 @@ export default function DriverPage() {
           onClick={() => setActiveTab('earnings')}
           className={`flex flex-col items-center justify-center flex-1 py-2 px-1 min-h-[52px] rounded-xl sm:rounded-2xl transition-all touch-manipulation active:scale-95 ${activeTab === 'earnings' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white font-bold' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <RandIcon size={22} className="shrink-0" />
           <span className="text-[11px] sm:text-xs mt-0.5 uppercase tracking-wider font-bold">Earnings</span>
         </button>
         <button 

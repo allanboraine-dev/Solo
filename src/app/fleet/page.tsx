@@ -18,7 +18,6 @@ import {
   PauseCircle,
   PlayCircle,
   UserPlus,
-  DollarSign,
   TrendingUp,
   Download,
   ExternalLink,
@@ -65,6 +64,7 @@ import {
   activateFleetSubscription,
   DISABLE_FLEET_PAYMENT_FOR_TESTING,
 } from "@/utils/fleetStore";
+import { RandIcon } from "@/components/icons/RandIcon";
 
 export default function FleetPage() {
   const [activeTab, setActiveTab] = useState<"vehicles" | "audits" | "compliance" | "billing">("vehicles");
@@ -618,7 +618,7 @@ export default function FleetPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2 shadow-2xs">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
-              <DollarSign size={18} />
+              <RandIcon size={18} />
             </div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">100% In-Vehicle Settlement</h3>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
@@ -1073,7 +1073,7 @@ export default function FleetPage() {
                 onClick={() => setIsRecordAuditOpen(true)}
                 className="inline-flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs md:text-sm border border-zinc-700 transition"
               >
-                <DollarSign size={16} />
+                <RandIcon size={16} />
                 <span>Record Shift Audit</span>
               </button>
             )}
@@ -2093,7 +2093,7 @@ export default function FleetPage() {
           <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] max-h-[90dvh] overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-zinc-800 pb-3">
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-                <DollarSign className="text-emerald-500" size={18} />
+                <RandIcon className="text-emerald-500" size={18} />
                 Record End-of-Shift Audit
               </h3>
               <button onClick={() => setIsRecordAuditOpen(false)} className="text-gray-400 hover:text-gray-600">

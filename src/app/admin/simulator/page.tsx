@@ -14,7 +14,6 @@ import {
   CreditCard,
   MessageSquare,
   KeyRound,
-  DollarSign,
   Smartphone,
   ChevronRight,
   Send,
@@ -26,6 +25,7 @@ import {
   Layers,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { RandIcon } from "@/components/icons/RandIcon";
 import { calculateDistanceKm, isWithinRadiusKm, estimateEtaMinutes } from "@/utils/geo";
 import { calculateFare } from "@/utils/mapService";
 
@@ -756,7 +756,7 @@ export default function DualWindowSimulator() {
             {(tripStep === "payment_pending" || tripStep === "completed") && (
               <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-3xl text-center space-y-4 animate-in fade-in">
                 <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto">
-                  <DollarSign size={24} />
+                  <RandIcon size={24} />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">
