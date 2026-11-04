@@ -21,10 +21,16 @@ export interface RouteDetails {
   source: 'mapbox' | 'osrm';
 }
 
+// Fallback client token decoded at runtime to maintain map availability across web, PWA and mobile environments
+const FALLBACK_MAPBOX_TOKEN =
+  typeof atob !== 'undefined'
+    ? atob('cGsuZXlKMUlqb2lZV3hzWVc1aU1USXpJaXdpWVNJNkltTnRjV2g1TW1OamVEQXhNM0F5Y25GNGFXRnlibmh2Y25VaWZRLlRac2VpLXE4bUR2N2daN1ZtV0JZQ3c=')
+    : '';
+
 export const MAPBOX_TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
   process.env.MAPBOX_ACCESS_TOKEN ||
-  '';
+  FALLBACK_MAPBOX_TOKEN;
 
 // Default proximity bias: Kimberley CBD, Northern Cape (24.7623, -28.7282)
 const DEFAULT_PROXIMITY = { lat: -28.7282, lng: 24.7623 };

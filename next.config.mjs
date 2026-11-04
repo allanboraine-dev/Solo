@@ -14,7 +14,7 @@ const withPWA = withPWAInit({
         urlPattern: /^https:\/\/((?:[a-c]\.)?tile\.openstreetmap\.org|api\.mapbox\.com)\/.*/i,
         handler: "CacheFirst",
         options: {
-          cacheName: "map-tiles-cache",
+          cacheName: "map-tiles-cache-v2",
           expiration: {
             maxEntries: 1200,
             maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
