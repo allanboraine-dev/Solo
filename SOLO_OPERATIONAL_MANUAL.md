@@ -2,7 +2,7 @@
 ### Standard Operating Procedures (SOP) & Platform Guidelines
 **Jurisdiction:** Republic of South Africa  
 **Applicable Statutes:** National Land Transport Act (Act No. 5 of 2009), Protection of Personal Information Act (POPIA Act No. 4 of 2013), Value-Added Tax Act (Act No. 89 of 1991), Consumer Protection Act (Act No. 68 of 2008), South African Reserve Bank (SARB) National Payment System Directives  
-**Document Version:** 2.1 (Direct In-Vehicle Fare Settlement & Security-Hardened Master Release)  
+**Document Version:** 2.2 (Safety, Automated KYC Expiry Lock & Live Fleet Billing Master Release)  
 **Classification:** Operational Policy & User Manual  
 
 ---
@@ -117,23 +117,28 @@ SOLO integrates Mapbox Commercial Geocoding and Matrix Routing, designed specifi
   *(First 5 km at **R6.50/km**, every km beyond 5 km at **R5.50/km**, plus a 1-Rider Solo Saver discount).*
 - **Guaranteed Beat-The-Competition Pricing:** No surge gouging, no hidden booking fees, and no per-minute traffic penalties. Every trip is algorithmically capped to be **at least 20% to 45% cheaper** than Bolt and UberX. A 6.2 km trip between Camps Bay and the V&A Waterfront costs **R49.00** standard.
 
-### 1.4 Driver Matching, 15km PostGIS Radius & Multi-Driver Decline Availability
+### 1.4 Driver Matching, 15km PostGIS Radius, Multi-Driver Decline Availability & 1-Hour Stale Request Expiry
 1. When you tap **"Request SOLO Ride"**, the PostGIS spatial engine queries for verified, online drivers within a **15-kilometer radius**.
 2. **Multi-Driver Ride Availability on Decline:** If a nearby driver is unable to accept your request and taps "Decline", your ride is **not cancelled**. It remains actively available in the dispatch pool for all other online drivers in your area, guaranteeing continuous matching opportunities without rider inconvenience.
-3. As soon as a driver accepts, you receive their full name, vehicle make, model, color, licence plate number, and live real-time GPS tracking on the map.
+3. **1-Hour Automatic Stale Request Expiration:** Unclaimed ride requests automatically expire after **60 minutes (`3,600,000 ms`)**, ensuring neither riders nor drivers ever encounter stale ghost trip requests.
+4. As soon as a driver accepts, you receive their full name, vehicle make, model, color, licence plate number, and live real-time GPS tracking on the map.
 
-### 1.5 Boarding Safety & The 4-Digit Security PIN
+### 1.5 Pre-Boarding Vehicle Verification, 4-Digit Security PIN & Mismatch Protection
 > [!IMPORTANT]
 > **CRITICAL PASSENGER SAFETY PROTOCOL:**
 > Every requested trip generates an anti-impersonation 4-digit PIN (e.g. `4892`).
 > When the vehicle arrives:
-> 1. Check the vehicle make, model, and licence plate number against your screen.
-> 2. Open the passenger door and ask the driver to confirm your name.
-> 3. Provide your 4-digit safety PIN to the driver. The driver terminal physically cannot start the trip meter until this PIN is entered correctly.
+> 1. **Check the Vehicle & Plate Before Boarding:** Verify the vehicle make, model, color, and licence plate number displayed on your screen.
+> 2. **1-Tap "Wrong Car / Driver" Mismatch Report:** If the arriving vehicle plate or driver does not match your screen, do **not** board. Tap **"Wrong Car / Driver"** on the pre-boarding checklist to immediately log a critical safety incident, alert Rapid Response, and cancel boarding safely.
+> 3. **Confirm 4-Digit PIN:** Open the passenger door, ask the driver to confirm your name, and provide your 4-digit safety PIN. The driver terminal physically cannot start the trip meter until this PIN is entered correctly.
 > 4. Never enter an unverified vehicle or one where the driver asks you to bypass PIN entry.
 
-### 1.6 In-Trip Experience & Live Chat
+### 1.6 In-Trip Experience, Proactive Route Deviation Check-In & Live Chat
 - **Live Telematics:** Track your vehicle along the optimal route with turn-by-turn progression.
+- **Proactive Route Deviation Safety Check-In (`checkRouteDeviationAnomaly`):** During an active trip (`in_progress`), SOLO continuously monitors the vehicle's GPS coordinates against the expected pickup-to-dropoff corridor. If the vehicle deviates by more than **1.5 km**, the Rider app automatically triggers a prominent *"Safety Check-In: Off-Route Detected"* prompt:
+  - Tap **"I'm Safe (Detour / Traffic)"** to dismiss if the detour is normal.
+  - Tap **"Emergency SOS"** to immediately dispatch your live GPS coordinates, vehicle plate, and driver identity to Rapid Response and SAPS (`10111`).
+- **1-Tap Live Telemetry Share:** Share your live trip status, driver identity, and vehicle registration plate via WhatsApp or SMS with family or trusted contacts at any time.
 - **In-App Encrypted Chat:** Coordinate pickup details (e.g. *"Waiting at gate 2 opposite the pharmacy"*) with real-time delivery and message deduplication.
 
 ### 1.7 In-Vehicle Direct Payment Settlement (Cash, Card Machine & In-App Card)
@@ -180,13 +185,18 @@ In compliance with the **National Land Transport Act (Act No. 5 of 2009)**, ever
 3. **Vehicle Certificate of Roadworthiness (CoR):** Issued by an accredited vehicle test station within the preceding six (6) months.
 4. **Vehicle Registration Document (RC1) & Commercial Insurance:** Registration document matching licence plates and proof of commercial passenger liability cover.
 
-### 2.2 KYC Document Submission Protocol & System Resilience
+### 2.2 KYC Document Submission Protocol & Automatic Document Expiry Lock
 1. Navigate to `/driver/register` on mobile or desktop.
 2. Complete your personal details (Full Name, Phone Number, Vehicle Make/Model/Year, Licence Plate).
-3. Upload photographs or PDF scans of the four required documents using the **KYC Document Uploader**:
+3. Upload photographs or PDF scans of the four required documents along with each credential's **Expiration Date** using the **KYC Document Uploader**:
    - Documents are uploaded directly to the encrypted `driver-documents` storage bucket.
    - The platform utilizes resilient database user-provisioning triggers to prevent registration lockouts.
 4. Once submitted, your profile enters the verification queue with status `pending`.
+5. **Automated Document Expiry Tracking & "Go Online" Compliance Lock (`evaluateDriverCompliance`):**
+   - **Tracked Expiry Dates:** SOLO continuously monitors the expiration dates of your **PrDP (Category P)**, **SA Driving Licence Card**, **Vehicle License Disc / CoF (Roadworthy)**, and **Commercial Passenger Liability Insurance**.
+   - **30-Day Advance Renewal Warning:** When any statutory document is within **30 days of expiring**, an amber warning banner is displayed on your Driver Dashboard so you can renew early without losing driving income.
+   - **Automatic Hard Dispatch Lock on Expiry (`isDispatchBlocked = true`):** The moment any statutory document reaches its expiration date (`daysRemaining < 0`), your driver account is automatically flagged, taken offline, and **blocked from toggling "Go Online"**.
+   - **Self-Service Re-Upload & Unlock:** Open the **Upload Renewed Document** modal directly in the Driver Portal, select the expired credential, enter the new future expiry date, and upload the renewed document to restore compliance and unlock dispatch.
 
 ### 2.2.1 Driver Account Credentials & Password Recovery Protocol
 1. **Driver Identifier / Username:** A driver's username is strictly their registered **Email address** configured during onboarding.
@@ -483,7 +493,10 @@ The **SOLO Fleet Partner Hub** (`/fleet`) replaces this commission model with an
    - *Example (3 Vehicles):* R770 + (3 × R499) = R2,267.00/mo ex. VAT (R2,607.05 incl. VAT).
    - *Example (5 Vehicles):* R770 + (5 × R499) = R3,265.00/mo ex. VAT (R3,754.75 incl. VAT).
    - *Example (10 Vehicles):* R770 + (10 × R499) = R5,760.00/mo ex. VAT (R6,624.00 incl. VAT).
-3. **SARS OpEx Deductibility:** B2B fleet subscription invoices are issued monthly by Boraine Tech (Pty) Ltd with 15% South African VAT, fully deductible as operational business expenditure.
+3. **Live Paystack Fleet Registration & Checkout (`POST /api/fleet/create-subscription`):**
+   - During Fleet Registration at `/fleet`, partners can click **"Register & Pay via Paystack"** to immediately initialize a live Paystack checkout for their selected fleet size (`R770 + N × R499 + 15% VAT`), or start a **7-Day Free Trial** and activate recurring Paystack billing at any time from the **Fleet Subscription & SARS Tax** tab.
+   - All fleet subscription payments are verified via Paystack callback and HMAC-SHA512 webhooks (`payment_type: 'solo_fleet_subscription'`).
+4. **SARS OpEx Deductibility:** B2B fleet subscription invoices are issued monthly by Boraine Tech (Pty) Ltd with 15% South African VAT, fully deductible as operational business expenditure.
 
 ### 11.2 In-Vehicle Hardware & Direct Banking Alignment
 - **Speedpoint Ownership:** The Fleet Owner installs their own business card machine (e.g. Yoco Neo/Go or iKhokha) in each fleet vehicle. All card payments settle directly into the **Fleet Owner's corporate bank account**, ensuring immediate custody of digital earnings.

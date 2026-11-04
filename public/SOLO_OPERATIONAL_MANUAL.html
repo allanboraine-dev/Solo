@@ -348,7 +348,7 @@
   <div class="top-action-bar">
     <div class="brand-title">
       <span>SOLO</span>
-      <span class="brand-badge">SOP Manual v2.0</span>
+      <span class="brand-badge">SOP Manual v2.2</span>
       <span style="font-size: 13px; font-weight: 400; color: #94a3b8; margin-left: 8px;">Republic of South Africa</span>
     </div>
     <div class="action-buttons">
@@ -378,7 +378,7 @@
       </p>
       <div class="doc-meta">
         <span><strong>Jurisdiction:</strong> Republic of South Africa</span>
-        <span><strong>Release Version:</strong> 2.0 (High-Concurrency & Operational Master)</span>
+        <span><strong>Release Version:</strong> 2.2 (Safety, Automated KYC Expiry Lock &amp; Live Fleet Billing Master)</span>
         <span><strong>Regulatory Acts:</strong> NLTA (Act 5 of 2009), POPIA (Act 4 of 2013), SARS Sec 11(2)</span>
         <span><strong>Classification:</strong> Official Operational Standard</span>
       </div>
@@ -430,44 +430,45 @@
       <div class="toc-grid">
         <div>
           <span class="badge-section badge-rider">Section A</span>
-          <strong>Rider Operations</strong>
+          <strong>Rider Operations &amp; Safety</strong>
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#rider-auth">1.1 WhatsApp Zero-Cost Auth (wa.me)</a></li>
             <li><a href="#rider-pwa">1.2 PWA Installation (Android, Samsung, iOS)</a></li>
-            <li><a href="#rider-booking">1.3 Booking & Commercial Matrix Routing</a></li>
-            <li><a href="#rider-matching">1.4 15km PostGIS & Multi-Driver Decline Pool</a></li>
-            <li><a href="#rider-pin">1.5 4-Digit Security PIN Safety</a></li>
-            <li><a href="#rider-settlement">1.6 Paystack Settlement & Receipts</a></li>
-            <li><a href="#rider-sos">1.7 Offline Dead Zones & SOS Hotlines</a></li>
+            <li><a href="#rider-booking">1.3 Booking &amp; Commercial Matrix Routing</a></li>
+            <li><a href="#rider-matching">1.4 15km PostGIS, Multi-Driver Pool &amp; 1-Hr Expiry</a></li>
+            <li><a href="#rider-pin">1.5 4-Digit PIN &amp; Vehicle Mismatch Protection</a></li>
+            <li><a href="#rider-deviation">1.6 Proactive Route Deviation Check-In</a></li>
+            <li><a href="#rider-settlement">1.7 Direct In-Vehicle &amp; Paystack Settlement</a></li>
+            <li><a href="#rider-sos">1.8 Offline Dead Zones &amp; SOS Hotlines</a></li>
           </ul>
         </div>
         <div>
           <span class="badge-section badge-driver">Section B</span>
-          <strong>Driver Operations</strong>
+          <strong>Driver Operations &amp; Compliance</strong>
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#driver-nlta">2.1 Statutory NLTA Compliance</a></li>
-            <li><a href="#driver-kyc">2.2 Resilient KYC Document Upload</a></li>
-            <li><a href="#driver-saas">2.3 7-Day Trial & R499/mo (Founder Exemption)</a></li>
+            <li><a href="#driver-kyc">2.2 KYC Upload &amp; Automatic Expiry Lock</a></li>
+            <li><a href="#driver-saas">2.3 7-Day Trial &amp; R499/mo (Founder Exemption)</a></li>
             <li><a href="#driver-bank">2.4 SA Universal Clearing Branch Codes</a></li>
             <li><a href="#driver-concurrency">2.5 Single-Device Active Concurrency</a></li>
-            <li><a href="#driver-routine">2.6 Daily Routine & Decline Handling</a></li>
-            <li><a href="#driver-tones">2.7 Native Device Alert Tones & Chime</a></li>
-            <li><a href="#driver-mobile">2.8 Samsung Internet & Mobile UI</a></li>
-            <li><a href="#driver-pin">2.9 Arrival & PIN Verification</a></li>
+            <li><a href="#driver-routine">2.6 Daily Routine &amp; Decline Handling</a></li>
+            <li><a href="#driver-tones">2.7 Native Device Alert Tones &amp; Chime</a></li>
+            <li><a href="#driver-mobile">2.8 Samsung Internet &amp; Mobile UI</a></li>
+            <li><a href="#driver-pin">2.9 Arrival &amp; PIN Verification</a></li>
             <li><a href="#driver-sars">2.10 Driver SARS Tax Guidance</a></li>
           </ul>
         </div>
         <div>
           <span class="badge-section badge-admin">Section C</span>
-          <strong>Admin Governance</strong>
+          <strong>Admin Governance &amp; Fleet Hub</strong>
           <ul style="margin: 8px 0 0 16px; font-size: 13px;">
             <li><a href="#admin-compliance">3.1 KYC Review Engine (/admin)</a></li>
             <li><a href="#admin-storage">3.2 1-Hour Ephemeral Signed URLs</a></li>
-            <li><a href="#admin-simulator">3.3 Dual-Window Simulator & TTL</a></li>
+            <li><a href="#admin-simulator">3.3 Dual-Window Simulator &amp; TTL</a></li>
             <li><a href="#admin-webhooks">3.4 Paystack HMAC SHA512 Webhooks</a></li>
             <li><a href="#admin-postgis">3.5 PostGIS Proximity Algorithms</a></li>
-            <li><a href="#admin-push">3.6 Web Push VAPID Protocols</a></li>
-            <li><a href="#admin-disputes">3.7 Dispute Resolution & Audit Trails</a></li>
+            <li><a href="#section-fleet">4.1 B2B Fleet Partner Hub &amp; Live Paystack Billing</a></li>
+            <li><a href="#section-fleet">4.3 Shift Pairing, Remote Holds &amp; Audits</a></li>
           </ul>
         </div>
       </div>
@@ -508,25 +509,40 @@
         <em>Example:</em> A 6.2 km trip between Camps Bay and the V&A Waterfront costs exactly <strong>R82.00</strong>. There are no surprise surge pricing multipliers or booking surcharges.
       </p>
 
-      <h3 id="rider-matching">1.4 Driver Matching, 15km PostGIS Radius & Multi-Driver Decline Pool</h3>
+      <h3 id="rider-matching">1.4 Driver Matching, 15km PostGIS Radius, Multi-Driver Decline Pool &amp; 1-Hour Stale Request Expiry</h3>
       <p>
         When you tap <strong>"Request SOLO Ride"</strong>, the PostGIS spatial engine scans for online, verified drivers within a <strong>15-kilometer radius</strong>.
       </p>
       <div class="alert alert-info">
-        <strong>Multi-Driver Pool Availability:</strong> If an individual driver declines your ride request, your booking is NOT cancelled. The trip remains actively available in the dispatch pool for all other registered online drivers in your area until accepted.
+        <strong>Multi-Driver Pool &amp; 1-Hour Automatic Expiration:</strong> If an individual driver declines your ride request, your booking is NOT cancelled—it remains actively available in the dispatch pool for all other registered online drivers nearby. Unclaimed requests older than 60 minutes (<code>3,600,000 ms</code>) automatically expire so neither riders nor drivers ever encounter stale ghost requests.
       </div>
 
-      <h3 id="rider-pin">1.5 Boarding Safety & The Mandatory 4-Digit PIN</h3>
+      <h3 id="rider-pin">1.5 Pre-Boarding Vehicle Verification, 4-Digit PIN &amp; Mismatch Protection</h3>
       <div class="alert alert-danger">
-        <strong>CRITICAL SAFETY PROTOCOL:</strong> Every trip generates an anti-impersonation 4-digit PIN (e.g. <code>4892</code>). When the vehicle arrives, check the registration plate, enter the vehicle, and give your 4-digit PIN to the driver. The driver cannot start the meter without this PIN. Never enter an unverified vehicle.
+        <strong>CRITICAL PASSENGER BOARDING PROTOCOL:</strong>
+        <ol style="margin-top: 8px; margin-bottom: 0;">
+          <li><strong>Verify Vehicle &amp; Plate Before Boarding:</strong> Check the vehicle make, model, color, and license plate badge displayed on your active trip card before approaching the car.</li>
+          <li><strong>4-Digit Security PIN:</strong> Every trip generates a cryptographic 4-digit PIN (e.g. <code>4892</code>). The driver terminal physically cannot start the trip meter without this PIN.</li>
+          <li><strong>1-Tap "Wrong Car / Driver" Mismatch Report:</strong> If the arriving vehicle plate or driver does not match your screen, do NOT board. Tap <strong>"Wrong Car / Driver"</strong> on the boarding checklist to immediately log a critical safety incident, alert Rapid Response, and cancel boarding safely.</li>
+        </ol>
       </div>
 
-      <h3 id="rider-settlement">1.6 Payment Settlement & Tax Receipts</h3>
+      <h3 id="rider-deviation">1.6 Proactive In-Trip Route Deviation Check-In &amp; Live GPS Share</h3>
       <p>
-        Payment is authorized via Paystack using 3D-Secure South African bank cards. When the driver completes the trip, the payment is captured automatically. Riders immediately receive a link to their SARS-compliant tax invoice at <code>/receipt/[tripId]</code> with itemized fare lines and 1-click PDF download for expense claims.
+        During an active trip (<code>in_progress</code>), SOLO continuously monitors live vehicle GPS telemetry against the direct pickup-to-dropoff route corridor:
+      </p>
+      <ul>
+        <li><strong>Automatic Off-Route Safety Check-In:</strong> If the vehicle deviates more than <strong>1.5 km</strong> from the expected route corridor, the Rider app automatically triggers a prominent <em>"Safety Check-In: Off-Route Detected"</em> banner asking if you are safe.</li>
+        <li><strong>Rider Response Options:</strong> Tap <strong>"I'm Safe (Detour / Traffic)"</strong> to dismiss the alert if it is a normal road detour, or tap <strong>"Emergency SOS"</strong> to immediately dispatch your live GPS coordinates, vehicle plate, and driver identity to Rapid Response &amp; SAPS <code>10111</code>.</li>
+        <li><strong>1-Tap Live Trip Telemetry Share:</strong> Riders can share their real-time trip tracking link, vehicle plate, and driver details via WhatsApp or SMS with family or trusted contacts at any point during the journey.</li>
+      </ul>
+
+      <h3 id="rider-settlement">1.7 Direct In-Vehicle Payment Settlement &amp; SARS Tax Receipts</h3>
+      <p>
+        Riders pay the driver directly upon arrival at the destination via <strong>Cash (ZAR banknotes)</strong>, the driver's <strong>In-Vehicle Mobile Card Machine / Speedpoint</strong> (Yoco, iKhokha, bank POS supporting Tap-to-Pay, Apple Pay, Google Wallet &amp; Samsung Pay), or optional 3D-Secure Paystack in-app card settlement. Riders immediately receive a SARS Section 11(2) compliant tax invoice at <code>/receipt/[tripId]</code> with itemized fare lines and 1-click PDF download.
       </p>
 
-      <h3 id="rider-sos">1.7 Offline Dead Zones & SOS Emergency Hotlines</h3>
+      <h3 id="rider-sos">1.8 Offline Dead Zones &amp; SOS Emergency Hotlines</h3>
       <p>
         If cellular network fails during a journey (e.g., mountain passes or underground parking), the SOLO PWA automatically engages offline mode. The active trip safety screen allows 1-tap emergency calling to official South African emergency numbers:
       </p>
@@ -556,10 +572,19 @@
         <li><strong>Vehicle Registration (RC1) & Commercial Insurance:</strong> Proving the vehicle is legally registered and insured.</li>
       </ol>
 
-      <h3 id="driver-kyc">2.2 KYC Document Submission Protocol & System Resilience</h3>
+      <h3 id="driver-kyc">2.2 KYC Document Submission &amp; Automatic Document Expiry Lock</h3>
       <p>
-        Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code>. Documents are stored in an encrypted, private storage bucket with strict access controls. The registration engine incorporates database-level user creation pre-emption to eliminate document upload errors.
+        Upload high-resolution scans or photos of the 4 statutory documents at <code>/driver/register</code> or in the Driver Portal compliance drawer, including the official <strong>Document Expiration Date</strong> for each credential. Documents are stored in an encrypted, private storage bucket with strict access controls.
       </p>
+      <div class="alert alert-danger">
+        <strong>Automated KYC Document Expiry &amp; "Go Online" Compliance Lock:</strong>
+        <ul style="margin-top: 8px; margin-bottom: 0;">
+          <li><strong>Tracked Expiry Dates:</strong> SOLO continuously tracks expiration dates for your <strong>PrDP (Category P)</strong>, <strong>SA Driving Licence Card</strong>, <strong>Vehicle License Disc / CoF (Roadworthy)</strong>, and <strong>Commercial Passenger Liability Insurance</strong>.</li>
+          <li><strong>30-Day Advance Renewal Warning:</strong> When any document is within <strong>30 days of expiring</strong>, an amber warning banner appears on your Driver Dashboard reminding you to renew early while allowing you to continue working.</li>
+          <li><strong>Automatic Dispatch Block on Expiry:</strong> The moment any statutory document reaches its expiration date (<code>daysRemaining &lt; 0</code>), your driver profile is automatically flagged, switched offline, and <strong>blocked from toggling "Go Online"</strong> (<code>isDispatchBlocked = true</code>).</li>
+          <li><strong>Self-Service Re-Upload &amp; Unlock:</strong> Upload your renewed document with its new future expiration date directly in the Driver Portal's <strong>Upload Renewed Document</strong> modal to restore compliance and unlock dispatch.</li>
+        </ul>
+      </div>
 
       <h3 id="driver-saas">2.3 SaaS Subscription Model (7-Day Trial & R499/mo)</h3>
       <p>
@@ -706,18 +731,19 @@
         Fleet Partner Operations & Shift Reconciliation
       </h2>
 
-      <h3>4.1 The South African Fleet Operating Model & Economics</h3>
+      <h3>4.1 The South African Fleet Operating Model &amp; Live Paystack Subscription Billing</h3>
       <p>
         Over 60% of South African e-hailing vehicles operate under commercial <strong>Fleet Partner / Investor</strong> ownership. Legacy aggregators (Uber/Bolt) extract 20% to 30% from gross vehicle turnover, costing fleet owners R5,000 to R8,000+ per vehicle every month.
       </p>
       <p>
-        The <strong>SOLO Fleet Partner Hub</strong> (<code>/fleet</code>) provides enterprise multi-vehicle management on a flat SaaS subscription:
+        The <strong>SOLO Fleet Partner Hub</strong> (<code>/fleet</code>) provides enterprise multi-vehicle management on a flat SaaS subscription with live Paystack checkout:
       </p>
       <ul>
         <li><strong>Fleet Hub Base License:</strong> R770.00 / month (covers centralized fleet dashboard, telematics, shift audits, and SARS invoicing).</li>
         <li><strong>Active Vehicle Slots:</strong> R499.00 / vehicle / month (matches standard driver dispatch fee with unlimited driver rotation).</li>
         <li><strong>Formula:</strong> Total = R770 base + (Vehicles &times; R499) + 15% VAT.</li>
-        <li><strong>100% Tax-Deductible OpEx:</strong> Boraine Tech issues consolidated monthly VAT tax invoices compliant with the Value-Added Tax Act.</li>
+        <li><strong>Live Paystack Registration &amp; Subscription Checkout:</strong> Fleet partners can click <strong>"Register &amp; Pay via Paystack"</strong> directly on the registration form to initialize live Paystack billing immediately upon signup, or start with a <strong>7-Day Free Trial</strong> and activate recurring Paystack billing at any time from the <em>Fleet Subscription &amp; SARS Tax</em> tab.</li>
+        <li><strong>100% Tax-Deductible OpEx:</strong> Boraine Tech issues consolidated monthly VAT tax invoices compliant with the Value-Added Tax Act (Act No. 89 of 1991).</li>
       </ul>
 
       <h3>4.2 In-Vehicle Speedpoint & Merchant Banking Alignment</h3>

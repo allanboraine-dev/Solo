@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Printer, Download, BookOpen, ShieldCheck, Car, Users } from "lucide-react";
+import { ArrowLeft, Printer, Download, BookOpen, ShieldCheck, Car, Users, Building2 } from "lucide-react";
 
 export default function OperationalManualPage() {
   return (
@@ -22,11 +22,11 @@ export default function OperationalManualPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black tracking-tight text-white">SOLO Operational Manual</h1>
                 <span className="text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  SOP v2.0
+                  SOP v2.2
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Standard Operating Procedures for South African E-Hailing (NLTA, SARS & POPIA Compliant)
+                Standard Operating Procedures for South African E-Hailing (NLTA, SARS, POPIA &amp; B2B Fleet Compliant)
               </p>
             </div>
           </div>
@@ -53,7 +53,7 @@ export default function OperationalManualPage() {
         </div>
 
         {/* Quick Jumper Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-8">
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-sky-500/20 flex flex-col justify-between">
             <div>
               <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center mb-3">
@@ -61,7 +61,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section A: Rider Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                WhatsApp zero-cost verification, PWA installation, commercial matrix routing, multi-driver decline pool, 4-digit PIN safety, and SARS-compliant PDF receipts.
+                WhatsApp verification, 4-digit PIN boarding, Wrong Car/Driver mismatch SOS, proactive off-route check-in, and SARS tax receipts.
               </p>
             </div>
             <a
@@ -78,9 +78,9 @@ export default function OperationalManualPage() {
               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
                 <Car className="w-5 h-5" />
               </div>
-              <h2 className="text-base font-bold text-white mb-1">Section B: Driver Partner Guide</h2>
+              <h2 className="text-base font-bold text-white mb-1">Section B: Driver Guide</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                NLTA compliance, 1-device active concurrency, native device notification alerts & chimes, Samsung Web optimization, and 0% commission R499/mo SaaS model.
+                NLTA compliance, automatic KYC document expiry lock (PrDP, licence, disc &amp; insurance), 1-device concurrency, and 0% commission R499/mo SaaS.
               </p>
             </div>
             <a
@@ -99,7 +99,7 @@ export default function OperationalManualPage() {
               </div>
               <h2 className="text-base font-bold text-white mb-1">Section C: Admin Governance</h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                KYC review engine, 1-hour signed URLs (POPIA), dual simulator diagnostic workflows with 5-minute TTL, PostGIS spatial queries, and Paystack audits.
+                KYC review &amp; expiry enforcement, 1-hour signed URLs (POPIA), 1-hour stale trip expiration, PostGIS spatial queries, and Paystack webhooks.
               </p>
             </div>
             <a
@@ -108,6 +108,25 @@ export default function OperationalManualPage() {
               className="mt-4 text-xs font-semibold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1"
             >
               Read Admin Section &rarr;
+            </a>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-slate-900/80 border border-purple-500/20 flex flex-col justify-between">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-3">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h2 className="text-base font-bold text-white mb-1">Section D: Fleet Partner Hub</h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Live Paystack B2B fleet registration &amp; billing (R770 base + R499/car + VAT), multi-driver shift pairing, remote dispatch holds, and cash/POS audits.
+              </p>
+            </div>
+            <a
+              href="/SOLO_OPERATIONAL_MANUAL.html#section-fleet"
+              target="_blank"
+              className="mt-4 text-xs font-semibold text-purple-400 hover:text-purple-300 inline-flex items-center gap-1"
+            >
+              Read Fleet Section &rarr;
             </a>
           </div>
         </div>
