@@ -212,6 +212,9 @@ export async function POST(req: NextRequest) {
 
     let driverId = crypto.randomUUID();
     let authUserCreated = false;
+    const authClient = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     // 5. Attempt to create user in Supabase Auth
     if (hasServiceRoleKey) {
@@ -223,6 +226,7 @@ export async function POST(req: NextRequest) {
           user_metadata: {
             full_name: cleanName,
             phone: cleanPhone,
+            user_type: 'driver',
             role: 'driver',
             registered_by_manager: auth.session?.email || 'manager',
           },
@@ -239,12 +243,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5b. Fallback: If SUPABASE_SERVICE_ROLE_KEY is not configured, create the user in Supabase Auth via signUp()
+    // 5b. Fallback: If SUPABASE_SERVICE_ROLE_KEY is not configured, create or authenticate the user in Supabase Auth
     if (!authUserCreated && !supabaseUrl.includes('mock.supabase.co')) {
       try {
         const requestOrigin =
           req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://soloride.co.za';
-        const signUpPromise = supabase.auth.signUp({
+        const signUpPromise = authClient.auth.signUp({
           email: cleanEmail,
           password: finalPassword,
           options: {
@@ -264,11 +268,34 @@ export async function POST(req: NextRequest) {
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
         ]);
 
-        if (signUpRes && !signUpRes.error && signUpRes.data?.user?.id) {
+        const isNewUser =
+          signUpRes &&
+          !signUpRes.error &&
+          signUpRes.data?.user?.id &&
+          (!Array.isArray(signUpRes.data.user.identities) || signUpRes.data.user.identities.length > 0);
+
+        if (isNewUser && signUpRes?.data?.user?.id) {
           driverId = signUpRes.data.user.id;
           authUserCreated = true;
-        } else if (signUpRes?.error) {
-          console.warn('[AdminRegisterDriverAPI] Supabase signUp notice:', signUpRes.error.message);
+        } else {
+          // User may already exist in Supabase Authentication (e.g. added via Supabase Dashboard) — sign in to link & authorize RLS
+          const signInPromise = authClient.auth.signInWithPassword({
+            email: cleanEmail,
+            password: finalPassword,
+          });
+          const signInRes = await Promise.race([
+            signInPromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+          ]);
+          if (signInRes && !signInRes.error && signInRes.data?.user?.id) {
+            driverId = signInRes.data.user.id;
+            authUserCreated = true;
+          } else if (signUpRes?.data?.user?.id) {
+            driverId = signUpRes.data.user.id;
+            authUserCreated = true;
+          } else if (signUpRes?.error) {
+            console.warn('[AdminRegisterDriverAPI] Supabase signUp notice:', signUpRes.error.message);
+          }
         }
       } catch (signUpErr) {
         console.warn('[AdminRegisterDriverAPI] Supabase signUp exception:', signUpErr);
@@ -279,6 +306,7 @@ export async function POST(req: NextRequest) {
     const verifiedStatus = isOwner ? true : Boolean(isVerified);
     const effectivePlan = isOwner ? 'owner' : (subscriptionPlan || 'trial');
     const trialStartIso = trialStartedAt ? new Date(trialStartedAt).toISOString() : new Date().toISOString();
+    const managerNotes = `Driver Name: ${cleanName} | Registered via Manager Console by ${auth.session?.name || auth.session?.email || 'Operations Manager'}`;
 
     // 6. Save into resilient in-memory server kycStore
     const savedDriver = saveKycDriverProfile({
@@ -294,7 +322,7 @@ export async function POST(req: NextRequest) {
       subscriptionPlan: effectivePlan,
       trialStartedAt: trialStartIso,
       createdAt: new Date().toISOString(),
-      verificationNotes: `Registered via Manager Console by ${auth.session?.name || auth.session?.email || 'Operations Manager'}`,
+      verificationNotes: managerNotes,
     });
 
     // 7. Record update alert for Manager Dashboard
@@ -325,34 +353,52 @@ export async function POST(req: NextRequest) {
       console.warn('[AdminRegisterDriverAPI] Supabase broadcast notice:', realtimeErr);
     }
 
-    // 9. Save / Upsert into Supabase driver_profiles table
+    // 9. Save / Upsert into Supabase profiles and driver_profiles tables
     try {
+      const dbClient = hasServiceRoleKey ? supabase : authClient;
+
+      const profilePromise = dbClient.from('profiles').upsert(
+        {
+          id: driverId,
+          full_name: cleanName,
+          phone: cleanPhone,
+          user_type: 'driver',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+
+      // Note: live Supabase driver_profiles table does not have a full_name column;
+      // full_name is stored in public.profiles and verification_notes, and is_online: true ensures RLS SELECT visibility.
       const dbPayload = {
         id: driverId,
-        full_name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
         vehicle_make: cleanMake,
         vehicle_model: cleanModel,
+        vehicle_year: vehicleYear ? Number(vehicleYear) : null,
+        vehicle_color: vehicleColor || null,
         license_plate: cleanPlate,
         prdp_number: cleanPrdp,
         has_license: hasLicense ?? true,
         has_prdp: hasPrdp ?? true,
         has_roadworthy: hasRoadworthy ?? true,
         is_verified: verifiedStatus,
+        is_online: true,
         subscription_active: true,
         subscription_plan: effectivePlan,
         trial_started_at: trialStartIso,
+        verification_notes: managerNotes,
         updated_at: new Date().toISOString(),
       };
 
-      const upsertPromise = supabase
+      const upsertPromise = dbClient
         .from('driver_profiles')
         .upsert(dbPayload, { onConflict: 'id' });
 
       await Promise.race([
-        upsertPromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+        Promise.allSettled([profilePromise, upsertPromise]),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
       ]);
     } catch (dbSaveErr) {
       console.warn('[AdminRegisterDriverAPI] Supabase driver_profiles error:', dbSaveErr);

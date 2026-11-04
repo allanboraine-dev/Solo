@@ -147,7 +147,6 @@ export async function POST(req: NextRequest) {
     try {
       const dbPayload = {
         id: driverId,
-        full_name: fullName,
         email: email,
         phone: phone,
         vehicle_make: vehicleMake,
@@ -158,9 +157,11 @@ export async function POST(req: NextRequest) {
         has_prdp: hasPrdp ?? false,
         has_roadworthy: hasRoadworthy ?? false,
         is_verified: isOwner ? true : (isVerified ?? false),
+        is_online: true,
         subscription_active: true,
         subscription_plan: isOwner ? 'owner' : (subscriptionPlan || 'trial'),
         trial_started_at: trialStartedAt ? new Date(trialStartedAt).toISOString() : new Date().toISOString(),
+        verification_notes: fullName ? `Driver Name: ${fullName}` : undefined,
         updated_at: new Date().toISOString(),
       };
 

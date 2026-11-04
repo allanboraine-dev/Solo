@@ -169,6 +169,63 @@ function DriverLoginForm() {
 
     // Save driver_id so mockBackend knows who we are locally
     setSafeLocalStorageItem('driver_id', data.user.id);
+
+    // Ensure driver_profiles record exists in Supabase & Manager Console (handles users added directly in Supabase Auth)
+    try {
+      const { data: existingProf } = await supabase
+        .from('driver_profiles')
+        .select('id, email, phone, vehicle_make, vehicle_model, license_plate, prdp_number, is_verified, subscription_plan, verification_notes')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      const fullName =
+        data.user.user_metadata?.full_name ||
+        (existingProf?.verification_notes?.match(/Driver Name:\s*([^|]+)/i)?.[1]?.trim()) ||
+        cleanEmail.split('@')[0] ||
+        'SOLO Driver';
+
+      if (!existingProf) {
+        await supabase.from('driver_profiles').upsert(
+          {
+            id: data.user.id,
+            email: cleanEmail,
+            phone: data.user.phone || data.user.user_metadata?.phone || '',
+            vehicle_make: data.user.user_metadata?.vehicle_make || 'Toyota',
+            vehicle_model: data.user.user_metadata?.vehicle_model || 'Corolla Quest',
+            license_plate: data.user.user_metadata?.license_plate || 'PENDING',
+            prdp_number: data.user.user_metadata?.prdp_number || 'PENDING',
+            has_license: true,
+            has_prdp: true,
+            has_roadworthy: true,
+            is_verified: true,
+            is_online: true,
+            subscription_active: true,
+            subscription_plan: 'trial',
+            trial_started_at: new Date().toISOString(),
+            verification_notes: `Driver Name: ${fullName} | Synced on Driver Login`,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+      }
+
+      fetch('/api/driver/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: data.user.id,
+          fullName,
+          email: cleanEmail,
+          phone: existingProf?.phone || data.user.phone || data.user.user_metadata?.phone || '',
+          vehicleMake: existingProf?.vehicle_make || data.user.user_metadata?.vehicle_make || 'Toyota',
+          vehicleModel: existingProf?.vehicle_model || data.user.user_metadata?.vehicle_model || 'Corolla Quest',
+          licensePlate: existingProf?.license_plate || data.user.user_metadata?.license_plate || 'PENDING',
+          prdpNumber: existingProf?.prdp_number || data.user.user_metadata?.prdp_number || 'PENDING',
+          isVerified: existingProf?.is_verified ?? true,
+          subscriptionPlan: existingProf?.subscription_plan || 'trial',
+        }),
+      }).catch(() => {});
+    } catch {}
     
     router.push('/driver')
   }

@@ -71,6 +71,12 @@ export type MockDriverProfile = {
 // ----------------------------------------
 // DRIVER PROFILE METHODS
 // ----------------------------------------
+const parseDriverNameFromNotes = (notes?: string | null): string | null => {
+  if (!notes || typeof notes !== 'string') return null;
+  const match = notes.match(/Driver Name:\s*([^|]+)/i);
+  return match && match[1] ? match[1].trim() : null;
+};
+
 export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
   if (typeof window === 'undefined') return null;
   
@@ -88,22 +94,27 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
     try {
       const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', driverId).single();
       if (data && !error) {
+        const resolvedName =
+          data.full_name ||
+          parseDriverNameFromNotes(data.verification_notes) ||
+          session?.user?.user_metadata?.full_name ||
+          (data.email ? data.email.split('@')[0] : 'SOLO Driver');
         // Map database fields back to our camelCase frontend model
         const mappedProfile: MockDriverProfile = {
           id: data.id,
-          fullName: data.full_name,
-          email: data.email,
-          phone: data.phone,
-          vehicleMake: data.vehicle_make,
-          vehicleModel: data.vehicle_model,
-          licensePlate: data.license_plate,
-          prdpNumber: data.prdp_number,
+          fullName: resolvedName,
+          email: data.email || session?.user?.email || '',
+          phone: data.phone || session?.user?.phone || '',
+          vehicleMake: data.vehicle_make || 'Toyota',
+          vehicleModel: data.vehicle_model || 'Corolla Quest',
+          licensePlate: data.license_plate || 'PENDING',
+          prdpNumber: data.prdp_number || '',
           hasLicense: data.has_license ?? true,
           hasPrdp: data.has_prdp ?? true,
           hasRoadworthy: data.has_roadworthy ?? true,
           isVerified: data.is_verified ?? false,
           subscriptionActive: data.subscription_active ?? (data.subscription_status === 'active' || data.subscription_status === 'trial'),
-          subscriptionPlan: data.subscription_plan,
+          subscriptionPlan: data.subscription_plan || 'trial',
           trialStartedAt: data.trial_started_at ? new Date(data.trial_started_at).getTime() : undefined,
           trialEndsAt: data.trial_ends_at ? new Date(data.trial_ends_at).getTime() : undefined,
           cardLast4: data.card_last4 || undefined,
@@ -140,8 +151,37 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
       }
     }
   } catch {
-    return null;
+    // Continue to session auto-provision fallback
   }
+
+  // If authenticated in Supabase Auth (e.g. user was added directly in Supabase Authentication -> Users),
+  // automatically provision their driver_profiles record so they can access /driver and appear in Manager Console
+  if (session?.user?.id) {
+    const userEmail = (session.user.email || '').trim().toLowerCase();
+    const userName =
+      session.user.user_metadata?.full_name ||
+      (userEmail ? userEmail.split('@')[0] : 'SOLO Driver');
+    const autoProfile: MockDriverProfile = applyOwnerPrivileges({
+      id: session.user.id,
+      fullName: userName,
+      email: userEmail,
+      phone: session.user.phone || session.user.user_metadata?.phone || '',
+      vehicleMake: session.user.user_metadata?.vehicle_make || 'Toyota',
+      vehicleModel: session.user.user_metadata?.vehicle_model || 'Corolla Quest',
+      licensePlate: session.user.user_metadata?.license_plate || 'PENDING',
+      prdpNumber: session.user.user_metadata?.prdp_number || 'PENDING',
+      hasLicense: true,
+      hasPrdp: true,
+      hasRoadworthy: true,
+      isVerified: true,
+      subscriptionActive: true,
+      subscriptionPlan: 'trial',
+      trialStartedAt: Date.now(),
+    });
+    await saveDriverProfile(autoProfile);
+    return autoProfile;
+  }
+
   return null;
 };
 
@@ -153,7 +193,10 @@ export const getDriverProfileById = async (driverId: string): Promise<MockDriver
     if (data && !error) {
       const mappedProfile: MockDriverProfile = {
         id: data.id,
-        fullName: data.full_name || 'Registered Driver',
+        fullName:
+          data.full_name ||
+          parseDriverNameFromNotes(data.verification_notes) ||
+          (data.email ? data.email.split('@')[0] : 'Registered Driver'),
         email: data.email || '',
         phone: data.phone || '',
         vehicleMake: data.vehicle_make || 'Toyota',
@@ -226,31 +269,25 @@ export const saveDriverProfile = async (profile: MockDriverProfile) => {
   } catch {}
 
   try {
+    // Only include columns that exist on live Supabase driver_profiles table
     const dbPayload = {
       ...(profile.id ? { id: profile.id } : {}),
-      full_name: profile.fullName,
       email: profile.email,
       phone: profile.phone,
       vehicle_make: profile.vehicleMake,
       vehicle_model: profile.vehicleModel,
       license_plate: profile.licensePlate,
       prdp_number: profile.prdpNumber,
-      has_license: profile.hasLicense,
-      has_prdp: profile.hasPrdp,
-      has_roadworthy: profile.hasRoadworthy,
+      has_license: profile.hasLicense ?? true,
+      has_prdp: profile.hasPrdp ?? true,
+      has_roadworthy: profile.hasRoadworthy ?? true,
       is_verified: profile.isVerified ?? false,
-      subscription_active: profile.subscriptionActive,
-      subscription_plan: profile.subscriptionPlan,
+      is_online: true,
+      subscription_active: profile.subscriptionActive ?? true,
+      subscription_plan: profile.subscriptionPlan || 'trial',
       trial_started_at: profile.trialStartedAt ? new Date(profile.trialStartedAt).toISOString() : undefined,
-      trial_ends_at: profile.trialEndsAt ? new Date(profile.trialEndsAt).toISOString() : undefined,
-      card_last4: profile.cardLast4,
-      card_brand: profile.cardBrand,
-      card_exp_month: profile.cardExpMonth,
-      card_exp_year: profile.cardExpYear,
-      paystack_subscription_code: profile.paystackSubscriptionCode,
-      paystack_authorization_code: profile.paystackAuthorizationCode,
-      next_billing_date: profile.nextBillingDate,
-      card_captured: profile.cardCaptured,
+      verification_notes: profile.fullName ? `Driver Name: ${profile.fullName}` : undefined,
+      updated_at: new Date().toISOString(),
     };
 
     // Upsert into Supabase

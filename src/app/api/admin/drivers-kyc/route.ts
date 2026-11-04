@@ -9,6 +9,7 @@ import {
   getKycDriverProfile,
   deleteKycDriverProfile,
   isDriverPurged,
+  extractDriverNameFromNotes,
 } from '@/utils/kycStore';
 import { validateAdminRequest } from '@/utils/adminAuth';
 
@@ -249,9 +250,14 @@ export async function GET(req: NextRequest) {
           complianceStatus = 'incomplete';
         }
 
+        const resolvedDriverName =
+          driver.full_name ||
+          extractDriverNameFromNotes(driver.verification_notes) ||
+          (isOwner ? 'Allan Boraine (Founder)' : driver.email ? driver.email.split('@')[0] : 'Driver');
+
         return {
           id: driver.id,
-          fullName: driver.full_name || 'Driver',
+          fullName: resolvedDriverName,
           phone: driver.phone || '',
           email: driver.email || '',
           vehicleMake: driver.vehicle_make || '',

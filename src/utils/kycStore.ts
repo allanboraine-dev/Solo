@@ -151,6 +151,12 @@ export function getAllKycDriverProfiles(): KycDriverProfile[] {
   return Array.from(memoryDrivers.values());
 }
 
+export function extractDriverNameFromNotes(notes?: string | null): string | null {
+  if (!notes || typeof notes !== 'string') return null;
+  const match = notes.match(/Driver Name:\s*([^|]+)/i);
+  return match && match[1] ? match[1].trim() : null;
+}
+
 /**
  * Synchronizes the in-memory driver store with authoritative database rows,
  * evicting any in-memory drivers that were deleted from Supabase.
@@ -163,8 +169,9 @@ export function reconcileMemoryDriversWithDatabase(
   const validPhones = new Set(authoritativeDrivers.map((d) => d.phone?.replace(/[\s\-\(\)]/g, '')).filter(Boolean));
 
   for (const [id, driver] of Array.from(memoryDrivers.entries())) {
-    // Platform owner is never purged
+    // Platform owner and manager-registered drivers are never auto-evicted unless explicitly purged
     if (isPlatformOwner(driver.email)) continue;
+    if (driver.verificationNotes?.includes('Manager Console')) continue;
 
     const normPhone = driver.phone?.replace(/[\s\-\(\)]/g, '');
     const normEmail = driver.email?.trim().toLowerCase();

@@ -116,11 +116,14 @@ export async function POST(req: NextRequest) {
 
     // 4. If direct password update is requested but server lacks SUPABASE_SERVICE_ROLE_KEY
     if (newPassword && !hasServiceRoleKey) {
-      // 4.1 First attempt to provision the account via supabase.auth.signUp() in case the driver
-      // was registered in the console before an auth.users record existed in Supabase.
+      // 4.1 First attempt to provision or link the account via supabase.auth.signUp() / signInWithPassword()
       if (resolvedEmail && !supabaseUrl.includes('mock.supabase.co')) {
         try {
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          const authClient = createClient(supabaseUrl, serviceKey, {
+            auth: { autoRefreshToken: false, persistSession: false },
+          });
+
+          const { data: signUpData, error: signUpErr } = await authClient.auth.signUp({
             email: resolvedEmail,
             password: newPassword,
             options: {
@@ -139,21 +142,53 @@ export async function POST(req: NextRequest) {
             signUpData?.user?.id &&
             (!Array.isArray(signUpData.user.identities) || signUpData.user.identities.length > 0);
 
-          if (isNewAuthUser && signUpData.user) {
-            authUserId = signUpData.user.id;
+          let provisionedUser = isNewAuthUser ? signUpData?.user : null;
+          let hasActiveSession = !!signUpData?.session;
+
+          // If user already exists in Supabase Auth (e.g. added manually in Supabase Dashboard),
+          // attempt signInWithPassword so we can sync their driver_profiles record under RLS
+          if (!provisionedUser) {
+            const { data: signInData, error: signInErr } = await authClient.auth.signInWithPassword({
+              email: resolvedEmail,
+              password: newPassword,
+            });
+            if (!signInErr && signInData?.user?.id) {
+              provisionedUser = signInData.user;
+              hasActiveSession = !!signInData.session;
+            }
+          }
+
+          if (provisionedUser) {
+            authUserId = provisionedUser.id;
             passwordDirectlyUpdated = true;
+            const displayDriverName = resolvedName || resolvedEmail.split('@')[0] || 'Driver';
             operationNotes.push(
-              'Driver account provisioned in Supabase Authentication (Users) with the specified password.'
+              'Driver account provisioned and linked in Supabase Authentication (Users) with the specified password.'
             );
 
-            // Sync driver_profiles to ensure foreign key / ID alignment
+            // Sync public.profiles and public.driver_profiles (without non-existent full_name column on driver_profiles)
             try {
-              await supabase.from('driver_profiles').upsert(
+              await authClient.from('profiles').upsert(
+                {
+                  id: authUserId,
+                  full_name: displayDriverName,
+                  phone: resolvedPhone,
+                  user_type: 'driver',
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'id' }
+              );
+
+              await authClient.from('driver_profiles').upsert(
                 {
                   id: authUserId,
                   email: resolvedEmail,
-                  full_name: resolvedName,
                   phone: resolvedPhone,
+                  is_verified: true,
+                  is_online: true,
+                  subscription_active: true,
+                  subscription_plan: 'trial',
+                  verification_notes: `Driver Name: ${displayDriverName} | Linked via Manager Console`,
                   updated_at: new Date().toISOString(),
                 },
                 { onConflict: 'id' }
@@ -164,14 +199,14 @@ export async function POST(req: NextRequest) {
 
             return NextResponse.json({
               success: true,
-              message: `Driver account created in Supabase Auth for ${resolvedEmail} with the new password.`,
+              message: `Driver account linked in Supabase Auth for ${resolvedEmail} with the new password.`,
               driverId: authUserId,
               email: resolvedEmail,
-              fullName: resolvedName,
+              fullName: displayDriverName,
               phone: resolvedPhone,
               passwordUpdated: true,
               authUserProvisioned: true,
-              emailSent: !signUpData.session,
+              emailSent: !hasActiveSession,
               notes: operationNotes,
             });
           }
@@ -180,8 +215,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 4.2 If user already exists in auth.users, Supabase Auth requires service_role key for direct overwrite;
-      // dispatch password recovery email so driver can finalize password.
+      // 4.2 If user already exists in auth.users with a different password, Supabase Auth requires service_role key
+      // for direct overwrite; dispatch password recovery email so driver can finalize password.
       console.warn('[ResetPasswordAPI] Direct password update attempted without SUPABASE_SERVICE_ROLE_KEY.');
 
       let emailDispatched = false;
@@ -320,11 +355,13 @@ export async function POST(req: NextRequest) {
 
               // Synchronize driver_profiles record with authUserId
               try {
+                const displayDriverName = resolvedName || resolvedEmail.split('@')[0] || 'Driver';
                 await supabase.from('driver_profiles').upsert({
                   id: authUserId,
                   email: resolvedEmail,
-                  full_name: resolvedName,
                   phone: resolvedPhone,
+                  is_online: true,
+                  verification_notes: `Driver Name: ${displayDriverName} | Provisioned via Manager Console`,
                   updated_at: new Date().toISOString(),
                 });
               } catch (linkEx) {
