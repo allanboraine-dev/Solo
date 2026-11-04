@@ -30,6 +30,7 @@ export interface FleetProfile {
   subscriptionStatus: FleetSubscriptionStatus;
   subscriptionTier: FleetSubscriptionTier;
   activeVehiclesCount: number;
+  estimatedVehicles?: number;
   trialEndsAt?: string;
   subscriptionRenewsAt?: string;
   lastPaymentReference?: string;

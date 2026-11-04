@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   getFleetProfile,
+  saveFleetProfile,
   getFleetVehicles,
   calculateFleetMonthlyBilling,
   seedDefaultFleetIfNeeded,
@@ -25,13 +26,40 @@ export async function POST(req: Request) {
     seedDefaultFleetIfNeeded();
 
     const body = await req.json();
-    const { fleetId, email } = body || {};
+    const {
+      fleetId,
+      email,
+      companyName,
+      contactPerson,
+      ownerPhone,
+      operatingCity,
+      vehicleCount,
+    } = body || {};
 
     if (!fleetId) {
       return NextResponse.json({ success: false, error: 'Fleet ID is required' }, { status: 400 });
     }
 
-    const fleet = getFleetProfile(fleetId);
+    let fleet = getFleetProfile(fleetId);
+    if (!fleet && email) {
+      const estCount = Math.max(1, Math.floor(Number(vehicleCount) || 1));
+      fleet = saveFleetProfile({
+        id: String(fleetId),
+        ownerEmail: String(email).trim().toLowerCase(),
+        ownerPhone: String(ownerPhone || '').trim(),
+        companyName: String(companyName || 'SOLO Fleet Partner').trim(),
+        contactPerson: String(contactPerson || 'Fleet Manager').trim(),
+        operatingCity: String(operatingCity || 'Johannesburg').trim(),
+        subscriptionStatus: 'trial',
+        subscriptionTier: estCount >= 15 ? 'fleet_enterprise' : estCount >= 5 ? 'fleet_pro' : 'fleet_starter',
+        activeVehiclesCount: 0,
+        estimatedVehicles: estCount,
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
     if (!fleet) {
       return NextResponse.json({ success: false, error: 'Fleet profile not found' }, { status: 404 });
     }
@@ -41,9 +69,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Company owner email is required' }, { status: 400 });
     }
 
-    // Retrieve active registered vehicles to compute exact Option C fee
+    // Retrieve active registered vehicles or fallback to estimated vehicle count during registration
     const vehicles = getFleetVehicles(fleetId);
-    const billing = calculateFleetMonthlyBilling(vehicles.length);
+    const billableVehicleCount = Math.max(
+      1,
+      vehicles.length || Number(vehicleCount) || fleet.estimatedVehicles || fleet.activeVehiclesCount || 1
+    );
+    const billing = calculateFleetMonthlyBilling(billableVehicleCount);
     const amountInCents = Math.round(billing.totalMonthlyZar * 100);
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -53,7 +85,7 @@ export async function POST(req: Request) {
 
     // Resilient testing bypass / dev mode: When payment function is disabled for testing or when PAYSTACK_SECRET_KEY is absent
     if (DISABLE_FLEET_PAYMENT_FOR_TESTING || !secretKey) {
-      console.warn('[Paystack Fleet] Testing mode active (DISABLE_FLEET_PAYMENT_FOR_TESTING = true). Payment gateway bypassed.');
+      console.warn('[Paystack Fleet] Testing mode active or PAYSTACK_SECRET_KEY missing. Payment gateway bypassed.');
       const mockReference = `SOLO-FLEET-TEST-${Date.now()}`;
       return NextResponse.json({
         success: true,
@@ -74,7 +106,7 @@ export async function POST(req: Request) {
         fleetId,
         fleet_name: fleet.companyName,
         payment_type: 'solo_fleet_subscription',
-        vehicle_count: vehicles.length,
+        vehicle_count: billableVehicleCount,
         base_fee_zar: billing.basePlatformFeeZar,
         vehicles_subtotal_zar: billing.vehiclesSubtotalZar,
         vat_amount_zar: billing.vatAmountZar,
@@ -88,7 +120,7 @@ export async function POST(req: Request) {
           {
             display_name: 'Active Vehicles',
             variable_name: 'vehicle_count',
-            value: `${vehicles.length} vehicle slots`,
+            value: `${billableVehicleCount} vehicle slots`,
           },
           {
             display_name: 'Total Monthly Bill',

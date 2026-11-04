@@ -43,7 +43,7 @@ export const FLEET_PRICING = {
  *  - Paystack checkouts run in zero-charge simulation mode without touching credit cards.
  * Set back to `false` when ready to go live with real Paystack billing.
  */
-export const DISABLE_FLEET_PAYMENT_FOR_TESTING = true;
+export const DISABLE_FLEET_PAYMENT_FOR_TESTING = false;
 
 /**
  * Calculates monthly fleet billing with South African VAT and savings vs Uber/Bolt.
@@ -465,6 +465,7 @@ export function registerFleetProfile(params: {
     subscriptionStatus: 'trial',
     subscriptionTier: (params.estimatedVehicles || 0) >= 15 ? 'fleet_enterprise' : (params.estimatedVehicles || 0) >= 5 ? 'fleet_pro' : 'fleet_starter',
     activeVehiclesCount: 0,
+    estimatedVehicles: Math.max(1, Math.floor(params.estimatedVehicles || 1)),
     trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

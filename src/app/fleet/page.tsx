@@ -283,6 +283,59 @@ export default function FleetPage() {
     }
   };
 
+  // Register Fleet & Immediately Proceed to Paystack Checkout
+  const handleRegisterAndPayFleet = async () => {
+    setRegError(null);
+
+    if (!regCompanyName.trim() || !regContactPerson.trim() || !regEmail.trim() || !regPhone.trim()) {
+      setRegError("Please complete company name, contact person, email, and mobile number.");
+      return;
+    }
+
+    if (!regPopiaConsent) {
+      setRegError("You must review and accept the POPIA Privacy Policy and Terms of Service to register.");
+      return;
+    }
+
+    const estCount = Number(regEstimatedVehicles) || 1;
+    setRegSubmitting(true);
+    try {
+      const settlementBank: FleetSettlementBank | undefined = regAccountNumber.trim()
+        ? {
+            bankName: regBankName,
+            accountHolder: regAccountHolder.trim() || regCompanyName.trim(),
+            accountNumber: regAccountNumber.trim(),
+            branchCode: regBranchCode.trim(),
+            accountType: "current",
+          }
+        : undefined;
+
+      const registered = registerFleetProfile({
+        companyName: regCompanyName.trim(),
+        contactPerson: regContactPerson.trim(),
+        ownerEmail: regEmail.trim(),
+        ownerPhone: regPhone.trim(),
+        operatingCity: regCity,
+        registrationNumber: regCipro.trim() || undefined,
+        vatNumber: regVat.trim() || undefined,
+        settlementBank,
+        estimatedVehicles: estCount,
+      });
+
+      handleResetRegisterForm();
+      setFleetProfile(registered);
+      setVehicles([]);
+      setAudits([]);
+      setActiveTab("billing");
+
+      await handleActivatePaystackSubscription(registered, estCount);
+    } catch (err: any) {
+      setRegError(err?.message || "Failed to register fleet and start payment. Please check details.");
+    } finally {
+      setRegSubmitting(false);
+    }
+  };
+
   // Login Handler
   const handleLoginFleet = (e: React.FormEvent) => {
     e.preventDefault();
@@ -352,8 +405,8 @@ export default function FleetPage() {
 
   // Billing calculation for current fleet size (Option C: R770 Base + R499/veh)
   const billing = useMemo(() => {
-    return calculateFleetMonthlyBilling(vehicles.length || 0);
-  }, [vehicles.length]);
+    return calculateFleetMonthlyBilling(vehicles.length || fleetProfile?.estimatedVehicles || 0);
+  }, [vehicles.length, fleetProfile?.estimatedVehicles]);
 
   // Prospective billing preview during registration
   const registrationBillingPreview = useMemo(() => {
@@ -391,22 +444,39 @@ export default function FleetPage() {
   }, [fleetProfile?.trialEndsAt]);
 
   // Activate Paystack Billing Handler (Approach 2)
-  const handleActivatePaystackSubscription = async () => {
-    if (!fleetProfile) return;
+  const handleActivatePaystackSubscription = async (
+    targetFleetOverride?: FleetProfile | React.MouseEvent,
+    overrideVehicleCount?: number
+  ) => {
+    const activeTarget =
+      targetFleetOverride && "id" in targetFleetOverride
+        ? (targetFleetOverride as FleetProfile)
+        : fleetProfile;
+    if (!activeTarget) return;
     setPaystackLoading(true);
     try {
       const res = await fetch("/api/fleet/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fleetId: fleetProfile.id,
-          email: fleetProfile.ownerEmail,
+          fleetId: activeTarget.id,
+          email: activeTarget.ownerEmail,
+          companyName: activeTarget.companyName,
+          contactPerson: activeTarget.contactPerson,
+          ownerPhone: activeTarget.ownerPhone,
+          operatingCity: activeTarget.operatingCity,
+          vehicleCount:
+            overrideVehicleCount ||
+            vehicles.length ||
+            activeTarget.estimatedVehicles ||
+            activeTarget.activeVehiclesCount ||
+            1,
         }),
       });
       const data = await res.json();
       if (data.success && data.mock) {
         // Direct instant activation in testing mode (No card charge / no external redirect)
-        const updated = activateFleetSubscription(fleetProfile.id, {
+        const updated = activateFleetSubscription(activeTarget.id, {
           paymentReference: data.reference,
           amountZar: data.amountZar,
           cardLast4: "4242",
@@ -414,7 +484,7 @@ export default function FleetPage() {
         });
         if (updated) {
           setFleetProfile(updated);
-          setActiveFleetSession(fleetProfile.id);
+          setActiveFleetSession(activeTarget.id);
           setPaymentSuccessMsg(
             `[Testing Mode Active] Simulated subscription activated! Ref: ${data.reference}. No real card charges applied.`
           );
@@ -1092,10 +1162,10 @@ export default function FleetPage() {
 
               <div className="text-[11px] text-purple-700 dark:text-purple-300 font-semibold flex items-center justify-center gap-1.5 pt-1">
                 <Sparkles size={13} />
-                <span>Includes 7-Day Free Trial • R0.00 upfront • Activate Paystack anytime</span>
+                <span>Pay &amp; Activate Immediately via Paystack or Start 7-Day Free Trial</span>
               </div>
 
-              <div className="flex items-stretch gap-2.5 pt-1">
+              <div className="flex flex-col sm:flex-row items-stretch gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={handleResetRegisterForm}
@@ -1106,16 +1176,30 @@ export default function FleetPage() {
                   <span>Reset Fields</span>
                 </button>
                 <button
+                  type="button"
+                  onClick={handleRegisterAndPayFleet}
+                  disabled={regSubmitting || paystackLoading}
+                  aria-busy={regSubmitting || paystackLoading}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/25 active:scale-95 transition-all text-xs md:text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  <CreditCard size={16} />
+                  <span>
+                    {paystackLoading
+                      ? "Connecting to Paystack..."
+                      : `Register & Pay via Paystack (R${registrationBillingPreview.totalMonthlyZar.toLocaleString()}/mo)`}
+                  </span>
+                </button>
+                <button
                   type="submit"
-                  disabled={regSubmitting}
+                  disabled={regSubmitting || paystackLoading}
                   aria-busy={regSubmitting}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-purple-600/25 active:scale-95 transition-all text-xs md:text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {regSubmitting ? (
                     <span>Registering Fleet Partner...</span>
                   ) : (
                     <>
-                      <span>Register Fleet &amp; Launch 7-Day Free Trial (R0.00 Upfront)</span>
+                      <span>Start 7-Day Free Trial</span>
                       <ArrowRight size={16} />
                     </>
                   )}

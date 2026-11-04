@@ -23,6 +23,7 @@ import {
   seedDefaultFleetIfNeeded,
   resetDemoFleet,
   recordCompletedTripToFleetAudit,
+  DISABLE_FLEET_PAYMENT_FOR_TESTING,
   FLEET_PRICING,
 } from '../src/utils/fleetStore.ts';
 import type { FleetProfile, FleetVehicle, FleetShiftAudit } from '../src/types/fleet.ts';
@@ -393,5 +394,28 @@ describe('SOLO B2B Fleet Management & Pricing Suite', () => {
     const todayAudit = auditsForFleet.find(a => a.shiftDate === today);
     assert.ok(todayAudit);
     assert.strictEqual(todayAudit?.totalGrossZar, baselineGross + 205);
+  });
+
+  it('enables live Paystack payment function for fleet registration and preserves estimatedVehicles', () => {
+    assert.strictEqual(
+      DISABLE_FLEET_PAYMENT_FOR_TESTING,
+      false,
+      'DISABLE_FLEET_PAYMENT_FOR_TESTING must be false so live Paystack billing is active'
+    );
+
+    const registered = registerFleetProfile({
+      companyName: 'Gauteng Executive Fleet (Pty) Ltd',
+      contactPerson: 'Sipho Nkosi',
+      ownerEmail: 'billing@gautengexec.co.za',
+      ownerPhone: '+27 82 444 9900',
+      operatingCity: 'Johannesburg',
+      estimatedVehicles: 8,
+    });
+
+    assert.strictEqual(registered.estimatedVehicles, 8);
+    const billing = calculateFleetMonthlyBilling(registered.estimatedVehicles || 1);
+    assert.strictEqual(billing.vehicleCount, 8);
+    assert.strictEqual(billing.basePlatformFeeZar, 770);
+    assert.strictEqual(billing.vehiclesSubtotalZar, 8 * 499);
   });
 });
