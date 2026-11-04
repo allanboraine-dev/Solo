@@ -7,6 +7,7 @@ import {
   recordDriverSignupAlert,
   checkDuplicateKycDriver,
   reconcileMemoryDriversWithDatabase,
+  setKycDriverPassword,
 } from '../../../../utils/kycStore.ts';
 import { checkDriverDuplicatesInMemory } from '../../../../utils/driverValidation.ts';
 
@@ -308,7 +309,7 @@ export async function POST(req: NextRequest) {
     const trialStartIso = trialStartedAt ? new Date(trialStartedAt).toISOString() : new Date().toISOString();
     const managerNotes = `Driver Name: ${cleanName} | Registered via Manager Console by ${auth.session?.name || auth.session?.email || 'Operations Manager'}`;
 
-    // 6. Save into resilient in-memory server kycStore
+    // 6. Save into resilient in-memory server kycStore and store driver credentials
     const savedDriver = saveKycDriverProfile({
       id: driverId,
       fullName: cleanName,
@@ -324,6 +325,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
       verificationNotes: managerNotes,
     });
+    setKycDriverPassword(cleanEmail, finalPassword);
 
     // 7. Record update alert for Manager Dashboard
     const signupAlert = recordDriverSignupAlert({

@@ -48,6 +48,33 @@ const memoryDrivers = new Map<string, KycDriverProfile>();
 const memoryDocuments = new Map<string, Map<KycDocType, DriverDocument>>();
 const memorySignupAlerts: DriverSignupAlert[] = [];
 const purgedDriverIds = new Set<string>();
+const memoryDriverCredentials = new Map<string, string>();
+
+export function setKycDriverPassword(email: string, password: string): void {
+  if (!email || !password) return;
+  memoryDriverCredentials.set(email.trim().toLowerCase(), password);
+}
+
+export function getKycDriverProfileByEmail(email: string): KycDriverProfile | undefined {
+  if (!email) return undefined;
+  const clean = email.trim().toLowerCase();
+  for (const driver of Array.from(memoryDrivers.values())) {
+    if (driver.email?.trim().toLowerCase() === clean) {
+      return driver;
+    }
+  }
+  return undefined;
+}
+
+export function verifyKycDriverPassword(email: string, password: string): KycDriverProfile | null {
+  if (!email || !password) return null;
+  const clean = email.trim().toLowerCase();
+  const storedPassword = memoryDriverCredentials.get(clean);
+  if (!storedPassword || storedPassword !== password) {
+    return null;
+  }
+  return getKycDriverProfileByEmail(clean) || null;
+}
 
 export function isDriverPurged(driverId: string): boolean {
   return purgedDriverIds.has(driverId);

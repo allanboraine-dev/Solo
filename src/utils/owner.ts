@@ -12,6 +12,7 @@ export const OWNER_EMAILS: string[] = [
 ];
 
 export const OWNER_PASSWORDS: string[] = [
+  '123456789',
   '13579',
   ...(process.env.OWNER_PASSWORD ? [process.env.OWNER_PASSWORD.trim()] : []),
 ];

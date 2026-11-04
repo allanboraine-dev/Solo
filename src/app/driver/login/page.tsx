@@ -135,7 +135,7 @@ function DriverLoginForm() {
         return
       }
 
-      // If owner email is used with a different password, try Supabase first
+      // If owner email is used with a custom manager-reset password, check Supabase and Server Credential Vault
       try {
         const { data, error: authError } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
@@ -144,6 +144,19 @@ function DriverLoginForm() {
 
         if (!authError && data?.user) {
           setSafeLocalStorageItem('driver_id', data.user.id)
+          router.push('/driver')
+          return
+        }
+
+        const vaultRes = await fetch('/api/driver/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password }),
+        })
+        const vaultData = await vaultRes.json()
+        if (vaultRes.ok && vaultData?.authenticated && vaultData?.driver) {
+          setSafeLocalStorageItem('driver_id', vaultData.driver.id)
+          setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(vaultData.driver))
           router.push('/driver')
           return
         }
@@ -162,6 +175,24 @@ function DriverLoginForm() {
     })
 
     if (authError || !data.user) {
+      // Fallback: Check SOLO Server Credential Vault (for drivers registered or reset via Manager Console)
+      try {
+        const vaultRes = await fetch('/api/driver/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password }),
+        })
+        const vaultData = await vaultRes.json()
+        if (vaultRes.ok && vaultData?.authenticated && vaultData?.driver) {
+          setSafeLocalStorageItem('driver_id', vaultData.driver.id)
+          setSafeLocalStorageItem('mock_driver_profile', JSON.stringify(vaultData.driver))
+          router.push('/driver')
+          return
+        }
+      } catch {
+        // Ignore network error and surface original auth error
+      }
+
       setError(authError?.message || 'Failed to login')
       setIsSubmitting(false)
       return
