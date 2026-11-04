@@ -11,15 +11,40 @@
 export const TRIP_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour (3,600,000 ms)
 export const STALE_REQUEST_MAX_AGE_MS = TRIP_EXPIRATION_MS;
 
+export const PURGED_TRIP_IDS = new Set<string>([
+  'fe854637-e49c-402c-80fc-9ab03de8f41c',
+  '8cbb1b75-8b7f-4726-ab01-43c3d5f74f26',
+  'e88d7281-1b92-40cb-ac74-23ad1e1a45e2',
+]);
+
 export interface ExpirableTrip {
+  id?: string | null;
   status: string;
+  pickup_location?: string | null;
+  dropoff_location?: string | null;
   created_at?: string | null;
   scheduled_time?: string | null;
   updated_at?: string | null;
 }
 
+export const isPurgedTrip = (trip: ExpirableTrip): boolean => {
+  if (!trip) return false;
+  if (trip.id && PURGED_TRIP_IDS.has(trip.id)) return true;
+  const pickup = (trip.pickup_location || '').trim().toLowerCase();
+  const dropoff = (trip.dropoff_location || '').trim().toLowerCase();
+  if (pickup.includes('burgandy hills') || pickup.includes('burgundy hills')) return true;
+  if (pickup === 'test' && dropoff === 'test') return true;
+  return false;
+};
+
 export const isStaleRequestedTrip = (trip: ExpirableTrip): boolean => {
+  if (isPurgedTrip(trip)) return true;
   if (trip.status !== 'requested') return false;
+
+  // Legacy/orphaned localStorage requested trips missing both created_at and scheduled_time must expire
+  if (!trip.created_at && !trip.scheduled_time) {
+    return true;
+  }
 
   // 1. Any unaccepted trip request created > 1 hour ago must expire and be removed
   if (trip.created_at) {
@@ -55,5 +80,5 @@ export const isStaleCancelledTrip = (trip: ExpirableTrip): boolean => {
 };
 
 export const isTripExpired = (trip: ExpirableTrip): boolean => {
-  return isStaleRequestedTrip(trip) || isStaleCancelledTrip(trip);
+  return isPurgedTrip(trip) || isStaleRequestedTrip(trip) || isStaleCancelledTrip(trip);
 };

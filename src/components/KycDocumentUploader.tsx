@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { KycDocType, DriverDocument, KYC_DOCUMENT_CONFIGS } from '@/types/kyc'
-import { uploadDriverKycDocument } from '@/utils/kyc'
+import { uploadDriverKycDocument, getDocumentExpiryState } from '@/utils/kyc'
 import CameraCaptureModal from '@/components/CameraCaptureModal'
 import {
   Upload,
@@ -61,6 +61,9 @@ export default function KycDocumentUploader({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isFullscreenPreviewOpen, setIsFullscreenPreviewOpen] = useState(false)
+  const [customExpiryDate, setCustomExpiryDate] = useState<string>(
+    existingDoc?.expires_at ? existingDoc.expires_at.slice(0, 10) : ''
+  )
 
   // Sync preview url when selectedFile changes
   useEffect(() => {
@@ -91,7 +94,12 @@ export default function KycDocumentUploader({
 
     if (autoUpload && driverId) {
       setIsUploading(true)
-      const res = await uploadDriverKycDocument(driverId, docType, file)
+      const res = await uploadDriverKycDocument(
+        driverId,
+        docType,
+        file,
+        customExpiryDate ? { expiresAt: customExpiryDate } : undefined
+      )
       setIsUploading(false)
       if (res.success && res.document) {
         if (onUploadSuccess) onUploadSuccess(res.document)
@@ -133,16 +141,21 @@ export default function KycDocumentUploader({
   }
 
   const status = existingDoc?.status
+  const expiryInfo = getDocumentExpiryState(existingDoc)
+  const isDocExpired = expiryInfo.state === 'expired'
+  const isDocExpiringSoon = expiryInfo.state === 'expiring_soon'
   const activePreview = previewUrl || existingDoc?.signedUrl
 
   return (
     <>
       <div
         className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-          status === 'approved'
-            ? 'border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20'
-            : status === 'rejected'
+          isDocExpired || status === 'rejected'
             ? 'border-red-300 dark:border-red-800/60 bg-red-50/50 dark:bg-red-950/20'
+            : isDocExpiringSoon
+            ? 'border-amber-400 dark:border-amber-700/80 bg-amber-50/50 dark:bg-amber-950/25'
+            : status === 'approved'
+            ? 'border-emerald-300 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20'
             : status === 'pending'
             ? 'border-amber-300 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20'
             : selectedFile
@@ -215,38 +228,74 @@ export default function KycDocumentUploader({
           </div>
 
           {/* Status Badge */}
-          <div>
-            {status === 'approved' && (
+          <div className="flex flex-col items-end gap-1">
+            {isDocExpired ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-black text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/60 px-2.5 py-1 rounded-full animate-pulse">
+                <AlertCircle size={13} />
+                Expired
+              </span>
+            ) : isDocExpiringSoon && expiryInfo.daysRemaining !== null ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/60 px-2.5 py-1 rounded-full">
+                <Clock size={13} />
+                Expires in {expiryInfo.daysRemaining}d
+              </span>
+            ) : status === 'approved' ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-1 rounded-full">
                 <CheckCircle2 size={13} />
                 Approved
               </span>
-            )}
-            {status === 'pending' && (
+            ) : status === 'pending' ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-2.5 py-1 rounded-full">
                 <Clock size={13} />
                 In Review
               </span>
-            )}
-            {status === 'rejected' && (
+            ) : status === 'rejected' ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/60 px-2.5 py-1 rounded-full">
                 <AlertCircle size={13} />
                 Rejected
               </span>
-            )}
-            {!status && selectedFile && (
+            ) : selectedFile ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-black text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/60 px-2.5 py-1 rounded-full">
                 <CheckCircle2 size={13} />
                 Photo Ready
               </span>
-            )}
-            {!status && !selectedFile && (
+            ) : (
               <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">
                 Not captured
               </span>
             )}
+            {expiryInfo.expiresAt && !isDocExpired && (
+              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                Exp: {new Date(expiryInfo.expiresAt).toLocaleDateString()}
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Expiry Alert or Date Input */}
+        {isDocExpired && (
+          <div className="mb-3 p-2.5 bg-red-100/80 dark:bg-red-950/60 border border-red-300 dark:border-red-900/50 rounded-xl text-xs text-red-800 dark:text-red-200 font-semibold">
+            <strong>Document Expired:</strong> Access to Go Online is paused until you upload a renewed {config.title}.
+          </div>
+        )}
+        {isDocExpiringSoon && expiryInfo.daysRemaining !== null && (
+          <div className="mb-3 p-2.5 bg-amber-100/80 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-900/50 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-medium">
+            <strong>Renewal Reminder:</strong> This document expires in {expiryInfo.daysRemaining} day{expiryInfo.daysRemaining === 1 ? '' : 's'}. Upload your renewed document before expiry to avoid account lock.
+          </div>
+        )}
+        {config.hasExpiry && !disabled && (
+          <div className="mb-2.5 pl-8 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <label className="text-gray-600 dark:text-gray-400 font-semibold">
+              Document Expiry Date (on card/disc):
+            </label>
+            <input
+              type="date"
+              value={customExpiryDate}
+              onChange={(e) => setCustomExpiryDate(e.target.value)}
+              className="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-800 dark:text-gray-200 text-xs font-semibold"
+            />
+          </div>
+        )}
 
         {/* Rejection Reason Display */}
         {status === 'rejected' && existingDoc?.rejection_reason && (

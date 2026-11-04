@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { isPlatformOwner, applyOwnerPrivileges, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner';
+import { isPlatformOwner, applyOwnerPrivileges, FOUNDER_DRIVER_UUID, LEGACY_FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner';
 import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession, generateUuid, safeJsonParse, getSafeLocalStorageItem, setSafeLocalStorageItem } from '@/utils/session';
 import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
 import { recordCompletedTripToFleetAudit } from '@/utils/fleetStore';
@@ -83,7 +83,7 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
   // Get active session from Supabase
   const { data: { session } } = await supabase.auth.getSession();
   let driverId = session?.user?.id || localStorage.getItem('driver_id');
-  if (driverId === 'owner-allan-boraine') {
+  if (driverId === 'owner-allan-boraine' || driverId === LEGACY_FOUNDER_DRIVER_UUID) {
     driverId = FOUNDER_DRIVER_UUID;
     try {
       setSafeLocalStorageItem('driver_id', FOUNDER_DRIVER_UUID);
@@ -187,7 +187,10 @@ export const getDriverProfile = async (): Promise<MockDriverProfile | null> => {
 
 export const getDriverProfileById = async (driverId: string): Promise<MockDriverProfile | null> => {
   if (!driverId) return null;
-  const normalizedDriverId = driverId === 'owner-allan-boraine' ? FOUNDER_DRIVER_UUID : driverId;
+  const normalizedDriverId =
+    driverId === 'owner-allan-boraine' || driverId === LEGACY_FOUNDER_DRIVER_UUID
+      ? FOUNDER_DRIVER_UUID
+      : driverId;
   try {
     const { data, error } = await supabase.from('driver_profiles').select('*').eq('id', normalizedDriverId).maybeSingle();
     if (data && !error) {
@@ -382,6 +385,8 @@ export const recordTripStatusOverride = (
 import {
   TRIP_EXPIRATION_MS,
   STALE_REQUEST_MAX_AGE_MS,
+  PURGED_TRIP_IDS,
+  isPurgedTrip,
   isStaleRequestedTrip,
   isStaleCancelledTrip,
   isTripExpired,
@@ -390,6 +395,8 @@ import {
 export {
   TRIP_EXPIRATION_MS,
   STALE_REQUEST_MAX_AGE_MS,
+  PURGED_TRIP_IDS,
+  isPurgedTrip,
   isStaleRequestedTrip,
   isStaleCancelledTrip,
   isTripExpired,
@@ -576,13 +583,8 @@ export const getTrips = async (): Promise<MockTrip[]> => {
       const localTrips: MockTrip[] = JSON.parse(localData);
       localTrips.forEach(t => {
         if (t && t.id) {
-          // Purge Burgundy Hills Estate trip and any unaccepted requests that have expired (> 1 hour)
-          if (
-            t.id === 'fe854637-e49c-402c-80fc-9ab03de8f41c' ||
-            t.pickup_location?.toLowerCase().includes('burgandy hills') ||
-            t.pickup_location?.toLowerCase().includes('burgundy hills') ||
-            isStaleRequestedTrip(t)
-          ) {
+          // Purge blocklisted test trips and any unaccepted requests that have expired (> 1 hour)
+          if (isPurgedTrip(t) || isTripExpired(t)) {
             return;
           }
           const resolvedStatus = resolveMonotonicStatus(t.id, t.status, completedIds, overrides, t);
@@ -598,7 +600,7 @@ export const getTrips = async (): Promise<MockTrip[]> => {
   // 3. Merge Supabase rows with fresh local trips using monotonic STATUS_PRIORITY
   if (dbRows) {
     dbRows.forEach((dbTrip: any) => {
-      if (!dbTrip?.id) return;
+      if (!dbTrip?.id || isPurgedTrip(dbTrip)) return;
       const existing = mergedMap.get(dbTrip.id);
       const dbStatus = resolveMonotonicStatus(
         dbTrip.id,
@@ -647,14 +649,9 @@ export const getTrips = async (): Promise<MockTrip[]> => {
     });
   }
 
-  // Remove expired trips (unaccepted requests > 1 hour, stale cancelled trips > 1 hour) and purged Burgandy Hills trip
+  // Remove expired trips (unaccepted requests > 1 hour, stale cancelled trips > 1 hour) and purged test trips
   const result = Array.from(mergedMap.values()).filter(
-    t =>
-      !isTripExpired(t) &&
-      !isStaleRequestedTrip(t) &&
-      !t.pickup_location?.toLowerCase().includes('burgandy hills') &&
-      !t.pickup_location?.toLowerCase().includes('burgundy hills') &&
-      t.id !== 'fe854637-e49c-402c-80fc-9ab03de8f41c'
+    t => !isTripExpired(t) && !isStaleRequestedTrip(t) && !isPurgedTrip(t)
   );
   try {
     localStorage.setItem('mock_trips', JSON.stringify(result.slice(0, 100)));
@@ -717,18 +714,14 @@ export const saveTrip = async (trip: MockTrip) => {
         updatePayload.payment_status = 'paid';
       }
 
-      const { data: updatedRow, error: updateErr } = await supabase
+      // Do not chain .select() on .update() because PostgreSQL RETURNING * checks SELECT RLS on the post-update row,
+      // which fails with 42501 when status transitions away from 'requested' for unauthenticated or cross-role callers.
+      const { error: updateErr } = await supabase
         .from('trips')
         .update(updatePayload)
-        .eq('id', enrichedTrip.id)
-        .select()
-        .maybeSingle();
+        .eq('id', enrichedTrip.id);
 
-      if (!updateErr && updatedRow) {
-        return;
-      }
-
-      // Fallback to SECURITY DEFINER RPCs when RLS blocks direct table UPDATE
+      // Fallback to SECURITY DEFINER RPCs / server route to guarantee status persistence in Supabase
       if (enrichedTrip.status === 'accepted') {
         await supabase.rpc('accept_trip', {
           p_trip_id: enrichedTrip.id,
@@ -759,6 +752,16 @@ export const saveTrip = async (trip: MockTrip) => {
           p_trip_id: enrichedTrip.id,
           p_payment_method: 'cash',
         });
+      } else if (enrichedTrip.status === 'cancelled' && updateErr && typeof window !== 'undefined') {
+        fetch('/api/trips/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: enrichedTrip.id,
+            driverId: resolvedDriverId || FOUNDER_DRIVER_UUID,
+            status: 'cancelled',
+          }),
+        }).catch(() => {});
       }
       return;
     }
@@ -1399,6 +1402,8 @@ export const getNearbyRequestedTrips = async (
       !t.driver_id &&
       !declinedIds.has(t.id) &&
       !completedIds.has(t.id) &&
+      !isTripDismissed(t.id) &&
+      !isPurgedTrip(t) &&
       !isStaleRequestedTrip(t)
   );
 
@@ -1414,14 +1419,10 @@ export const getNearbyRequestedTrips = async (
       const rpcTrips: MockTrip[] = data
         .filter((t: any) => {
           if (!t?.id) return false;
-          if (
-            t.id === 'fe854637-e49c-402c-80fc-9ab03de8f41c' ||
-            t.pickup_location?.toLowerCase().includes('burgandy hills') ||
-            t.pickup_location?.toLowerCase().includes('burgundy hills')
-          ) {
+          if (isPurgedTrip(t)) {
             return false;
           }
-          if (declinedIds.has(t.id) || completedIds.has(t.id)) return false;
+          if (declinedIds.has(t.id) || completedIds.has(t.id) || isTripDismissed(t.id)) return false;
           const knownStatus = knownStatusMap.get(t.id);
           if (knownStatus && knownStatus !== 'requested') return false;
           if (isStaleRequestedTrip({ status: t.status || 'requested', created_at: t.created_at, scheduled_time: t.scheduled_time })) {

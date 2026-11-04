@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { KycDocType } from '@/types/kyc'
+import { KycDocType, KYC_DOCUMENT_CONFIGS } from '@/types/kyc'
 import { saveKycDocument, saveKycDriverProfile } from '@/utils/kycStore'
 import { checkUploadRateLimit } from '@/utils/rateLimit'
 
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     const vehicleModel = formData.get('vehicleModel') as string | null
     const licensePlate = formData.get('licensePlate') as string | null
     const prdpNumber = formData.get('prdpNumber') as string | null
+    const rawExpiresAt = formData.get('expiresAt') as string | null
 
     if (!driverId) {
       return NextResponse.json({ error: 'Driver ID is required' }, { status: 400 })
@@ -105,6 +106,17 @@ export async function POST(req: Request) {
       prdpNumber: prdpNumber || undefined,
     })
 
+    // Calculate statutory expiration date if document type expires
+    const docConfig = KYC_DOCUMENT_CONFIGS[docType]
+    let resolvedExpiresAt: string | null = null
+    if (rawExpiresAt && !Number.isNaN(new Date(rawExpiresAt).getTime())) {
+      resolvedExpiresAt = new Date(rawExpiresAt).toISOString()
+    } else if (docConfig?.hasExpiry && docConfig.defaultValidityMonths) {
+      const d = new Date()
+      d.setMonth(d.getMonth() + docConfig.defaultValidityMonths)
+      resolvedExpiresAt = d.toISOString()
+    }
+
     // 3. Upsert record into driver_documents table
     let docRecord: any = null
     try {
@@ -127,7 +139,10 @@ export async function POST(req: Request) {
       if (dbError) {
         console.warn('[UploadKycAPI] Database driver_documents notice:', dbError.message)
       } else {
-        docRecord = data
+        docRecord = {
+          ...data,
+          expires_at: resolvedExpiresAt || data?.expires_at || null,
+        }
       }
     } catch (dbErr: any) {
       console.warn('[UploadKycAPI] driver_documents exception:', dbErr?.message)
@@ -141,6 +156,7 @@ export async function POST(req: Request) {
         doc_type: docType,
         file_path: storagePath,
         status: 'pending',
+        expires_at: resolvedExpiresAt,
         rejection_reason: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

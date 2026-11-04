@@ -10,6 +10,7 @@ import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
 import SafetyShieldModal, { SafetyFloatingButton } from '@/components/SafetyShieldModal'
+import { evaluateInTripSafetyCheckIn, triggerRapidResponseSos } from '@/utils/safetyDispatch'
 import RiderSupportModal from '@/components/RiderSupportModal'
 import { createClient } from '@/utils/supabase/client'
 import { buildWhatsAppTripShareUrl, phoneToDeterministicUuid } from '@/utils/phone'
@@ -36,6 +37,7 @@ export default function RiderPage() {
   const [pickupCoords, setPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [dropoffCoords, setDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
+  const [safetyCheckInDismissed, setSafetyCheckInDismissed] = useState(false)
   const activeTripRef = useRef<MockTrip | null>(null)
 
   const updateActiveTripState = (next: MockTrip | null) => {
@@ -1375,9 +1377,44 @@ export default function RiderPage() {
                             {/* Security & Verification Reminder + Quick Message Button */}
                             <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-white/10 flex items-center justify-between gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex-wrap">
                               <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                                <ShieldCheck size={15} className="shrink-0" /> Verify plate before boarding
+                                <ShieldCheck size={15} className="shrink-0" /> Verify plate before boarding • PIN Required
                               </span>
-                              <div className="flex items-center gap-2.5 shrink-0">
+                              <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                                {(activeTrip.status === 'accepted' || activeTrip.status === 'arrived') && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const confirmReport = window.confirm(
+                                        'Does the arriving vehicle or driver NOT match the license plate / profile shown above?\n\nPress OK to report a vehicle/driver mismatch and safely cancel this trip at no charge.'
+                                      );
+                                      if (!confirmReport) return;
+                                      try {
+                                        await triggerRapidResponseSos({
+                                          role: 'rider',
+                                          category: 'suspicious_activity',
+                                          silentDuress: true,
+                                          userId: currentUser?.id,
+                                          userName: currentUser?.fullName || 'SOLO Rider',
+                                          userPhone: currentUser?.phone,
+                                          lat: activeTrip.pickup_lat,
+                                          lng: activeTrip.pickup_lng,
+                                          tripId: activeTrip.id,
+                                          pickupLocation: activeTrip.pickup_location,
+                                          dropoffLocation: activeTrip.dropoff_location,
+                                          driverName: assignedDriverInfo?.fullName,
+                                          driverPhone: assignedDriverInfo?.phone,
+                                          vehicleMake: assignedDriverInfo?.vehicleMake,
+                                          vehicleModel: assignedDriverInfo?.vehicleModel,
+                                          licensePlate: assignedDriverInfo?.licensePlate,
+                                        });
+                                      } catch {}
+                                      await handleCancelActiveTrip();
+                                    }}
+                                    className="font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/60 px-2.5 py-1.5 rounded-lg text-xs hover:bg-red-100 transition"
+                                  >
+                                    Wrong Car/Driver?
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => setTripSubTab('chat')}
@@ -1397,6 +1434,44 @@ export default function RiderPage() {
                             </div>
                           </div>
                         )}
+
+                        {/* Proactive In-Trip Route Deviation Safety Check-In */}
+                        {(() => {
+                          const checkIn = evaluateInTripSafetyCheckIn({
+                            tripStatus: activeTrip.status,
+                            currentLat: driverCoords?.lat,
+                            currentLng: driverCoords?.lng,
+                            pickupLat: activeTrip.pickup_lat,
+                            pickupLng: activeTrip.pickup_lng,
+                            dropoffLat: activeTrip.dropoff_lat,
+                            dropoffLng: activeTrip.dropoff_lng,
+                          });
+                          if (!checkIn.shouldPromptCheckIn || safetyCheckInDismissed) return null;
+                          return (
+                            <div className="mt-3.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/50 border-2 border-red-400 dark:border-red-700 text-red-950 dark:text-red-100 animate-in fade-in">
+                              <p className="text-xs sm:text-sm font-black flex items-center gap-1.5">
+                                <AlertCircle size={16} className="text-red-600 shrink-0" />
+                                <span>{checkIn.message}</span>
+                              </p>
+                              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSafetyCheckInDismissed(true)}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-black"
+                                >
+                                  ✓ I&apos;m Safe
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowSafetyModal(true)}
+                                  className="px-3 py-1.5 rounded-xl bg-red-600 text-white text-xs font-black"
+                                >
+                                  🚨 Need Help (SOS)
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                           <button

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, TRIP_EXPIRATION_MS } from '../src/utils/tripExpiration.ts';
+import { isPurgedTrip, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, TRIP_EXPIRATION_MS } from '../src/utils/tripExpiration.ts';
 
 interface MockTrip {
   id: string;
@@ -256,5 +256,34 @@ describe('1-Hour Unclaimed Trip Expiration Suite', () => {
         t.id !== 'fe854637-e49c-402c-80fc-9ab03de8f41c'
     );
     assert.strictEqual(visibleTrips.length, 0, 'Burgandy Hills trip must be completely excluded from dashboard');
+  });
+
+  it('purges stale Kimberley test requests and expires orphaned requested rows missing timestamps', () => {
+    const staleTestTrip1 = {
+      id: '8cbb1b75-8b7f-4726-ab01-43c3d5f74f26',
+      status: 'requested',
+      pickup_location: 'test',
+      created_at: new Date().toISOString(),
+    };
+    const staleTestTrip2 = {
+      id: 'e88d7281-1b92-40cb-ac74-23ad1e1a45e2',
+      status: 'requested',
+      pickup_location: 'North Cape Mall, Royldene, Kimberley',
+      created_at: new Date().toISOString(),
+    };
+    const orphanedRequest = {
+      id: 'orphan-req-1',
+      status: 'requested',
+      pickup_location: 'Kimberley CBD',
+      created_at: null,
+      scheduled_time: null,
+    };
+
+    assert.strictEqual(isPurgedTrip(staleTestTrip1), true);
+    assert.strictEqual(isTripExpired(staleTestTrip1), true);
+    assert.strictEqual(isPurgedTrip(staleTestTrip2), true);
+    assert.strictEqual(isTripExpired(staleTestTrip2), true);
+    assert.strictEqual(isStaleRequestedTrip(orphanedRequest), true);
+    assert.strictEqual(isTripExpired(orphanedRequest), true);
   });
 });

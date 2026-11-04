@@ -7,7 +7,7 @@ export type KycDocType =
   | 'vehicle_photo'
   | 'roadworthy';
 
-export type KycDocStatus = 'pending' | 'approved' | 'rejected';
+export type KycDocStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
 export interface DriverDocument {
   id: string;
@@ -15,6 +15,7 @@ export interface DriverDocument {
   doc_type: KycDocType;
   file_path: string;
   status: KycDocStatus;
+  expires_at?: string | null;
   rejection_reason?: string | null;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
@@ -30,6 +31,8 @@ export interface KycDocumentConfig {
   required: boolean;
   acceptedFormats: string[];
   maxSizeMb: number;
+  hasExpiry?: boolean;
+  defaultValidityMonths?: number;
 }
 
 export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
@@ -40,6 +43,7 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp'],
     maxSizeMb: 10,
+    hasExpiry: false,
   },
   license_front: {
     type: 'license_front',
@@ -48,6 +52,8 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
+    hasExpiry: true,
+    defaultValidityMonths: 60,
   },
   license_back: {
     type: 'license_back',
@@ -56,6 +62,8 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
+    hasExpiry: true,
+    defaultValidityMonths: 60,
   },
   prdp: {
     type: 'prdp',
@@ -64,6 +72,8 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
+    hasExpiry: true,
+    defaultValidityMonths: 24,
   },
   license_disc: {
     type: 'license_disc',
@@ -72,6 +82,8 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
+    hasExpiry: true,
+    defaultValidityMonths: 12,
   },
   vehicle_photo: {
     type: 'vehicle_photo',
@@ -80,6 +92,7 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp'],
     maxSizeMb: 10,
+    hasExpiry: false,
   },
   roadworthy: {
     type: 'roadworthy',
@@ -88,5 +101,7 @@ export const KYC_DOCUMENT_CONFIGS: Record<KycDocType, KycDocumentConfig> = {
     required: true,
     acceptedFormats: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
     maxSizeMb: 10,
+    hasExpiry: true,
+    defaultValidityMonths: 12,
   },
 };

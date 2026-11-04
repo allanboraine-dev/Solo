@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote, Globe, Search, Filter } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isPurgedTrip, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, areCitiesMatching, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -12,10 +12,10 @@ import { createClient } from '@/utils/supabase/client'
 import Chat from '@/components/Chat'
 import { useRouter } from 'next/navigation'
 import { DriverDocument, KycDocType } from '@/types/kyc'
-import { fetchDriverKycDocuments } from '@/utils/kyc'
+import { fetchDriverKycDocuments, evaluateDriverKycCompliance } from '@/utils/kyc'
 import KycDocumentUploader from '@/components/KycDocumentUploader'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
-import { isPlatformOwner, FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner'
+import { isPlatformOwner, FOUNDER_DRIVER_UUID, LEGACY_FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner'
 import { checkVehicleFleetCoverage } from '@/utils/fleetStore'
 import { audioAlert } from '@/utils/audioAlert'
 import { registerForPushNotifications, dispatchDriverArrivedPush } from '@/utils/pushClient'
@@ -173,7 +173,7 @@ export default function DriverPage() {
 
   // Fetch KYC documents when profile tab is active
   useEffect(() => {
-    if (activeTab === 'profile' && profile?.id) {
+    if (profile?.id) {
       setIsLoadingDocs(true)
       fetchDriverKycDocuments(profile.id).then((res) => {
         setDriverDocs(res.documents)
@@ -219,6 +219,14 @@ export default function DriverPage() {
   }, [activeTab, activeTrip])
 
   const isOwner = isPlatformOwner(profile?.email) || profile?.subscriptionPlan === 'owner';
+  const kycCompliance = evaluateDriverKycCompliance(driverDocs, isOwner);
+
+  useEffect(() => {
+    if (kycCompliance.isBlocked && isOnline && !activeTrip) {
+      audioAlert.stopTripRingtoneLoop();
+      setIsOnline(false);
+    }
+  }, [kycCompliance.isBlocked, isOnline, activeTrip]);
 
   const isSubscriptionActive = isOwner || profile?.subscriptionPlan === 'fleet_pro' || (
     !!profile?.subscriptionActive &&
@@ -358,7 +366,7 @@ export default function DriverPage() {
 
       const trips = await getTrips();
       // Filter out stale unclaimed requests and stale cancelled trips (> 1hr) from driver dashboard
-      setAllNationalTrips(trips.filter(t => !isTripExpired(t)));
+      setAllNationalTrips(trips.filter(t => !isTripExpired(t) && !isPurgedTrip(t)));
       const declinedIds = getDeclinedTripIds(driverId);
       const completedIds = getCompletedTripIds();
       const currentActive = activeTripRef.current;
@@ -377,8 +385,8 @@ export default function DriverPage() {
           !t.driver_id &&
           declinedIds.has(t.id) &&
           !completedIds.has(t.id) &&
-          !isTripDismissed(t.id) &&
-          !isStaleRequestedTrip(t) &&
+          !isTripDismissed(t.id) && !isPurgedTrip(t) &&
+          !isPurgedTrip(t) && !isStaleRequestedTrip(t) &&
           isTripInDriverCity(t, coords?.lat, coords?.lng, currentDriverCity)
       );
       setDeclinedAvailableTrips(declinedAvailable);
@@ -416,7 +424,7 @@ export default function DriverPage() {
           (t.status === 'accepted' || t.status === 'arrived' || t.status === 'in_progress' || t.status === 'payment_pending') &&
           (driverId
             ? t.driver_id === driverId ||
-              (driverId === FOUNDER_DRIVER_UUID && t.driver_id === 'owner-allan-boraine')
+              (driverId === FOUNDER_DRIVER_UUID && (t.driver_id === 'owner-allan-boraine' || t.driver_id === LEGACY_FOUNDER_DRIVER_UUID))
             : false) &&
           !completedIds.has(t.id) &&
           !isTripDismissed(t.id)
@@ -444,7 +452,7 @@ export default function DriverPage() {
               !t.driver_id &&
               !declinedIds.has(t.id) &&
               !completedIds.has(t.id) &&
-              !isStaleRequestedTrip(t) &&
+              !isPurgedTrip(t) && !isStaleRequestedTrip(t) &&
               isTripInDriverCity(t, coords?.lat, coords?.lng, currentDriverCity)
           );
         }
@@ -531,7 +539,7 @@ export default function DriverPage() {
 
       if (type === 'INSERT' || type === 'trip_updated') {
         const trip = payload as MockTrip;
-        if (!trip) return;
+        if (!trip || isPurgedTrip(trip) || isTripExpired(trip)) return;
         const driverId = profile?.id || getSafeLocalStorageItem('driver_id');
         const currentActive = activeTripRef.current;
 
@@ -1230,6 +1238,17 @@ export default function DriverPage() {
               onClick={async () => {
                 const nextOnline = !isOnline;
                 if (nextOnline) {
+                  if (kycCompliance.isBlocked) {
+                    audioAlert.stopTripRingtoneLoop();
+                    setIsOnline(false);
+                    setActiveTab('profile');
+                    const reasons = [
+                      ...kycCompliance.expiredDocs.map(d => `${d.title} (Expired)`),
+                      ...kycCompliance.rejectedDocs.map(d => `${d.title} (Rejected)`),
+                    ].join(', ');
+                    alert(`Compliance Hold — Cannot Go Online:\n\nYour ${reasons} must be updated and verified before you can receive passenger trips. Please upload your renewed document(s) in your Profile tab.`);
+                    return;
+                  }
                   if (!isSubscriptionActive) {
                     audioAlert.stopTripRingtoneLoop();
                     setIsOnline(false);
@@ -1704,6 +1723,57 @@ export default function DriverPage() {
                 </div>
               ) : (
                 <div className="text-center mt-6 animate-in fade-in duration-700">
+                  {kycCompliance.isBlocked && (
+                    <div className="mb-5 p-5 rounded-3xl bg-red-500/10 border-2 border-red-500/40 text-left shadow-xl animate-in fade-in">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                          <ShieldAlert size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-black text-sm sm:text-base text-red-900 dark:text-red-200">
+                            Compliance Hold: Document Renewal Required
+                          </h4>
+                          <p className="text-xs text-red-800 dark:text-red-300 mt-1 leading-relaxed">
+                            Your driver access is paused until the following registration document(s) are updated:
+                          </p>
+                          <ul className="mt-2 space-y-1 text-xs font-bold text-red-900 dark:text-red-200">
+                            {kycCompliance.expiredDocs.map(d => (
+                              <li key={d.docType}>• {d.title} — Expired ({new Date(d.expiresAt).toLocaleDateString()})</li>
+                            ))}
+                            {kycCompliance.rejectedDocs.map(d => (
+                              <li key={d.docType}>• {d.title} — Rejected {d.reason ? `(${d.reason})` : ''}</li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('profile')}
+                            className="mt-3 w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black transition active:scale-95"
+                          >
+                            Upload Renewed Documents Now →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!kycCompliance.isBlocked && kycCompliance.expiringSoonDocs.length > 0 && (
+                    <div className="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-left flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+                          ⚠️ Document Expiring Soon: {kycCompliance.expiringSoonDocs.map(d => `${d.title} (${d.daysRemaining}d left)`).join(', ')}
+                        </p>
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                          Upload your renewed document before expiry to avoid automatic account pause.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('profile')}
+                        className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-black"
+                      >
+                        Renew
+                      </button>
+                    </div>
+                  )}
                   {isTrialExpired && (
                     <div className="mb-5 p-5 rounded-3xl bg-gradient-to-br from-amber-500/10 via-red-500/10 to-amber-500/10 border-2 border-amber-500/40 text-center shadow-xl animate-in fade-in">
                       <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-2.5">
@@ -2518,6 +2588,57 @@ export default function DriverPage() {
                       )}
                     </span>
                   </div>
+                  {kycCompliance.isBlocked && (
+                    <div className="mb-5 p-5 rounded-3xl bg-red-500/10 border-2 border-red-500/40 text-left shadow-xl animate-in fade-in">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                          <ShieldAlert size={20} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-black text-sm sm:text-base text-red-900 dark:text-red-200">
+                            Compliance Hold: Document Renewal Required
+                          </h4>
+                          <p className="text-xs text-red-800 dark:text-red-300 mt-1 leading-relaxed">
+                            Your driver access is paused until the following registration document(s) are updated:
+                          </p>
+                          <ul className="mt-2 space-y-1 text-xs font-bold text-red-900 dark:text-red-200">
+                            {kycCompliance.expiredDocs.map(d => (
+                              <li key={d.docType}>• {d.title} — Expired ({new Date(d.expiresAt).toLocaleDateString()})</li>
+                            ))}
+                            {kycCompliance.rejectedDocs.map(d => (
+                              <li key={d.docType}>• {d.title} — Rejected {d.reason ? `(${d.reason})` : ''}</li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('profile')}
+                            className="mt-3 w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black transition active:scale-95"
+                          >
+                            Upload Renewed Documents Now →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!kycCompliance.isBlocked && kycCompliance.expiringSoonDocs.length > 0 && (
+                    <div className="mb-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-left flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+                          ⚠️ Document Expiring Soon: {kycCompliance.expiringSoonDocs.map(d => `${d.title} (${d.daysRemaining}d left)`).join(', ')}
+                        </p>
+                        <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                          Upload your renewed document before expiry to avoid automatic account pause.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('profile')}
+                        className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-black"
+                      >
+                        Renew
+                      </button>
+                    </div>
+                  )}
                   {isTrialExpired && (
                     <div className="my-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-200">
                       <Lock size={15} className="text-amber-500 shrink-0 mt-0.5" />

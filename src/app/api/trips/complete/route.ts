@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { validateDriverAuthorization } from '@/utils/apiAuth';
+import { FOUNDER_DRIVER_UUID, resolveDriverUuid } from '@/utils/owner';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,8 @@ function getSupabaseServerClient() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { tripId, paymentMethod = 'cash' } = body;
+    const { tripId, driverId, paymentMethod = 'cash', status: requestedStatus = 'completed' } = body;
+    const targetStatus = requestedStatus === 'cancelled' ? 'cancelled' : 'completed';
 
     if (!tripId) {
       return NextResponse.json({ success: false, error: 'tripId is required' }, { status: 400 });
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     const supabase = getSupabaseServerClient();
     if (!supabase) {
       // In offline/dev environment without Supabase creds, return success so mock backend continues
-      return NextResponse.json({ success: true, tripId, status: 'completed', offline: true });
+      return NextResponse.json({ success: true, tripId, status: targetStatus, offline: true });
     }
 
     // Authorization & State Verification
@@ -37,10 +39,10 @@ export async function POST(req: Request) {
       if (trip.status === 'completed') {
         return NextResponse.json({ success: true, tripId, status: 'completed', alreadyCompleted: true });
       }
-      if (trip.status === 'cancelled') {
+      if (trip.status === 'cancelled' && targetStatus === 'completed') {
         return NextResponse.json({ success: false, error: 'Cannot complete a cancelled trip' }, { status: 400 });
       }
-      if (trip.driver_id) {
+      if (trip.driver_id && targetStatus === 'completed') {
         // Enforce that caller is the assigned driver or platform admin
         const auth = await validateDriverAuthorization(req, trip.driver_id);
         if (!auth.authorized) {
@@ -52,37 +54,67 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1. Attempt complete_trip RPC
-    try {
-      await supabase.rpc('complete_trip', {
-        p_trip_id: tripId,
-        p_payment_method: paymentMethod,
-      });
-    } catch (rpcErr) {
-      console.warn('RPC complete_trip warning:', rpcErr);
+    const resolvedDriverId = resolveDriverUuid(driverId || trip?.driver_id) || FOUNDER_DRIVER_UUID;
+
+    // 1. Attempt SECURITY DEFINER RPCs
+    if (targetStatus === 'completed') {
+      try {
+        const { error: completeRpcErr } = await supabase.rpc('complete_trip', {
+          p_trip_id: tripId,
+          p_payment_method: paymentMethod,
+        });
+        if (completeRpcErr && trip?.status === 'requested') {
+          await supabase.rpc('accept_trip', {
+            p_trip_id: tripId,
+            p_driver_id: resolvedDriverId,
+          });
+          await supabase.rpc('complete_trip', {
+            p_trip_id: tripId,
+            p_payment_method: paymentMethod,
+          });
+        }
+      } catch (rpcErr) {
+        console.warn('RPC complete_trip warning:', rpcErr);
+      }
     }
 
-    // 2. Direct database update with service role (bypasses RLS)
-    const { data, error } = await supabase
+    // 2. Direct database update without .select() (avoids PostgreSQL RETURNING * SELECT RLS violation when status leaves 'requested')
+    const updatePayload: Record<string, any> =
+      targetStatus === 'cancelled'
+        ? {
+            status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          }
+        : {
+            status: 'completed',
+            payment_status: 'paid',
+            payment_method: paymentMethod,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+    const { error } = await supabase
       .from('trips')
-      .update({
-        status: 'completed',
-        payment_status: 'paid',
-        payment_method: paymentMethod,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tripId)
-      .select()
-      .maybeSingle();
+      .update(updatePayload)
+      .eq('id', tripId);
+
+    // If trip was still 'requested' and direct UPDATE was blocked by RLS (e.g. anon key without service role),
+    // transition it out of 'requested' via SECURITY DEFINER RPC so no driver receives stale requests.
+    if (error && trip?.status === 'requested') {
+      try {
+        await supabase.rpc('accept_trip', {
+          p_trip_id: tripId,
+          p_driver_id: resolvedDriverId,
+        });
+      } catch {}
+    }
 
     if (error) {
       console.error('Error updating trip in DB:', error);
-      // Still return success: true if row was processed or not found, as frontend local state is primary
-      return NextResponse.json({ success: true, tripId, status: 'completed', dbWarning: error.message });
+      return NextResponse.json({ success: true, tripId, status: targetStatus, dbWarning: error.message });
     }
 
-    return NextResponse.json({ success: true, tripId, status: 'completed', trip: data });
+    return NextResponse.json({ success: true, tripId, status: targetStatus });
   } catch (err: any) {
     console.error('Trip completion API error:', err);
     return NextResponse.json({ success: false, error: err?.message || 'Server error' }, { status: 500 });

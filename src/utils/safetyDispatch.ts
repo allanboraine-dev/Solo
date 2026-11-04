@@ -654,3 +654,120 @@ class DeterrentSirenController {
 }
 
 export const emergencySiren = new DeterrentSirenController();
+
+// ============================================================================
+// 5. Proactive In-Trip Route Deviation & Unscheduled Stop Safety Check-In
+// ============================================================================
+const EARTH_RADIUS_KM = 6371;
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Calculates the minimum distance (in km) from a live GPS coordinate to the
+ * planned pickup -> dropoff corridor segment.
+ */
+export function calculateCorridorDeviationKm(
+  currentLat: number,
+  currentLng: number,
+  pickupLat: number,
+  pickupLng: number,
+  dropoffLat: number,
+  dropoffLng: number
+): number {
+  const dx = dropoffLng - pickupLng;
+  const dy = dropoffLat - pickupLat;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-10) {
+    return haversineKm(currentLat, currentLng, pickupLat, pickupLng);
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((currentLng - pickupLng) * dx + (currentLat - pickupLat) * dy) / lenSq)
+  );
+  const projLat = pickupLat + t * dy;
+  const projLng = pickupLng + t * dx;
+  return haversineKm(currentLat, currentLng, projLat, projLng);
+}
+
+export interface SafetyCheckInEvaluation {
+  shouldPromptCheckIn: boolean;
+  reason: 'route_deviation' | 'unscheduled_stop' | null;
+  message: string | null;
+  deviationKm: number;
+}
+
+export function evaluateInTripSafetyCheckIn(params: {
+  tripStatus: string;
+  currentLat?: number | null;
+  currentLng?: number | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropoffLat?: number | null;
+  dropoffLng?: number | null;
+  stationarySeconds?: number;
+  maxCorridorDeviationKm?: number;
+  maxStationarySeconds?: number;
+}): SafetyCheckInEvaluation {
+  const {
+    tripStatus,
+    currentLat,
+    currentLng,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
+    stationarySeconds = 0,
+    maxCorridorDeviationKm = 1.8,
+    maxStationarySeconds = 240,
+  } = params;
+
+  if (
+    tripStatus !== 'in_progress' ||
+    typeof currentLat !== 'number' ||
+    typeof currentLng !== 'number' ||
+    typeof pickupLat !== 'number' ||
+    typeof pickupLng !== 'number' ||
+    typeof dropoffLat !== 'number' ||
+    typeof dropoffLng !== 'number'
+  ) {
+    return { shouldPromptCheckIn: false, reason: null, message: null, deviationKm: 0 };
+  }
+
+  const distToDropoffKm = haversineKm(currentLat, currentLng, dropoffLat, dropoffLng);
+  const deviationKm = calculateCorridorDeviationKm(
+    currentLat,
+    currentLng,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng
+  );
+
+  if (distToDropoffKm > 0.35 && deviationKm > maxCorridorDeviationKm) {
+    return {
+      shouldPromptCheckIn: true,
+      reason: 'route_deviation',
+      message: `SOLO Safety Check-In: Your trip is ${deviationKm.toFixed(1)} km outside the planned corridor. Are you okay?`,
+      deviationKm,
+    };
+  }
+
+  if (distToDropoffKm > 0.35 && stationarySeconds >= maxStationarySeconds) {
+    return {
+      shouldPromptCheckIn: true,
+      reason: 'unscheduled_stop',
+      message: 'SOLO Safety Check-In: Your vehicle has been stationary for over 4 minutes before reaching your destination. Are you okay?',
+      deviationKm,
+    };
+  }
+
+  return { shouldPromptCheckIn: false, reason: null, message: null, deviationKm };
+}

@@ -130,13 +130,14 @@ export interface AtomicRideResult {
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const FOUNDER_DRIVER_UUID = '00000000-0000-4000-8000-0000000a11a0';
+const FOUNDER_DRIVER_UUID = 'c9c50c07-49b1-4217-8736-cd56718410d4';
+const LEGACY_FOUNDER_DRIVER_UUID = '00000000-0000-4000-8000-0000000a11a0';
 
 function resolveValidDriverUuid(driverId?: string | null): string | null {
   if (!driverId) return null;
   const trimmed = driverId.trim();
   if (!trimmed) return null;
-  if (trimmed === 'owner-allan-boraine') {
+  if (trimmed === 'owner-allan-boraine' || trimmed === LEGACY_FOUNDER_DRIVER_UUID) {
     return FOUNDER_DRIVER_UUID;
   }
   if (UUID_REGEX.test(trimmed)) {
@@ -501,7 +502,8 @@ export class SoloDispatchService {
     try {
       const safeDriverId = validDriverId;
 
-      const { data: updatedRows, error: updateErr } = await this.supabase
+      // Avoid chaining .select() on .update() because PostgreSQL RETURNING * checks SELECT RLS on the post-update row
+      const { error: updateErr } = await this.supabase
         .from('trips')
         .update({
           status: 'accepted',
@@ -510,10 +512,9 @@ export class SoloDispatchService {
         })
         .eq('id', tripId)
         .eq('status', 'requested')
-        .is('driver_id', null)
-        .select('id, status, driver_id');
+        .is('driver_id', null);
 
-      if (!updateErr && Array.isArray(updatedRows) && updatedRows.length === 0) {
+      if (!updateErr) {
         // Check if trip exists in DB and was already taken by someone else
         const { data: existingTrip } = await this.supabase
           .from('trips')

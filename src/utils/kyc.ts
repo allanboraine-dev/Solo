@@ -15,6 +15,124 @@ export interface DriverMetadata {
   vehicleModel?: string;
   licensePlate?: string;
   prdpNumber?: string;
+  expiresAt?: string;
+}
+
+export const DOC_EXPIRY_WARNING_DAYS = 30
+
+export interface DocumentExpiryState {
+  state: 'valid' | 'expiring_soon' | 'expired';
+  daysRemaining: number | null;
+  expiresAt: string | null;
+}
+
+export function getDocumentExpiryState(
+  doc?: Pick<DriverDocument, 'status' | 'expires_at'> | null,
+  nowMs: number = Date.now()
+): DocumentExpiryState {
+  if (!doc) {
+    return { state: 'valid', daysRemaining: null, expiresAt: null }
+  }
+  if (doc.status === 'expired') {
+    return { state: 'expired', daysRemaining: 0, expiresAt: doc.expires_at || null }
+  }
+  if (!doc.expires_at) {
+    return { state: 'valid', daysRemaining: null, expiresAt: null }
+  }
+  const expiryMs = new Date(doc.expires_at).getTime()
+  if (Number.isNaN(expiryMs)) {
+    return { state: 'valid', daysRemaining: null, expiresAt: null }
+  }
+  const diffDays = Math.ceil((expiryMs - nowMs) / (24 * 60 * 60 * 1000))
+  if (diffDays <= 0) {
+    return { state: 'expired', daysRemaining: diffDays, expiresAt: doc.expires_at }
+  }
+  if (diffDays <= DOC_EXPIRY_WARNING_DAYS) {
+    return { state: 'expiring_soon', daysRemaining: diffDays, expiresAt: doc.expires_at }
+  }
+  return { state: 'valid', daysRemaining: diffDays, expiresAt: doc.expires_at }
+}
+
+export interface KycComplianceEvaluation {
+  canGoOnline: boolean;
+  isBlocked: boolean;
+  expiredDocs: Array<{
+    docType: KycDocType;
+    title: string;
+    expiresAt: string;
+    daysOverdue: number;
+  }>;
+  expiringSoonDocs: Array<{
+    docType: KycDocType;
+    title: string;
+    expiresAt: string;
+    daysRemaining: number;
+  }>;
+  rejectedDocs: Array<{
+    docType: KycDocType;
+    title: string;
+    reason?: string | null;
+  }>;
+}
+
+export function evaluateDriverKycCompliance(
+  documents: DriverDocument[],
+  isOwner: boolean = false,
+  nowMs: number = Date.now()
+): KycComplianceEvaluation {
+  if (isOwner) {
+    return {
+      canGoOnline: true,
+      isBlocked: false,
+      expiredDocs: [],
+      expiringSoonDocs: [],
+      rejectedDocs: [],
+    }
+  }
+
+  const expiredDocs: KycComplianceEvaluation['expiredDocs'] = []
+  const expiringSoonDocs: KycComplianceEvaluation['expiringSoonDocs'] = []
+  const rejectedDocs: KycComplianceEvaluation['rejectedDocs'] = []
+
+  for (const doc of documents || []) {
+    const config = KYC_DOCUMENT_CONFIGS[doc.doc_type]
+    const title = config?.title || doc.doc_type
+
+    if (doc.status === 'rejected') {
+      rejectedDocs.push({
+        docType: doc.doc_type,
+        title,
+        reason: doc.rejection_reason,
+      })
+      continue
+    }
+
+    const expiry = getDocumentExpiryState(doc, nowMs)
+    if (expiry.state === 'expired') {
+      expiredDocs.push({
+        docType: doc.doc_type,
+        title,
+        expiresAt: expiry.expiresAt || doc.updated_at || new Date(nowMs).toISOString(),
+        daysOverdue: Math.abs(expiry.daysRemaining || 0),
+      })
+    } else if (expiry.state === 'expiring_soon' && expiry.daysRemaining !== null && expiry.expiresAt) {
+      expiringSoonDocs.push({
+        docType: doc.doc_type,
+        title,
+        expiresAt: expiry.expiresAt,
+        daysRemaining: expiry.daysRemaining,
+      })
+    }
+  }
+
+  const isBlocked = expiredDocs.length > 0 || rejectedDocs.length > 0
+  return {
+    canGoOnline: !isBlocked,
+    isBlocked,
+    expiredDocs,
+    expiringSoonDocs,
+    rejectedDocs,
+  }
 }
 
 export function validateKycFile(file: File, docType: KycDocType): { valid: boolean; error?: string } {
@@ -60,6 +178,7 @@ export async function uploadDriverKycDocument(
       if (metadata.vehicleModel) formData.append('vehicleModel', metadata.vehicleModel)
       if (metadata.licensePlate) formData.append('licensePlate', metadata.licensePlate)
       if (metadata.prdpNumber) formData.append('prdpNumber', metadata.prdpNumber)
+      if (metadata.expiresAt) formData.append('expiresAt', metadata.expiresAt)
     }
 
     const res = await fetch('/api/upload-kyc-document', {

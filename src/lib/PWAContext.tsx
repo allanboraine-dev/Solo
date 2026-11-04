@@ -350,6 +350,8 @@ export function PWAProvider({ children }: { children: ReactNode }) {
         .then((reg) => {
           if (!reg) {
             navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+          } else {
+            reg.update().catch(() => {});
           }
         })
         .catch(() => {});

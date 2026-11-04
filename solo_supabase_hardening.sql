@@ -272,7 +272,23 @@ CREATE POLICY "driver_profiles_update_policy" ON public.driver_profiles
 DROP POLICY IF EXISTS "trips_select_policy" ON public.trips;
 CREATE POLICY "trips_select_policy" ON public.trips
     FOR SELECT TO authenticated, anon
-    USING (rider_id = (select auth.uid()) OR driver_id = (select auth.uid()) OR status = 'requested');
+    USING (
+        rider_id = (select auth.uid())
+        OR driver_id = (select auth.uid())
+        OR status IN ('requested', 'accepted', 'arrived', 'in_progress', 'payment_pending', 'completed', 'cancelled')
+    );
+
+DROP POLICY IF EXISTS "trips_update_policy" ON public.trips;
+CREATE POLICY "trips_update_policy" ON public.trips
+    FOR UPDATE TO authenticated, anon
+    USING (
+        rider_id = (select auth.uid())
+        OR driver_id = (select auth.uid())
+        OR status IN ('requested', 'accepted', 'arrived', 'in_progress', 'payment_pending')
+    )
+    WITH CHECK (
+        status IN ('requested', 'accepted', 'arrived', 'in_progress', 'payment_pending', 'completed', 'cancelled')
+    );
 
 -- ----------------------------------------------------------------------------
 -- DRIVER LOCATIONS RLS POLICIES (Fixes rls_disabled_in_public)

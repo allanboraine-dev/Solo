@@ -18,21 +18,22 @@ export const OWNER_PASSWORDS: string[] = [
 ];
 
 /**
- * Canonical RFC-4122 v4 UUID for Platform Founder (Allan Boraine) when operating without a Supabase Auth JWT.
- * Ensures PostgreSQL UUID columns and `accept_trip` / `upsert_driver_location` RPCs always validate cleanly.
+ * Canonical RFC-4122 v4 UUID for Platform Founder (Allan Boraine) matching Supabase `auth.users` & `driver_profiles`.
+ * Ensures PostgreSQL foreign key constraints (`trips_driver_id_fkey`) and `accept_trip` / `upsert_driver_location` RPCs always validate cleanly.
  */
-export const FOUNDER_DRIVER_UUID = '00000000-0000-4000-8000-0000000a11a0';
+export const FOUNDER_DRIVER_UUID = 'c9c50c07-49b1-4217-8736-cd56718410d4';
+export const LEGACY_FOUNDER_DRIVER_UUID = '00000000-0000-4000-8000-0000000a11a0';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Resolves any driver identifier (including legacy 'owner-allan-boraine' or non-UUID strings)
+ * Resolves any driver identifier (including legacy 'owner-allan-boraine', legacy founder UUID, or non-UUID strings)
  * into a guaranteed valid RFC-4122 UUID for PostgreSQL RPCs and foreign keys.
  */
 export function resolveDriverUuid(driverId?: string | null): string {
   if (!driverId) return FOUNDER_DRIVER_UUID;
   const trimmed = driverId.trim();
-  if (trimmed === 'owner-allan-boraine') {
+  if (trimmed === 'owner-allan-boraine' || trimmed === LEGACY_FOUNDER_DRIVER_UUID) {
     return FOUNDER_DRIVER_UUID;
   }
   if (UUID_REGEX.test(trimmed)) {
@@ -71,10 +72,18 @@ export function applyOwnerPrivileges<T extends { id?: string; email?: string; su
   if (!profile || typeof profile !== 'object') {
     return profile;
   }
-  if (isPlatformOwner(profile.email) || profile.subscriptionPlan === 'owner' || profile.id === 'owner-allan-boraine') {
+  if (
+    isPlatformOwner(profile.email) ||
+    profile.subscriptionPlan === 'owner' ||
+    profile.id === 'owner-allan-boraine' ||
+    profile.id === LEGACY_FOUNDER_DRIVER_UUID
+  ) {
     const isBmwOrUnset = !profile.vehicleMake || profile.vehicleMake === 'BMW' || profile.licensePlate === 'SOLO-01-GP';
     const normalizedId =
-      !profile.id || profile.id === 'owner-allan-boraine' || !UUID_REGEX.test(profile.id)
+      !profile.id ||
+      profile.id === 'owner-allan-boraine' ||
+      profile.id === LEGACY_FOUNDER_DRIVER_UUID ||
+      !UUID_REGEX.test(profile.id)
         ? FOUNDER_DRIVER_UUID
         : profile.id;
     return {
