@@ -19,6 +19,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // If next is a password reset route or recovery flow, forward directly so the browser
+  // client can read hash-based tokens (#access_token=... / #type=recovery)
+  if (nextParam?.startsWith('/driver/reset-password') || type === 'recovery') {
+    return NextResponse.redirect(new URL(next, requestUrl.origin))
+  }
+
   // If code exchange failed or no code, return to login with contextual notice
   const errorReason = type === 'recovery' ? 'reset_link_expired' : 'confirmation_failed'
   return NextResponse.redirect(

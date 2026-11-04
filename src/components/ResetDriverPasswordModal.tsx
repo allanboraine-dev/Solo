@@ -240,16 +240,19 @@ export default function ResetDriverPasswordModal({
         {successData ? (
           <div className="space-y-4 animate-in fade-in">
             {successData.warning ? (
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-3">
                 <div className="flex items-center gap-2 font-bold text-sm text-amber-400">
                   <AlertCircle size={18} />
-                  <span>Password Reset Email Sent to Driver</span>
+                  <span>Action Required: Driver Must Click Email Link</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-100 text-xs font-semibold">
+                  ⚠️ Note: The password entered above has NOT taken effect yet. Supabase Auth requires the driver to click the link sent to their email to set their new password.
                 </div>
                 <p className="text-xs text-zinc-300 leading-relaxed">
                   {successData.warning}
                 </p>
                 <div className="pt-1 text-[11px] text-amber-300/80 bg-zinc-950/60 p-2.5 rounded-xl border border-amber-500/20 font-mono">
-                  Tip: To enable instant 1-click password assignment directly from this console without sending email links, add <span className="text-white font-bold">SUPABASE_SERVICE_ROLE_KEY</span> from Supabase Project Settings to your .env.local file.
+                  Tip: To enable instant 1-click password assignment directly from this console without requiring email links, add <span className="text-white font-bold">SUPABASE_SERVICE_ROLE_KEY</span> from Supabase Project Settings to your Vercel Environment Variables and .env.local file.
                 </div>
               </div>
             ) : (

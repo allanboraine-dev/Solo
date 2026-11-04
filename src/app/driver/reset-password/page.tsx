@@ -36,6 +36,14 @@ function ResetPasswordForm() {
 
     async function initRecoverySession() {
       try {
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+          const hashError = hashParams.get('error_description') || hashParams.get('error')
+          if (hashError) {
+            setErrorMessage(decodeURIComponent(hashError.replace(/\+/g, ' ')))
+          }
+        }
+
         const code = searchParams.get('code')
         if (code) {
           const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code)
