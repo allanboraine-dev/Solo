@@ -31,6 +31,7 @@ import {
   Radio,
   Trash2,
   KeyRound,
+  UserPlus,
 } from "lucide-react";
 import { DriverDocument, KycDocType, KycDocStatus, KYC_DOCUMENT_CONFIGS } from "@/types/kyc";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
@@ -39,6 +40,7 @@ import { audioAlert } from "@/utils/audioAlert";
 import { createClient } from "@/utils/supabase/client";
 import { DriverSignupAlert } from "@/utils/kycStore";
 import ResetDriverPasswordModal, { DriverToReset } from "@/components/ResetDriverPasswordModal";
+import RegisterDriverModal from "@/components/RegisterDriverModal";
 
 const REJECTION_PRESETS = [
   "Document is expired according to license card date",
@@ -84,6 +86,7 @@ export default function AdminComplianceDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
   const [passwordResetDriver, setPasswordResetDriver] = useState<DriverToReset | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const handleNewDriverAlert = (alert: DriverSignupAlert) => {
     if (!alert || !alert.fullName) return;
@@ -713,6 +716,14 @@ export default function AdminComplianceDashboard() {
               <Users size={14} />
               <span>Overview</span>
             </Link>
+
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="flex items-center gap-2 py-2.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition shadow-md shadow-emerald-600/20 active:scale-95"
+            >
+              <UserPlus size={14} />
+              <span>Register Driver</span>
+            </button>
 
             <Link
               href="/admin/simulator"
@@ -1481,6 +1492,13 @@ export default function AdminComplianceDashboard() {
         isOpen={!!passwordResetDriver}
         onClose={() => setPasswordResetDriver(null)}
         driver={passwordResetDriver}
+      />
+
+      {/* Manager Console Driver Registration Modal */}
+      <RegisterDriverModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => fetchComplianceData(true)}
       />
     </div>
   );

@@ -18,10 +18,12 @@ import {
   RefreshCw,
   Trash2,
   KeyRound,
+  UserPlus,
 } from "lucide-react";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
 import { isPlatformOwner } from "@/utils/owner";
 import ResetDriverPasswordModal, { DriverToReset } from "@/components/ResetDriverPasswordModal";
+import RegisterDriverModal from "@/components/RegisterDriverModal";
 
 export default function AdminOverviewDashboard() {
   const [drivers, setDrivers] = useState<DriverKycSummary[]>([]);
@@ -35,6 +37,7 @@ export default function AdminOverviewDashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [passwordResetDriver, setPasswordResetDriver] = useState<DriverToReset | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -200,7 +203,7 @@ export default function AdminOverviewDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               onClick={loadData}
               disabled={loading}
@@ -209,12 +212,19 @@ export default function AdminOverviewDashboard() {
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="py-3 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition active:scale-98"
+            >
+              <UserPlus size={16} />
+              <span>Register New Driver</span>
+            </button>
             <Link
               href="/admin/compliance"
-              className="py-3 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-98"
+              className="py-3 px-5 bg-zinc-800/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center gap-2 transition active:scale-98"
             >
               <FileCheck2 size={16} />
-              <span>Open KYC Approval Center</span>
+              <span>Open KYC Center</span>
               <ArrowRight size={16} />
             </Link>
           </div>
@@ -319,15 +329,24 @@ export default function AdminOverviewDashboard() {
             </p>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <input
-              type="text"
-              placeholder="Search name, phone, plate..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
-            />
-            <Search size={14} className="absolute left-3 top-2.5 text-zinc-500" />
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-72">
+              <input
+                type="text"
+                placeholder="Search name, phone, plate..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
+              />
+              <Search size={14} className="absolute left-3 top-2.5 text-zinc-500" />
+            </div>
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-98 shrink-0 shadow-md shadow-emerald-600/20"
+            >
+              <UserPlus size={14} />
+              <span>Add Driver</span>
+            </button>
           </div>
         </div>
 
@@ -470,6 +489,13 @@ export default function AdminOverviewDashboard() {
         isOpen={!!passwordResetDriver}
         onClose={() => setPasswordResetDriver(null)}
         driver={passwordResetDriver}
+      />
+
+      {/* Manager Console Driver Registration Modal */}
+      <RegisterDriverModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => loadData()}
       />
     </div>
   );
