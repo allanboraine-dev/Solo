@@ -214,6 +214,19 @@ label,
   color-scheme: light;
 }
 
+/* Critical Leaflet tile rendering fix for mobile viewports:
+   Prevents Tailwind's global img reset from crushing 512px tiles on mobile screens (<512px width). */
+.leaflet-container img,
+.leaflet-container img.leaflet-tile,
+.leaflet-tile,
+.leaflet-tile-container img {
+  max-width: none !important;
+  max-height: none !important;
+  width: auto;
+  height: auto;
+  padding: 0 !important;
+}
+
 .dark .leaflet-container {
   background-color: #09090b !important;
 }

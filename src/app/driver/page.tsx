@@ -123,6 +123,22 @@ export default function DriverPage() {
     }
   }, [driverCoords]);
 
+  // One-time passive GPS lookup on mount so driver map on mobile centers on current location before going online
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator && !driverCoords) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setDriverCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+      );
+    }
+  }, []);
+
   const [profile, setProfile] = useState<MockDriverProfile | null>(null)
   const [completedTrips, setCompletedTrips] = useState<MockTrip[]>([])
   const [showSubModal, setShowSubModal] = useState(false)
@@ -1145,7 +1161,7 @@ export default function DriverPage() {
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
         {/* Overlay to dim map slightly when offline - pointer-events-none so touches pass through to map/buttons */}
-        {!isOnline && <div className="absolute inset-0 bg-white/40 dark:bg-black/60 z-[1] backdrop-blur-sm transition-all duration-500 pointer-events-none"></div>}
+        {!isOnline && <div className="absolute inset-0 bg-black/10 dark:bg-black/30 z-[1] transition-all duration-500 pointer-events-none"></div>}
         
         {/* Animated Radar overlay when online, only if no active trip */}
         {isOnline && !activeTrip && !request && (

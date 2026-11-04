@@ -142,6 +142,7 @@ const MapUpdater = ({
     map.invalidateSize();
     const t1 = setTimeout(() => map.invalidateSize(), 150);
     const t2 = setTimeout(() => map.invalidateSize(), 500);
+    const t3 = setTimeout(() => map.invalidateSize(), 1000);
 
     const container = map.getContainer();
     let ro: ResizeObserver | null = null;
@@ -168,6 +169,7 @@ const MapUpdater = ({
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
       if (ro) ro.disconnect();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
@@ -275,6 +277,10 @@ const MapUpdater = ({
         initialCenteredRef.current = true;
       } else if (hasValidDriver) {
         map.setView([driverLat, driverLng], 15);
+        initialCenteredRef.current = true;
+      } else {
+        // Fallback initial view for standalone driver portal on mobile / desktop
+        map.setView([driverLat || -28.7282, driverLng || 24.7623], 14);
         initialCenteredRef.current = true;
       }
       return;
