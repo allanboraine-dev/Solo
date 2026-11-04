@@ -34,7 +34,10 @@ export default function DriverForgotPasswordPage() {
 
     try {
       const supabase = createClient()
-      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const origin =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_APP_URL || 'https://soloride.co.za'
       const redirectTo = `${origin}/auth/callback?next=/driver/reset-password`
 
       const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {

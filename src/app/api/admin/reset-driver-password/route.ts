@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const requestOrigin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://solo.soloride.co.za';
+    const requestOrigin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://soloride.co.za';
     const redirectUrl = `${requestOrigin}/auth/callback?next=/driver/reset-password`;
 
     let passwordDirectlyUpdated = false;

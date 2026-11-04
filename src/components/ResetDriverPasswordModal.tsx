@@ -102,7 +102,7 @@ export default function ResetDriverPasswordModal({
   };
 
   const handleCopyFullCredentials = () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://solo.soloride.co.za";
+    const origin = typeof window !== "undefined" && window.location.origin ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://soloride.co.za");
     const loginUrl = `${origin}/driver/login`;
     const message = `SOLO Driver Account Details:\nDriver: ${driver.fullName}\nEmail: ${driver.email}\nNew Password: ${newPassword}\nLogin Portal: ${loginUrl}\n\nPlease sign in and change your password in settings if desired.`;
     handleCopy(message, "full_credentials");
