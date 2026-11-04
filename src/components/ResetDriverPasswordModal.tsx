@@ -128,6 +128,7 @@ export default function ResetDriverPasswordModal({
         body: JSON.stringify({
           driverId: driver.id,
           email: driver.email,
+          fullName: driver.fullName,
           newPassword: passwordToSend || undefined,
           sendEmailLink: linkOnly || sendEmailLink,
         }),

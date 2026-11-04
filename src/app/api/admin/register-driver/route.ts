@@ -239,6 +239,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 5b. Fallback: If SUPABASE_SERVICE_ROLE_KEY is not configured, create the user in Supabase Auth via signUp()
+    if (!authUserCreated && !supabaseUrl.includes('mock.supabase.co')) {
+      try {
+        const requestOrigin =
+          req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://soloride.co.za';
+        const signUpPromise = supabase.auth.signUp({
+          email: cleanEmail,
+          password: finalPassword,
+          options: {
+            emailRedirectTo: `${requestOrigin}/auth/callback?next=/driver`,
+            data: {
+              full_name: cleanName,
+              phone: cleanPhone,
+              user_type: 'driver',
+              role: 'driver',
+              registered_by_manager: auth.session?.email || 'manager',
+            },
+          },
+        });
+
+        const signUpRes = await Promise.race([
+          signUpPromise,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
+
+        if (signUpRes && !signUpRes.error && signUpRes.data?.user?.id) {
+          driverId = signUpRes.data.user.id;
+          authUserCreated = true;
+        } else if (signUpRes?.error) {
+          console.warn('[AdminRegisterDriverAPI] Supabase signUp notice:', signUpRes.error.message);
+        }
+      } catch (signUpErr) {
+        console.warn('[AdminRegisterDriverAPI] Supabase signUp exception:', signUpErr);
+      }
+    }
+
     const isOwner = isPlatformOwner(cleanEmail);
     const verifiedStatus = isOwner ? true : Boolean(isVerified);
     const effectivePlan = isOwner ? 'owner' : (subscriptionPlan || 'trial');
