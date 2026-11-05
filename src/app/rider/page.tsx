@@ -20,6 +20,7 @@ import { calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { reverseGeocode } from '@/utils/mapService'
 import { User, LogOut, Phone, ShieldCheck, Lock, CreditCard, AlertCircle, MessageCircle, ChevronDown, ChevronUp, Car, MapPin, Navigation, X, HelpCircle, Download, Clock } from 'lucide-react'
 import { NotificationPermissionBanner } from '@/components/NotificationPermissionBanner'
+import AppIntroSplash from '@/components/AppIntroSplash'
 import { audioAlert } from '@/utils/audioAlert'
 import { usePWA } from '@/lib/PWAContext'
 
@@ -836,6 +837,9 @@ export default function RiderPage() {
 
   return (
     <div className="h-mobile-portal w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+      {/* Intro Welcome Animation */}
+      <AppIntroSplash role="rider" bypass={Boolean(activeTrip || (typeof window !== 'undefined' && getRiderActiveTripId()))} />
+
       {/* Map Background layer */}
       <div className="absolute inset-0 z-0">
         <MapComponent 

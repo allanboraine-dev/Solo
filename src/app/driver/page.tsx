@@ -27,6 +27,7 @@ import type { SafetyIncidentRecord } from '@/utils/safetyDispatch'
 import { updateSupportTicketStatus, type SupportTicket } from '@/utils/supportStore'
 import { usePWA } from '@/lib/PWAContext'
 import { RandIcon } from '@/components/icons/RandIcon'
+import AppIntroSplash from '@/components/AppIntroSplash'
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
   ssr: false,
@@ -1201,6 +1202,9 @@ export default function DriverPage() {
 
   return (
     <div className="h-mobile-portal w-full relative overflow-hidden bg-gray-100 dark:bg-zinc-900">
+      {/* Intro Welcome Animation */}
+      <AppIntroSplash role="driver" bypass={Boolean(activeTrip)} />
+
       {/* Real Map Background */}
       <div className="absolute inset-0 z-0">
         <MapComponent {...mapProps} />
