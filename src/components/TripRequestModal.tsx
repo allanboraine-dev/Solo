@@ -60,6 +60,21 @@ export default function TripRequestModal({ request, onAccept, onDecline }: TripR
               <span className="text-gray-600 dark:text-gray-400 block text-xs uppercase font-extrabold tracking-wider mb-1">Pickup</span>
               <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-gray-100 leading-snug break-words">{request.pickup_location}</span>
             </div>
+            {Array.isArray(request.stops) && request.stops.length > 0 && (
+              <div className="bg-amber-50/90 dark:bg-amber-950/30 p-3 rounded-xl border border-amber-300/60 dark:border-amber-800/50 space-y-1.5">
+                <span className="text-amber-800 dark:text-amber-300 block text-xs uppercase font-extrabold tracking-wider">
+                  Intermediate Stops ({request.stops.length}) • Auto-Fare Included
+                </span>
+                {request.stops.map((stop, idx) => (
+                  <div key={stop.id || idx} className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-black shrink-0">
+                      Stop {idx + 1}
+                    </span>
+                    <span className="break-words">{stop.address}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div>
               <span className="text-gray-600 dark:text-gray-400 block text-xs uppercase font-extrabold tracking-wider mb-1">Dropoff</span>
               <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-gray-100 leading-snug break-words">{request.dropoff_location}</span>

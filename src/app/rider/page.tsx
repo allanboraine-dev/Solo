@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import BookingForm from '@/components/BookingForm'
 import OnlineDriversModal from '@/components/OnlineDriversModal'
-import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver, type MockMessage } from '@/lib/mockBackend'
+import TripStopsManager from '@/components/TripStopsManager'
+import PickupWaitingTimerBanner from '@/components/PickupWaitingTimerBanner'
+import { subscribeToEvents, subscribeToRegionalDriverMesh, getTrips, saveTrip, completeTripAtomic, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isStaleRequestedTrip, STATUS_PRIORITY, getActiveDrivers, getDriverProfileById, saveTripRating, getRiderSessionId, getRiderActiveTripId, setRiderActiveTripId, type MockTrip, type LiveDriver, type MockMessage, type TripStop } from '@/lib/mockBackend'
 import Chat from '@/components/Chat'
 import RatingModal from '@/components/RatingModal'
 import RiderAuthModal from '@/components/RiderAuthModal'
@@ -36,6 +38,7 @@ export default function RiderPage() {
   const { installApp, isStandalone } = usePWA()
   const [pickupCoords, setPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [dropoffCoords, setDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
+  const [bookingStops, setBookingStops] = useState<TripStop[]>([])
   const [activeTrip, setActiveTrip] = useState<MockTrip | null>(null)
   const [safetyCheckInDismissed, setSafetyCheckInDismissed] = useState(false)
   const activeTripRef = useRef<MockTrip | null>(null)
@@ -521,9 +524,15 @@ export default function RiderPage() {
           }
           const matchedPrio = STATUS_PRIORITY[matched.status] || 0;
           const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
+          const hasTripDataChanged =
+            matched.fare_amount !== currentActive.fare_amount ||
+            matched.waiting_fee_amount !== currentActive.waiting_fee_amount ||
+            matched.arrived_at !== currentActive.arrived_at ||
+            JSON.stringify(matched.stops || []) !== JSON.stringify(currentActive.stops || []);
           if (
             matchedPrio > activePrio ||
-            (matched.driver_id && matched.driver_id !== currentActive.driver_id)
+            (matched.driver_id && matched.driver_id !== currentActive.driver_id) ||
+            (matchedPrio === activePrio && hasTripDataChanged)
           ) {
             if (matched.status !== currentActive.status) {
               if (matched.status === 'accepted' || matched.status === 'arrived' || matched.status === 'in_progress') {
@@ -672,7 +681,16 @@ export default function RiderPage() {
           } else if (currentActive.id === trip.id) {
             const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
             const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
-            if (incomingPrio > activePrio || (trip.driver_id && trip.driver_id !== currentActive.driver_id)) {
+            const hasTripDataChanged =
+              trip.fare_amount !== currentActive.fare_amount ||
+              trip.waiting_fee_amount !== currentActive.waiting_fee_amount ||
+              trip.arrived_at !== currentActive.arrived_at ||
+              JSON.stringify(trip.stops || []) !== JSON.stringify(currentActive.stops || []);
+            if (
+              incomingPrio > activePrio ||
+              (trip.driver_id && trip.driver_id !== currentActive.driver_id) ||
+              (incomingPrio === activePrio && hasTripDataChanged)
+            ) {
               setDeclineNotice(null);
               if (trip.status === 'accepted' && currentActive.status === 'requested') {
                 audioAlert.alertRiderOfTripStatus('accepted', trip);
@@ -825,6 +843,7 @@ export default function RiderPage() {
           pickupLng={activeTrip ? activeTrip.pickup_lng : pickupCoords?.lng}
           dropoffLat={activeTrip ? activeTrip.dropoff_lat : dropoffCoords?.lat}
           dropoffLng={activeTrip ? activeTrip.dropoff_lng : dropoffCoords?.lng}
+          stops={activeTrip ? activeTrip.stops : bookingStops}
           availableDrivers={availableDrivers.map(d => ({
             id: d.id,
             lat: d.lat,
@@ -1093,6 +1112,7 @@ export default function RiderPage() {
                     )}
                     <BookingForm 
                       onLocationSelect={handleLocationSelect} 
+                      onStopsChange={setBookingStops}
                       currentUser={currentUser}
                       onRequireAuth={() => setShowAuthModal(true)}
                       onTripCreated={(trip) => {
@@ -1306,6 +1326,20 @@ export default function RiderPage() {
                             <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
                             <span className="font-bold text-gray-900 dark:text-gray-100 break-words">{activeTrip.pickup_location}</span>
                           </div>
+                          {Array.isArray(activeTrip.stops) && activeTrip.stops.length > 0 && (
+                            <div className="pl-2 space-y-1">
+                              {activeTrip.stops.map((stop, idx) => (
+                                <div key={stop.id || idx} className="flex items-start gap-2 text-xs sm:text-sm">
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-black shrink-0 mt-0.5">
+                                    Stop {idx + 1}
+                                  </span>
+                                  <span className={`font-semibold break-words ${stop.completed ? 'line-through text-gray-400' : 'text-amber-900 dark:text-amber-200'}`}>
+                                    {stop.address}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex items-start gap-2.5">
                             <span className="w-2.5 h-2.5 rounded-none bg-emerald-500 shrink-0 mt-1.5" />
                             <span className="font-bold text-gray-900 dark:text-gray-100 break-words">{activeTrip.dropoff_location}</span>
@@ -1316,7 +1350,34 @@ export default function RiderPage() {
                               {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
                             </span>
                           </div>
+                          {(Boolean(activeTrip.stops_fare_adjustment) || Boolean(activeTrip.waiting_fee_amount)) && (
+                            <div className="pt-1.5 border-t border-blue-200/50 dark:border-blue-800/30 space-y-1 text-xs">
+                              {Boolean(activeTrip.stops_fare_adjustment) && (
+                                <div className="flex items-center justify-between text-amber-800 dark:text-amber-300 font-bold">
+                                  <span>Stops Fare Adjustment ({activeTrip.stops?.length || 0} stops):</span>
+                                  <span>{activeTrip.stops_fare_adjustment! >= 0 ? `+R${activeTrip.stops_fare_adjustment}` : `R${activeTrip.stops_fare_adjustment}`}</span>
+                                </div>
+                              )}
+                              {Boolean(activeTrip.waiting_fee_amount) && (
+                                <div className="flex items-center justify-between text-red-600 dark:text-red-400 font-bold">
+                                  <span>Pickup Waiting Fee (&gt;2 min grace):</span>
+                                  <span>+R{activeTrip.waiting_fee_amount}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
+
+                        {/* 2-Minute Driver Arrival Grace Period Countdown & Automatic Fare Adjustment */}
+                        {activeTrip.status === 'arrived' && (
+                          <div className="mt-3.5">
+                            <PickupWaitingTimerBanner
+                              trip={activeTrip}
+                              role="rider"
+                              onWaitingFareIncreased={(updated) => updateActiveTripState(updated)}
+                            />
+                          </div>
+                        )}
 
                         {/* Driver Arrived PIN Alert */}
                         {activeTrip.status === 'arrived' && (
@@ -1329,6 +1390,18 @@ export default function RiderPage() {
                               {activeTrip.verification_pin}
                             </span>
                           </div>
+                        )}
+
+                        {/* Add / Manage Stops with Automatic Fare Adjustment (Rider Portal) */}
+                        {(activeTrip.status === 'requested' ||
+                          activeTrip.status === 'accepted' ||
+                          activeTrip.status === 'arrived' ||
+                          activeTrip.status === 'in_progress') && (
+                          <TripStopsManager
+                            trip={activeTrip}
+                            role="rider"
+                            onTripUpdated={(updated) => updateActiveTripState(updated)}
+                          />
                         )}
 
                         {/* Dispatched Driver & Vehicle Identification Card */}
@@ -1552,6 +1625,29 @@ export default function RiderPage() {
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/20 rounded-2xl p-6 mb-5 border border-blue-200 dark:border-blue-900/50 flex flex-col items-center shadow-inner">
               <span className="text-blue-800 dark:text-blue-300 font-bold mb-1 uppercase tracking-wider text-xs sm:text-sm">Total Due</span>
               <span className="font-black text-5xl text-blue-600 dark:text-blue-400">R{activeTrip.fare_amount}</span>
+
+              {(Boolean(activeTrip.stops_fare_adjustment) || Boolean(activeTrip.waiting_fee_amount)) && (
+                <div className="w-full mt-3 pt-2.5 border-t border-blue-200/60 dark:border-blue-900/60 space-y-1 text-xs">
+                  {Boolean(activeTrip.base_agreed_fare) && (
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Initial Base Fare</span>
+                      <span className="font-bold">R{activeTrip.base_agreed_fare}</span>
+                    </div>
+                  )}
+                  {Boolean(activeTrip.stops_fare_adjustment) && (
+                    <div className="flex justify-between text-amber-700 dark:text-amber-300">
+                      <span>Stops Adjustment ({activeTrip.stops?.length || 0} stops)</span>
+                      <span className="font-bold">{activeTrip.stops_fare_adjustment! >= 0 ? `+R${activeTrip.stops_fare_adjustment}` : `R${activeTrip.stops_fare_adjustment}`}</span>
+                    </div>
+                  )}
+                  {Boolean(activeTrip.waiting_fee_amount) && (
+                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                      <span>Pickup Waiting Fee (&gt;2 min grace)</span>
+                      <span className="font-bold">+R{activeTrip.waiting_fee_amount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="w-full mt-4 pt-3 border-t border-blue-200/60 dark:border-blue-900/60 flex justify-between text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                 <span>SOLO Platform Commission</span>

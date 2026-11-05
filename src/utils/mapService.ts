@@ -2692,20 +2692,67 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
+export interface TripStop {
+  id: string;
+  address: string;
+  lat: number;
+  lng: number;
+  addedBy?: 'rider' | 'driver';
+  addedAt?: string;
+  completed?: boolean;
+}
+
+export const STOP_SURCHARGE_ZAR = 8; // R8 per intermediate stop + route detour distance
+export const PICKUP_GRACE_PERIOD_SECONDS = 120; // 2 minutes free waiting time after driver arrives at pickup
+export const PICKUP_GRACE_PERIOD_MS = PICKUP_GRACE_PERIOD_SECONDS * 1000;
+export const WAITING_FEE_PER_MINUTE_ZAR = 2; // R2 per minute after the 2-minute free grace period
+
 /**
- * Turn-by-Turn Routing & Directions:
+ * Calculates cumulative driving distance (km) across Pickup -> Intermediate Stops -> Dropoff
+ * using road-factor adjusted Haversine distance when live routing APIs are offline.
+ */
+export function calculateMultiStopDistanceKm(
+  pickup: { lat: number; lng: number },
+  dropoff: { lat: number; lng: number },
+  stops: { lat: number; lng: number }[] = []
+): number {
+  const validStops = (stops || []).filter(
+    (s) => s && typeof s.lat === 'number' && typeof s.lng === 'number' && !isNaN(s.lat) && !isNaN(s.lng)
+  );
+  const points = [pickup, ...validStops, dropoff];
+  let totalStraightKm = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const leg = calculateDistanceKm(points[i].lat, points[i].lng, points[i + 1].lat, points[i + 1].lng);
+    totalStraightKm += leg;
+  }
+  // Apply standard 1.25x urban road curvature factor for multi-leg estimation
+  return Math.max(0.5, Math.round(totalStraightKm * 1.25 * 10) / 10);
+}
+
+/**
+ * Turn-by-Turn Routing & Directions (supports optional intermediate stops/waypoints):
  * Queries Mapbox Driving Traffic (with live congestion) or falls back to OSRM
  */
 export async function getRouteDirections(
   originLng: number,
   originLat: number,
   destLng: number,
-  destLat: number
+  destLat: number,
+  waypoints: { lat: number; lng: number }[] = []
 ): Promise<RouteDetails | null> {
+  const validWaypoints = (waypoints || []).filter(
+    (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && !isNaN(w.lat) && !isNaN(w.lng)
+  );
+  const coordList = [
+    `${originLng},${originLat}`,
+    ...validWaypoints.map((w) => `${w.lng},${w.lat}`),
+    `${destLng},${destLat}`,
+  ].join(';');
+
   // 1. Try Mapbox Directions with live driving traffic (with Referer header)
   if (MAPBOX_TOKEN) {
     try {
-      const endpoint = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${originLng},${originLat};${destLng},${destLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+      const endpoint = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordList}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
       const res = await fetchWithTimeout(
         endpoint,
         {},
@@ -2719,7 +2766,7 @@ export async function getRouteDirections(
             (c: [number, number]) => [c[1], c[0]]
           );
           const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
-          const durationMinutes = Math.max(1, Math.round(route.duration / 60));
+          const durationMinutes = Math.max(1, Math.round(route.duration / 60) + validWaypoints.length * 2);
 
           return {
             coordinates: coords,
@@ -2736,7 +2783,7 @@ export async function getRouteDirections(
 
   // 2. Fallback to OSRM
   try {
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordList}?overview=full&geometries=geojson`;
     const res = await fetchWithTimeout(osrmUrl, {}, 3000);
     if (res && res.ok) {
       const data = await res.json();
@@ -2746,7 +2793,7 @@ export async function getRouteDirections(
           (c: [number, number]) => [c[1], c[0]]
         );
         const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
-        const durationMinutes = Math.max(1, Math.round(route.duration / 60));
+        const durationMinutes = Math.max(1, Math.round(route.duration / 60) + validWaypoints.length * 2);
 
         return {
           coordinates: coords,
@@ -2760,7 +2807,23 @@ export async function getRouteDirections(
     console.error('Both Mapbox and OSRM routing notice:', err);
   }
 
-  return null;
+  // 3. Deterministic geometric multi-leg fallback so routing & fare calculation never fail offline
+  const fallbackDistKm = calculateMultiStopDistanceKm(
+    { lat: originLat, lng: originLng },
+    { lat: destLat, lng: destLng },
+    validWaypoints
+  );
+  const fallbackCoords: [number, number][] = [
+    [originLat, originLng],
+    ...validWaypoints.map((w): [number, number] => [w.lat, w.lng]),
+    [destLat, destLng],
+  ];
+  return {
+    coordinates: fallbackCoords,
+    distanceKm: fallbackDistKm,
+    durationMinutes: Math.max(2, Math.round(fallbackDistKm * 2) + validWaypoints.length * 2),
+    source: 'osrm',
+  };
 }
 
 export type TariffTierCode = 'standard' | 'morning_peak' | 'evening_peak' | 'night_owl' | 'early_dawn';
@@ -2791,6 +2854,8 @@ export interface FareBreakdown {
   baseFareZar: number;
   distanceFareZar: number;
   occupantSupplementZar: number;
+  stopsCount: number;
+  stopSurchargeZar: number;
   subtotalZar: number;
   multiplier: number;
   totalFare: number;
@@ -2802,6 +2867,7 @@ export interface FareBreakdown {
 export interface DynamicFareOptions {
   durationMinutes?: number;
   occupantCount?: 1 | 2;
+  stopsCount?: number;
   enforceStandard?: boolean;
 }
 
@@ -2871,19 +2937,21 @@ export function getTimeOfDayTariff(date: Date = new Date()): TariffTier {
 
 /**
  * Estimates South African competitor fares (Bolt & UberX) for the same route and time window.
- * Competitors charge: Base + (Distance * Per-Km) + (Duration * Per-Minute) + Platform Booking Fee + Peak Surge.
+ * Competitors charge: Base + (Distance * Per-Km) + (Duration * Per-Minute) + Platform Booking Fee + Multi-Stop Fees + Peak Surge.
  */
 export function estimateCompetitorFares(
   distanceKm: number,
   durationMinutes?: number,
-  atTime?: Date
+  atTime?: Date,
+  stopsCount: number = 0
 ): Omit<CompetitorFareComparison, 'riderSavingsVsBoltZar' | 'riderSavingsVsUberZar' | 'riderSavingsMaxZar' | 'savingsPercentVsLowest' | 'savingsPercentVsHighest'> {
   const validDist = Math.max(0, Number(distanceKm) || 0);
+  const validStops = Math.max(0, Math.floor(Number(stopsCount) || 0));
   // Estimate driving duration at ~2 min/km (30 km/h urban average) if live duration is not provided
   const estMinutes =
     durationMinutes && durationMinutes > 0
       ? durationMinutes
-      : Math.max(3, Math.round(validDist * 2.0));
+      : Math.max(3, Math.round(validDist * 2.0) + validStops * 3);
 
   let boltSurge = 1.0;
   let uberSurge = 1.0;
@@ -2899,12 +2967,12 @@ export function estimateCompetitorFares(
     }
   }
 
-  // Bolt SA baseline: R13 base + R7.80/km + R0.85/min + R3.50 booking fee (min R32)
-  const rawBolt = (13 + validDist * 7.8 + estMinutes * 0.85 + 3.5) * boltSurge;
+  // Bolt SA baseline: R13 base + R7.80/km + R0.85/min + R3.50 booking fee + R14/stop (min R32)
+  const rawBolt = (13 + validDist * 7.8 + estMinutes * 0.85 + 3.5 + validStops * 14) * boltSurge;
   const boltEstimateZar = Math.max(32, Math.round(rawBolt));
 
-  // UberX SA baseline: R15 base + R9.20/km + R1.05/min + R4.50 booking fee (min R38)
-  const rawUber = (15 + validDist * 9.2 + estMinutes * 1.05 + 4.5) * uberSurge;
+  // UberX SA baseline: R15 base + R9.20/km + R1.05/min + R4.50 booking fee + R16/stop (min R38)
+  const rawUber = (15 + validDist * 9.2 + estMinutes * 1.05 + 4.5 + validStops * 16) * uberSurge;
   const uberEstimateZar = Math.max(38, Math.round(rawUber));
 
   const lowestCompetitorZar = Math.min(boltEstimateZar, uberEstimateZar);
@@ -2940,8 +3008,9 @@ function calculateTaperedDistanceCharge(distanceKm: number): number {
  * Computes full fare breakdown with:
  * 1. Lower Base + Tapered Per-Km Rate (R10 base + R6.50/km ≤5km, R5.50/km >5km, min R22)
  * 2. 1-Rider Solo Discount vs 2-Rider Shared Supplement (+R4 for 2 riders)
- * 3. Softened Time-of-Day Tariff
- * 4. Automatic 20% Competitor Undercut Ceiling (Always cheaper than Bolt & Uber)
+ * 3. Intermediate Stop Surcharge (+R8 per stop + route detour distance)
+ * 4. Softened Time-of-Day Tariff
+ * 5. Automatic 20% Competitor Undercut Ceiling (Always cheaper than Bolt & Uber)
  */
 export function calculateDynamicFare(
   distanceKm: number,
@@ -2949,6 +3018,9 @@ export function calculateDynamicFare(
   options: DynamicFareOptions = {}
 ): FareBreakdown {
   const validDist = Math.max(0, Number(distanceKm) || 0);
+  const stopsCount = Math.max(0, Math.floor(Number(options.stopsCount) || 0));
+  const stopSurchargeZar = stopsCount * STOP_SURCHARGE_ZAR;
+
   const tariff = options.enforceStandard
     ? {
         code: 'standard' as const,
@@ -2962,10 +3034,10 @@ export function calculateDynamicFare(
   const baseFareZar = 10;
   const distanceFareZar = calculateTaperedDistanceCharge(validDist);
   const occupantSupplementZar = options.occupantCount === 2 ? 4 : 0;
-  const subtotalZar = baseFareZar + distanceFareZar + occupantSupplementZar;
+  const subtotalZar = baseFareZar + distanceFareZar + occupantSupplementZar + stopSurchargeZar;
 
-  // Apply time-of-day multiplier with minimum fare floor (R22 * multiplier)
-  const minimumFareZar = Math.max(22, Math.round(22 * tariff.multiplier));
+  // Apply time-of-day multiplier with minimum fare floor (R22 * multiplier + stopSurchargeZar)
+  const minimumFareZar = Math.max(22 + stopSurchargeZar, Math.round(22 * tariff.multiplier) + stopSurchargeZar);
   const scaledFare = Math.round(subtotalZar * tariff.multiplier);
   const uncappedSoloFare = Math.max(minimumFareZar, scaledFare);
 
@@ -2973,11 +3045,12 @@ export function calculateDynamicFare(
   const compBase = estimateCompetitorFares(
     validDist,
     options.durationMinutes,
-    options.enforceStandard ? undefined : atTime
+    options.enforceStandard ? undefined : atTime,
+    stopsCount
   );
 
-  // Guarantee SOLO is always <= 80% of the lowest competitor (at least 20% cheaper), with a R22 floor
-  const totalFare = Math.max(22, Math.min(uncappedSoloFare, compBase.guaranteedCeilingZar));
+  // Guarantee SOLO is always <= 80% of the lowest competitor (at least 20% cheaper), with a R22 + stopSurcharge floor
+  const totalFare = Math.max(22 + stopSurchargeZar, Math.min(uncappedSoloFare, compBase.guaranteedCeilingZar));
 
   const riderSavingsVsBoltZar = Math.max(1, compBase.boltEstimateZar - totalFare);
   const riderSavingsVsUberZar = Math.max(1, compBase.uberEstimateZar - totalFare);
@@ -2997,6 +3070,8 @@ export function calculateDynamicFare(
     baseFareZar,
     distanceFareZar,
     occupantSupplementZar,
+    stopsCount,
+    stopSurchargeZar,
     subtotalZar,
     multiplier: tariff.multiplier,
     totalFare,
@@ -3020,7 +3095,7 @@ export function calculateDynamicFare(
  */
 export function calculateFare(
   distanceKm: number,
-  dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean; durationMinutes?: number; occupantCount?: 1 | 2 }
+  dateOrOptions?: Date | { atTime?: Date; enforceStandard?: boolean; durationMinutes?: number; occupantCount?: 1 | 2; stopsCount?: number }
 ): number {
   if (!dateOrOptions) {
     return calculateDynamicFare(distanceKm, new Date(), { enforceStandard: true }).totalFare;
@@ -3032,7 +3107,201 @@ export function calculateFare(
     enforceStandard: dateOrOptions.enforceStandard,
     durationMinutes: dateOrOptions.durationMinutes,
     occupantCount: dateOrOptions.occupantCount,
+    stopsCount: dateOrOptions.stopsCount,
   }).totalFare;
+}
+
+export interface MultiStopFareAdjustmentResult {
+  directDistanceKm: number;
+  multiStopDistanceKm: number;
+  extraDistanceKm: number;
+  stopsCount: number;
+  directBaseFareZar: number;
+  adjustedRouteFareZar: number;
+  stopsAdjustmentZar: number;
+  waitingFeeZar: number;
+  finalTotalFareZar: number;
+  estimatedDurationMinutes: number;
+  breakdown: FareBreakdown;
+}
+
+/**
+ * Automatically recalculates trip distance and fare when a rider or driver adds/removes stops.
+ * Preserves any pickup waiting fee already accrued on the trip.
+ */
+export function calculateTripWithStopsAdjustment(params: {
+  pickup: { lat: number; lng: number };
+  dropoff: { lat: number; lng: number };
+  stops?: { lat: number; lng: number }[];
+  occupantCount?: 1 | 2;
+  atTime?: Date;
+  routeDistanceKm?: number;
+  routeDurationMinutes?: number;
+  waitingFeeZar?: number;
+  enforceStandard?: boolean;
+}): MultiStopFareAdjustmentResult {
+  const validStops = (params.stops || []).filter(
+    (s) => s && typeof s.lat === 'number' && typeof s.lng === 'number' && !isNaN(s.lat) && !isNaN(s.lng)
+  );
+  const stopsCount = validStops.length;
+  const targetTime = params.atTime || new Date();
+  const directDistanceKm = calculateMultiStopDistanceKm(params.pickup, params.dropoff, []);
+  const computedMultiStopDistKm =
+    typeof params.routeDistanceKm === 'number' && params.routeDistanceKm > 0
+      ? params.routeDistanceKm
+      : calculateMultiStopDistanceKm(params.pickup, params.dropoff, validStops);
+
+  const multiStopDistanceKm =
+    stopsCount > 0 ? Math.max(directDistanceKm, computedMultiStopDistKm) : computedMultiStopDistKm;
+  const extraDistanceKm = Math.max(0, Math.round((multiStopDistanceKm - directDistanceKm) * 10) / 10);
+
+  const directBreakdown = calculateDynamicFare(directDistanceKm, targetTime, {
+    occupantCount: params.occupantCount,
+    stopsCount: 0,
+    enforceStandard: params.enforceStandard,
+  });
+
+  const multiStopBreakdown = calculateDynamicFare(multiStopDistanceKm, targetTime, {
+    durationMinutes: params.routeDurationMinutes,
+    occupantCount: params.occupantCount,
+    stopsCount,
+    enforceStandard: params.enforceStandard,
+  });
+
+  // Ensure every added stop guarantees at least +R8 per stop + distance difference over the direct fare
+  const minimumStopAdjustedFare =
+    stopsCount > 0
+      ? directBreakdown.totalFare + stopsCount * STOP_SURCHARGE_ZAR + Math.round(extraDistanceKm * 5.5)
+      : directBreakdown.totalFare;
+
+  const adjustedRouteFareZar =
+    stopsCount > 0
+      ? Math.max(multiStopBreakdown.totalFare, minimumStopAdjustedFare)
+      : multiStopBreakdown.totalFare;
+
+  const stopsAdjustmentZar = Math.max(0, adjustedRouteFareZar - directBreakdown.totalFare);
+  const waitingFeeZar = Math.max(0, Math.round(Number(params.waitingFeeZar) || 0));
+  const finalTotalFareZar = adjustedRouteFareZar + waitingFeeZar;
+  const estimatedDurationMinutes =
+    params.routeDurationMinutes && params.routeDurationMinutes > 0
+      ? params.routeDurationMinutes
+      : Math.max(3, Math.round(multiStopDistanceKm * 2) + stopsCount * 3);
+
+  return {
+    directDistanceKm,
+    multiStopDistanceKm,
+    extraDistanceKm,
+    stopsCount,
+    directBaseFareZar: directBreakdown.totalFare,
+    adjustedRouteFareZar,
+    stopsAdjustmentZar,
+    waitingFeeZar,
+    finalTotalFareZar,
+    estimatedDurationMinutes,
+    breakdown: {
+      ...multiStopBreakdown,
+      totalFare: adjustedRouteFareZar,
+    },
+  };
+}
+
+export interface PickupWaitingFeeStatus {
+  arrivedAtMs: number;
+  elapsedSeconds: number;
+  gracePeriodSeconds: number;
+  remainingGraceSeconds: number;
+  overtimeSeconds: number;
+  overtimeMinutesBilled: number;
+  isGracePeriodExpired: boolean;
+  waitingFeeZar: number;
+  baseAgreedFareZar: number;
+  adjustedTotalFareZar: number;
+  formattedCountdown: string;
+}
+
+/**
+ * Evaluates the 2-minute (120s) rider pickup waiting grace period after a driver arrives at pickup.
+ * - First 2 minutes (0s - 120s): R0 waiting fee (free boarding grace period).
+ * - After 2 minutes (> 120s): Agreed trip price automatically increases by R2 per minute started.
+ */
+export function calculatePickupWaitingFare(
+  baseAgreedFareZar: number,
+  arrivedAt: string | number | Date | undefined | null,
+  nowMs: number = Date.now()
+): PickupWaitingFeeStatus {
+  const safeBaseFare = Math.max(22, Math.round(Number(baseAgreedFareZar) || 22));
+
+  let arrivedAtMs = 0;
+  if (typeof arrivedAt === 'number') {
+    arrivedAtMs = arrivedAt;
+  } else if (arrivedAt instanceof Date) {
+    arrivedAtMs = arrivedAt.getTime();
+  } else if (typeof arrivedAt === 'string' && arrivedAt.trim().length > 0) {
+    const parsed = new Date(arrivedAt).getTime();
+    if (!isNaN(parsed)) arrivedAtMs = parsed;
+  }
+
+  if (!arrivedAtMs || arrivedAtMs <= 0) {
+    return {
+      arrivedAtMs: nowMs,
+      elapsedSeconds: 0,
+      gracePeriodSeconds: PICKUP_GRACE_PERIOD_SECONDS,
+      remainingGraceSeconds: PICKUP_GRACE_PERIOD_SECONDS,
+      overtimeSeconds: 0,
+      overtimeMinutesBilled: 0,
+      isGracePeriodExpired: false,
+      waitingFeeZar: 0,
+      baseAgreedFareZar: safeBaseFare,
+      adjustedTotalFareZar: safeBaseFare,
+      formattedCountdown: '02:00',
+    };
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((nowMs - arrivedAtMs) / 1000));
+
+  if (elapsedSeconds <= PICKUP_GRACE_PERIOD_SECONDS) {
+    const remainingGraceSeconds = PICKUP_GRACE_PERIOD_SECONDS - elapsedSeconds;
+    const mins = Math.floor(remainingGraceSeconds / 60);
+    const secs = remainingGraceSeconds % 60;
+    const formattedCountdown = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    return {
+      arrivedAtMs,
+      elapsedSeconds,
+      gracePeriodSeconds: PICKUP_GRACE_PERIOD_SECONDS,
+      remainingGraceSeconds,
+      overtimeSeconds: 0,
+      overtimeMinutesBilled: 0,
+      isGracePeriodExpired: false,
+      waitingFeeZar: 0,
+      baseAgreedFareZar: safeBaseFare,
+      adjustedTotalFareZar: safeBaseFare,
+      formattedCountdown,
+    };
+  }
+
+  const overtimeSeconds = elapsedSeconds - PICKUP_GRACE_PERIOD_SECONDS;
+  const overtimeMinutesBilled = Math.ceil(overtimeSeconds / 60);
+  const waitingFeeZar = overtimeMinutesBilled * WAITING_FEE_PER_MINUTE_ZAR;
+  const adjustedTotalFareZar = safeBaseFare + waitingFeeZar;
+
+  const overMins = Math.floor(overtimeSeconds / 60);
+  const overSecs = overtimeSeconds % 60;
+  const formattedCountdown = `+${String(overMins).padStart(2, '0')}:${String(overSecs).padStart(2, '0')}`;
+
+  return {
+    arrivedAtMs,
+    elapsedSeconds,
+    gracePeriodSeconds: PICKUP_GRACE_PERIOD_SECONDS,
+    remainingGraceSeconds: 0,
+    overtimeSeconds,
+    overtimeMinutesBilled,
+    isGracePeriodExpired: true,
+    waitingFeeZar,
+    baseAgreedFareZar: safeBaseFare,
+    adjustedTotalFareZar,
+    formattedCountdown,
+  };
 }
 
 /**

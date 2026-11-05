@@ -3,6 +3,23 @@ import { isPlatformOwner, applyOwnerPrivileges, FOUNDER_DRIVER_UUID, LEGACY_FOUN
 import { setDriverActiveSession, clearDriverActiveSession, isDriverSessionPreempted, getDriverActiveSession, generateUuid, safeJsonParse, getSafeLocalStorageItem, setSafeLocalStorageItem } from '@/utils/session';
 import { SoloLocationEngine, SoloDispatchService } from './solo_realtime_and_ride_service';
 import { recordCompletedTripToFleetAudit } from '@/utils/fleetStore';
+import {
+  calculateTripWithStopsAdjustment,
+  calculatePickupWaitingFare,
+  PICKUP_GRACE_PERIOD_SECONDS,
+  WAITING_FEE_PER_MINUTE_ZAR,
+  STOP_SURCHARGE_ZAR,
+  type TripStop,
+} from '@/utils/mapService';
+
+export type { TripStop };
+export {
+  calculateTripWithStopsAdjustment,
+  calculatePickupWaitingFare,
+  PICKUP_GRACE_PERIOD_SECONDS,
+  WAITING_FEE_PER_MINUTE_ZAR,
+  STOP_SURCHARGE_ZAR,
+};
 
 export const soloLocationEngine = new SoloLocationEngine(supabase);
 export const soloDispatchService = new SoloDispatchService(supabase);
@@ -17,7 +34,13 @@ export type MockTrip = {
   dropoff_location: string;
   dropoff_lat: number;
   dropoff_lng: number;
-  fare_amount: number;
+  stops?: TripStop[]; // Intermediate stops added by rider or driver
+  fare_amount: number; // Current agreed/adjusted total fare in ZAR
+  base_agreed_fare?: number; // Route fare (including any stop adjustments) before pickup waiting fee
+  stops_fare_adjustment?: number; // Extra ZAR added for intermediate stops
+  waiting_fee_amount?: number; // Extra ZAR added after 2-minute pickup grace period expires
+  waiting_seconds_charged?: number; // Seconds waited beyond the 2-minute pickup grace period
+  arrived_at?: string; // ISO timestamp when driver arrived at pickup (starts 2-min countdown)
   passenger_count?: 1 | 2; // Maximum 2 riders per trip
   payment_method?: 'paystack' | 'speedpoint' | 'cash';
   status: 'requested' | 'accepted' | 'arrived' | 'in_progress' | 'payment_pending' | 'completed' | 'cancelled';
@@ -612,6 +635,22 @@ export const getTrips = async (): Promise<MockTrip[]> => {
 
       const rawPassengerCount = Number(dbTrip.passenger_count || existing?.passenger_count || 1);
       const clampedPassengerCount: 1 | 2 = rawPassengerCount >= 2 ? 2 : 1;
+      const resolvedStops = Array.isArray(dbTrip.stops)
+        ? dbTrip.stops
+        : existing?.stops;
+      const resolvedArrivedAt = dbTrip.arrived_at || existing?.arrived_at;
+      const resolvedBaseAgreedFare =
+        dbTrip.base_agreed_fare !== undefined && dbTrip.base_agreed_fare !== null
+          ? Number(dbTrip.base_agreed_fare)
+          : existing?.base_agreed_fare;
+      const resolvedStopsAdjustment =
+        dbTrip.stops_fare_adjustment !== undefined && dbTrip.stops_fare_adjustment !== null
+          ? Number(dbTrip.stops_fare_adjustment)
+          : existing?.stops_fare_adjustment;
+      const resolvedWaitingFee =
+        dbTrip.waiting_fee_amount !== undefined && dbTrip.waiting_fee_amount !== null
+          ? Number(dbTrip.waiting_fee_amount)
+          : existing?.waiting_fee_amount;
 
       const mapped: MockTrip = {
         id: dbTrip.id,
@@ -623,7 +662,15 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         dropoff_location: dbTrip.dropoff_location,
         dropoff_lat: dbTrip.dropoff_lat,
         dropoff_lng: dbTrip.dropoff_lng,
-        fare_amount: Number(dbTrip.fare_amount),
+        stops: resolvedStops,
+        fare_amount: existing?.fare_amount && existing.fare_amount > Number(dbTrip.fare_amount)
+          ? existing.fare_amount
+          : Number(dbTrip.fare_amount),
+        base_agreed_fare: resolvedBaseAgreedFare,
+        stops_fare_adjustment: resolvedStopsAdjustment,
+        waiting_fee_amount: resolvedWaitingFee,
+        waiting_seconds_charged: existing?.waiting_seconds_charged,
+        arrived_at: resolvedArrivedAt,
         passenger_count: clampedPassengerCount,
         status: dbStatus,
         verification_pin: dbTrip.verification_pin || existing?.verification_pin,
@@ -641,6 +688,11 @@ export const getTrips = async (): Promise<MockTrip[]> => {
         mergedMap.set(mapped.id, {
           ...existing,
           ...mapped,
+          stops: existing.stops !== undefined ? existing.stops : mapped.stops,
+          arrived_at: existing.arrived_at || mapped.arrived_at,
+          base_agreed_fare: existing.base_agreed_fare ?? mapped.base_agreed_fare,
+          stops_fare_adjustment: existing.stops_fare_adjustment ?? mapped.stops_fare_adjustment,
+          waiting_fee_amount: existing.waiting_fee_amount ?? mapped.waiting_fee_amount,
           passenger_count: existing.passenger_count || mapped.passenger_count || 1,
           driver_id: existing.driver_id || mapped.driver_id,
           status: winningStatus,
@@ -675,7 +727,7 @@ export const saveTrip = async (trip: MockTrip) => {
     rider_id: ensureValidUuid(trip.rider_id),
     verification_pin: trip.verification_pin || Math.floor(1000 + Math.random() * 9000).toString(),
     created_at: trip.created_at || new Date().toISOString(),
-    updated_at: trip.updated_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
   // 1. Save locally first for instant UI response & broadcast immediately across tabs/clients
@@ -704,6 +756,7 @@ export const saveTrip = async (trip: MockTrip) => {
     if (enrichedTrip.status !== 'requested') {
       const updatePayload: Record<string, any> = {
         status: enrichedTrip.status,
+        fare_amount: enrichedTrip.fare_amount,
         updated_at: new Date().toISOString(),
       };
       if (resolvedDriverId) {
@@ -1840,6 +1893,17 @@ const initGlobalChannels = () => {
         dropoff_location: dbTrip.dropoff_location,
         dropoff_lat: dbTrip.dropoff_lat,
         dropoff_lng: dbTrip.dropoff_lng,
+        ...(Array.isArray(dbTrip.stops) ? { stops: dbTrip.stops } : {}),
+        ...(dbTrip.arrived_at ? { arrived_at: dbTrip.arrived_at } : {}),
+        ...(dbTrip.base_agreed_fare !== undefined && dbTrip.base_agreed_fare !== null
+          ? { base_agreed_fare: Number(dbTrip.base_agreed_fare) }
+          : {}),
+        ...(dbTrip.stops_fare_adjustment !== undefined && dbTrip.stops_fare_adjustment !== null
+          ? { stops_fare_adjustment: Number(dbTrip.stops_fare_adjustment) }
+          : {}),
+        ...(dbTrip.waiting_fee_amount !== undefined && dbTrip.waiting_fee_amount !== null
+          ? { waiting_fee_amount: Number(dbTrip.waiting_fee_amount) }
+          : {}),
         fare_amount: Number(dbTrip.fare_amount),
         status: dbTrip.status,
         verification_pin: dbTrip.verification_pin,

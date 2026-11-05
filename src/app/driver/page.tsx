@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import TripRequestModal from '@/components/TripRequestModal'
+import TripStopsManager from '@/components/TripStopsManager'
+import PickupWaitingTimerBanner from '@/components/PickupWaitingTimerBanner'
 import { Car, Navigation, Power, User, MapPin, BookOpen, ShieldCheck, ShieldAlert, CheckCircle2, Lock, CreditCard, Clock, Building2, Crown, X, Smartphone, AlertTriangle, ChevronDown, ChevronUp, KeyRound, MessageCircle, Compass, ExternalLink, Phone, AlertCircle, XCircle, Download, Banknote, Globe, Search, Filter } from 'lucide-react'
-import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isPurgedTrip, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
+import { getTrips, getNearbyRequestedTrips, saveTrip, acceptTripAtomic, completeTripAtomic, declineTrip, undeclineTrip, getDeclinedTripIds, isTripDeclined, getDeclinedAvailableTrips, getCompletedTripIds, isTripCompleted, markTripCompleted, isTripDismissed, markTripDismissed, isPurgedTrip, isStaleRequestedTrip, isStaleCancelledTrip, isTripExpired, STATUS_PRIORITY, recordTripStatusOverride, subscribeToEvents, broadcastEvent, getDriverProfile, saveDriverProfile, updateDriverLocation, getDriverRatingSummary, startTripWithPin, calculatePickupWaitingFare, type MockTrip, type MockDriverProfile, type TripRating, type MockMessage } from '@/lib/mockBackend'
 import { resolveCityFromLocation, resolveCityFromCoords, isTripInDriverCity, areCitiesMatching, SOUTH_AFRICAN_CITIES } from '@/utils/cityMatching'
 import { isWithinRadiusKm, calculateDistanceKm, estimateEtaMinutes } from '@/utils/geo'
 import { getDriverDeviceId, isDriverSessionPreempted, setDriverActiveSession, getSafeLocalStorageItem, removeSafeLocalStorageItem, generateUuid } from '@/utils/session'
@@ -409,9 +411,15 @@ export default function DriverPage() {
             return;
           }
           // Only advance status monotonically (never regress 'in_progress' back to 'accepted')
+          // Also sync same-status updates when stops, fare, or pickup waiting fee changes
           const dbPrio = STATUS_PRIORITY[currentInDb.status] || 0;
           const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
-          if (dbPrio > activePrio) {
+          const hasTripDataChanged =
+            currentInDb.fare_amount !== currentActive.fare_amount ||
+            currentInDb.waiting_fee_amount !== currentActive.waiting_fee_amount ||
+            currentInDb.arrived_at !== currentActive.arrived_at ||
+            JSON.stringify(currentInDb.stops || []) !== JSON.stringify(currentActive.stops || []);
+          if (dbPrio > activePrio || (dbPrio === activePrio && hasTripDataChanged)) {
             updateActiveTripState(currentInDb);
           }
         }
@@ -613,7 +621,12 @@ export default function DriverPage() {
         ) {
           const incomingPrio = STATUS_PRIORITY[trip.status] || 0;
           const activePrio = STATUS_PRIORITY[currentActive.status] || 0;
-          if (incomingPrio > activePrio) {
+          const hasTripDataChanged =
+            trip.fare_amount !== currentActive.fare_amount ||
+            trip.waiting_fee_amount !== currentActive.waiting_fee_amount ||
+            trip.arrived_at !== currentActive.arrived_at ||
+            JSON.stringify(trip.stops || []) !== JSON.stringify(currentActive.stops || []);
+          if (incomingPrio > activePrio || (incomingPrio === activePrio && hasTripDataChanged)) {
             updateActiveTripState(trip);
           }
         } else if (trip.status !== 'requested' || isTripDeclined(trip.id, driverId) || isTripCompleted(trip.id) || isTripDismissed(trip.id)) {
@@ -980,7 +993,13 @@ export default function DriverPage() {
     if (!current) return;
     setIsNotifyingArrival(true);
     try {
-      const updated: MockTrip = { ...current, status: 'arrived' };
+      const arrivedAtIso = current.arrived_at || new Date().toISOString();
+      const updated: MockTrip = {
+        ...current,
+        status: 'arrived',
+        arrived_at: arrivedAtIso,
+        base_agreed_fare: current.base_agreed_fare ?? current.fare_amount,
+      };
       recordTripStatusOverride(updated.id, 'arrived', updated.driver_id);
       updateActiveTripState(updated);
       await saveTrip(updated);
@@ -996,6 +1015,22 @@ export default function DriverPage() {
     } finally {
       setIsNotifyingArrival(false);
     }
+  };
+
+  const lockInWaitingFeeOnStart = (trip: MockTrip): MockTrip => {
+    if (!trip.arrived_at) return { ...trip, status: 'in_progress' };
+    const fareExcludingWaiting =
+      typeof trip.waiting_fee_amount === 'number' && trip.waiting_fee_amount > 0
+        ? Math.max(22, trip.fare_amount - trip.waiting_fee_amount)
+        : trip.fare_amount;
+    const waitingState = calculatePickupWaitingFare(fareExcludingWaiting, trip.arrived_at, Date.now());
+    return {
+      ...trip,
+      status: 'in_progress',
+      waiting_fee_amount: waitingState.waitingFeeZar,
+      waiting_seconds_charged: waitingState.overtimeSeconds,
+      fare_amount: waitingState.adjustedTotalFareZar,
+    };
   };
 
   const handleVerifyPinAndStart = async (inputCode?: string) => {
@@ -1017,7 +1052,7 @@ export default function DriverPage() {
         return;
       }
 
-      const updated: MockTrip = { ...current, status: 'in_progress' };
+      const updated: MockTrip = lockInWaitingFeeOnStart(current);
       recordTripStatusOverride(updated.id, 'in_progress', updated.driver_id);
       updateActiveTripState(updated);
       await saveTrip(updated);
@@ -1035,7 +1070,7 @@ export default function DriverPage() {
   const handleConfirmPickup = async () => {
     const current = activeTripRef.current || activeTrip;
     if (current) {
-      const updated: MockTrip = { ...current, status: 'in_progress' };
+      const updated: MockTrip = lockInWaitingFeeOnStart(current);
       recordTripStatusOverride(updated.id, 'in_progress', updated.driver_id);
       updateActiveTripState(updated);
       await saveTrip(updated);
@@ -1150,17 +1185,18 @@ export default function DriverPage() {
         pickupLng: activeTrip.pickup_lng,
         dropoffLat: activeTrip.dropoff_lat,
         dropoffLng: activeTrip.dropoff_lng,
+        stops: activeTrip.stops,
         driverLat: driverCoords?.lat,
         driverLng: driverCoords?.lng,
         tripStatus: activeTrip.status,
         onRouteChange: (details: { distanceKm: number; durationMinutes: number }) => setLiveNavDetails(details),
       }
     : request
-      ? { pickupLat: request.pickup_lat, pickupLng: request.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+      ? { pickupLat: request.pickup_lat, pickupLng: request.pickup_lng, stops: request.stops, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : selectedDeclinedTrip
-      ? { pickupLat: selectedDeclinedTrip.pickup_lat, pickupLng: selectedDeclinedTrip.pickup_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+      ? { pickupLat: selectedDeclinedTrip.pickup_lat, pickupLng: selectedDeclinedTrip.pickup_lng, stops: selectedDeclinedTrip.stops, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : previewNationalTrip
-      ? { pickupLat: previewNationalTrip.pickup_lat, pickupLng: previewNationalTrip.pickup_lng, dropoffLat: previewNationalTrip.dropoff_lat, dropoffLng: previewNationalTrip.dropoff_lng, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
+      ? { pickupLat: previewNationalTrip.pickup_lat, pickupLng: previewNationalTrip.pickup_lng, dropoffLat: previewNationalTrip.dropoff_lat, dropoffLng: previewNationalTrip.dropoff_lng, stops: previewNationalTrip.stops, driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
       : { driverLat: driverCoords?.lat, driverLng: driverCoords?.lng }
 
   return (
@@ -1583,6 +1619,20 @@ export default function DriverPage() {
                           <span className="text-gray-500 dark:text-gray-400 font-semibold shrink-0">Pickup:</span>
                           <span className="font-bold text-gray-900 dark:text-gray-100 break-words">{activeTrip.pickup_location}</span>
                         </div>
+                        {Array.isArray(activeTrip.stops) && activeTrip.stops.length > 0 && (
+                          <div className="pl-3 space-y-1">
+                            {activeTrip.stops.map((stop, idx) => (
+                              <div key={stop.id || idx} className="flex items-start gap-2">
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-black shrink-0 mt-0.5">
+                                  Stop {idx + 1}
+                                </span>
+                                <span className={`font-bold break-words ${stop.completed ? 'line-through text-gray-400' : 'text-amber-900 dark:text-amber-200'}`}>
+                                  {stop.address}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex items-start gap-2">
                           <span className="w-2.5 h-2.5 rounded-none bg-emerald-500 shrink-0 mt-1.5" />
                           <span className="text-gray-500 dark:text-gray-400 font-semibold shrink-0">Dropoff:</span>
@@ -1594,7 +1644,43 @@ export default function DriverPage() {
                             {activeTrip.passenger_count === 2 ? '👥 2 Riders (Max)' : '👤 1 Rider (Solo)'}
                           </span>
                         </div>
+                        {(Boolean(activeTrip.stops_fare_adjustment) || Boolean(activeTrip.waiting_fee_amount)) && (
+                          <div className="pt-2 border-t border-gray-200/60 dark:border-white/10 space-y-1 text-xs">
+                            {Boolean(activeTrip.stops_fare_adjustment) && (
+                              <div className="flex items-center justify-between text-amber-700 dark:text-amber-300 font-bold">
+                                <span>Stops Fare Adjustment ({activeTrip.stops?.length || 0} stops):</span>
+                                <span>{activeTrip.stops_fare_adjustment! >= 0 ? `+R${activeTrip.stops_fare_adjustment}` : `R${activeTrip.stops_fare_adjustment}`}</span>
+                              </div>
+                            )}
+                            {Boolean(activeTrip.waiting_fee_amount) && (
+                              <div className="flex items-center justify-between text-red-600 dark:text-red-400 font-bold">
+                                <span>Pickup Waiting Fee (&gt;2 min grace):</span>
+                                <span>+R{activeTrip.waiting_fee_amount}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
+
+                      {/* 2-Minute Pickup Grace Period Countdown & Automatic Fare Adjustment (Driver Portal) */}
+                      {activeTrip.status === 'arrived' && (
+                        <PickupWaitingTimerBanner
+                          trip={activeTrip}
+                          role="driver"
+                          onWaitingFareIncreased={(updated) => updateActiveTripState(updated)}
+                        />
+                      )}
+
+                      {/* Add / Manage Stops with Automatic Fare Adjustment (Driver Portal) */}
+                      {(activeTrip.status === 'accepted' ||
+                        activeTrip.status === 'arrived' ||
+                        activeTrip.status === 'in_progress') && (
+                        <TripStopsManager
+                          trip={activeTrip}
+                          role="driver"
+                          onTripUpdated={(updated) => updateActiveTripState(updated)}
+                        />
+                      )}
 
                       {activeTrip.status === 'accepted' && (
                         <div className="flex flex-col gap-2.5">
@@ -3013,6 +3099,28 @@ export default function DriverPage() {
             <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-5 mb-5 border border-green-200 dark:border-green-900/50 flex flex-col items-center">
               <span className="text-green-800 dark:text-green-300 font-bold mb-1 uppercase tracking-wider text-xs sm:text-sm">Total Amount Due</span>
               <span className="font-black text-4xl sm:text-5xl text-green-600 dark:text-green-400">R{activeTrip.fare_amount}</span>
+              {(Boolean(activeTrip.stops_fare_adjustment) || Boolean(activeTrip.waiting_fee_amount)) && (
+                <div className="w-full mt-3 pt-2.5 border-t border-green-200/70 dark:border-green-800/60 space-y-1 text-xs">
+                  {Boolean(activeTrip.base_agreed_fare) && (
+                    <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                      <span>Initial Agreed Fare</span>
+                      <span className="font-bold">R{activeTrip.base_agreed_fare}</span>
+                    </div>
+                  )}
+                  {Boolean(activeTrip.stops_fare_adjustment) && (
+                    <div className="flex justify-between text-amber-700 dark:text-amber-300">
+                      <span>Stops Fare Adjustment ({activeTrip.stops?.length || 0} stops)</span>
+                      <span className="font-bold">{activeTrip.stops_fare_adjustment! >= 0 ? `+R${activeTrip.stops_fare_adjustment}` : `R${activeTrip.stops_fare_adjustment}`}</span>
+                    </div>
+                  )}
+                  {Boolean(activeTrip.waiting_fee_amount) && (
+                    <div className="flex justify-between text-red-600 dark:text-red-400">
+                      <span>Pickup Waiting Fee (&gt;2 min grace)</span>
+                      <span className="font-bold">+R{activeTrip.waiting_fee_amount}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <span className="text-xs sm:text-sm text-green-700 dark:text-green-400/90 font-semibold mt-2 text-center">100% of this fare belongs to you (0% platform commission)</span>
             </div>
 

@@ -1,16 +1,17 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users } from 'lucide-react'
+import { LocateFixed, Clock, Home, Building2, Car, ShieldCheck, MapPin, ChevronRight, Star, CreditCard, Banknote, User, Users, Plus, Trash2, Route } from 'lucide-react'
 import { saveTrip, getRiderSessionId, setRiderActiveTripId, type MockTrip, type LiveDriver } from '@/lib/mockBackend'
 import { generateUuid } from '@/utils/session'
-import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, type SearchResultPlace, type TariffTier, type CompetitorFareComparison } from '@/utils/mapService'
+import { reverseGeocode, getRouteDirections, calculateFare, calculateDynamicFare, calculateTripWithStopsAdjustment, STOP_SURCHARGE_ZAR, type SearchResultPlace, type TariffTier, type CompetitorFareComparison, type TripStop } from '@/utils/mapService'
 import { dispatchRideRequestPush } from '@/utils/pushClient'
 import { resolveCityFromLocation } from '@/utils/cityMatching'
 import CustomSearchInput from './CustomSearchInput'
 
 interface BookingFormProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', lat: number, lng: number) => void
+  onStopsChange?: (stops: TripStop[]) => void
   currentUser?: { id: string; fullName?: string; phone?: string } | null
   onRequireAuth?: () => void
   onTripCreated?: (trip: MockTrip) => void
@@ -44,6 +45,7 @@ function formatSelectedPlaceLabel(feature: SearchResultPlace): string {
 
 export default function BookingForm({
   onLocationSelect,
+  onStopsChange,
   currentUser,
   onRequireAuth,
   onTripCreated,
@@ -59,6 +61,7 @@ export default function BookingForm({
   const [dropoffDetail, setDropoffDetail] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [fare, setFare] = useState<number | null>(null)
+  const [stopsFareAdjustment, setStopsFareAdjustment] = useState<number>(0)
   const [appliedTariff, setAppliedTariff] = useState<TariffTier | null>(null)
   const [fareComparison, setFareComparison] = useState<CompetitorFareComparison | null>(null)
   const [distanceKm, setDistanceKm] = useState<number | null>(null)
@@ -67,9 +70,27 @@ export default function BookingForm({
   const [activeTripId, setActiveTripId] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'speedpoint' | 'cash'>('speedpoint')
   const [occupantCount, setOccupantCount] = useState<1 | 2>(1)
+  const [stops, setStops] = useState<{ id: string; query: string; lat?: number; lng?: number }[]>([])
 
   const [realPickupCoords, setRealPickupCoords] = useState<{lat: number, lng: number} | null>(null)
   const [realDropoffCoords, setRealDropoffCoords] = useState<{lat: number, lng: number} | null>(null)
+
+  const resolvedStops: TripStop[] = stops
+    .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number' && s.query.trim().length > 0)
+    .map((s) => ({
+      id: s.id,
+      address: s.query.trim(),
+      lat: s.lat!,
+      lng: s.lng!,
+      addedBy: 'rider' as const,
+      addedAt: new Date().toISOString(),
+    }));
+
+  useEffect(() => {
+    if (onStopsChange) {
+      onStopsChange(resolvedStops);
+    }
+  }, [JSON.stringify(resolvedStops)]);
 
   // Listen to coordinates picked directly on the map
   useEffect(() => {
@@ -134,7 +155,7 @@ export default function BookingForm({
     }
   }
 
-  // Calculate Route, Live Traffic Duration & Fare using Mapbox Directions
+  // Calculate Route, Live Traffic Duration & Fare using Mapbox Directions (including intermediate stops)
   useEffect(() => {
     if (!realPickupCoords || !realDropoffCoords) return;
 
@@ -144,7 +165,8 @@ export default function BookingForm({
           realPickupCoords.lng,
           realPickupCoords.lat,
           realDropoffCoords.lng,
-          realDropoffCoords.lat
+          realDropoffCoords.lat,
+          resolvedStops.map((s) => ({ lat: s.lat, lng: s.lng }))
         );
 
         if (details) {
@@ -152,12 +174,28 @@ export default function BookingForm({
           const dynamicFare = calculateDynamicFare(details.distanceKm, targetDate, {
             durationMinutes: details.durationMinutes,
             occupantCount,
+            stopsCount: resolvedStops.length,
           });
           setDistanceKm(details.distanceKm);
           setDurationMinutes(details.durationMinutes);
           setFare(dynamicFare.totalFare);
           setAppliedTariff(dynamicFare.tariff);
           setFareComparison(dynamicFare.comparison);
+
+          if (resolvedStops.length > 0) {
+            const stopCalc = calculateTripWithStopsAdjustment({
+              pickup: realPickupCoords,
+              dropoff: realDropoffCoords,
+              stops: resolvedStops,
+              routeDistanceKm: details.distanceKm,
+              routeDurationMinutes: details.durationMinutes,
+              occupantCount,
+              atTime: targetDate,
+            });
+            setStopsFareAdjustment(stopCalc.stopsAdjustmentZar);
+          } else {
+            setStopsFareAdjustment(0);
+          }
         }
       } catch (err) {
         console.error("Commercial directions error:", err);
@@ -166,24 +204,53 @@ export default function BookingForm({
         setFareComparison(null);
         setDistanceKm(null);
         setDurationMinutes(null);
+        setStopsFareAdjustment(0);
       }
     };
 
     getDirections();
-  }, [realPickupCoords, realDropoffCoords]);
+  }, [realPickupCoords, realDropoffCoords, JSON.stringify(resolvedStops)]);
 
-  // Recalculate fare & competitor savings instantly when occupantCount (1 vs 2 riders) or pickupTime changes
+  // Recalculate fare & competitor savings instantly when occupantCount (1 vs 2 riders), pickupTime, or stops change
   useEffect(() => {
-    if (distanceKm === null) return;
+    if (distanceKm === null || !realPickupCoords || !realDropoffCoords) return;
     const targetDate = pickupTime ? new Date(pickupTime) : new Date();
     const dynamicFare = calculateDynamicFare(distanceKm, targetDate, {
       durationMinutes: durationMinutes ?? undefined,
       occupantCount,
+      stopsCount: resolvedStops.length,
     });
     setFare(dynamicFare.totalFare);
     setAppliedTariff(dynamicFare.tariff);
     setFareComparison(dynamicFare.comparison);
-  }, [distanceKm, durationMinutes, occupantCount, pickupTime]);
+
+    if (resolvedStops.length > 0) {
+      const stopCalc = calculateTripWithStopsAdjustment({
+        pickup: realPickupCoords,
+        dropoff: realDropoffCoords,
+        stops: resolvedStops,
+        routeDistanceKm: distanceKm,
+        routeDurationMinutes: durationMinutes ?? undefined,
+        occupantCount,
+        atTime: targetDate,
+      });
+      setStopsFareAdjustment(stopCalc.stopsAdjustmentZar);
+    } else {
+      setStopsFareAdjustment(0);
+    }
+  }, [distanceKm, durationMinutes, occupantCount, pickupTime, JSON.stringify(resolvedStops)]);
+
+  const handleAddStopSlot = () => {
+    if (stops.length >= 4) return;
+    setStops((prev) => [
+      ...prev,
+      { id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, query: '' },
+    ]);
+  };
+
+  const handleRemoveStopSlot = (id: string) => {
+    setStops((prev) => prev.filter((s) => s.id !== id));
+  };
 
   const handleBook = async () => {
     if (fare === null || !realPickupCoords || !realDropoffCoords) return
@@ -213,6 +280,10 @@ export default function BookingForm({
         dropoff_location: fullDropoffAddress,
         dropoff_lat: realDropoffCoords.lat,
         dropoff_lng: realDropoffCoords.lng,
+        stops: resolvedStops,
+        base_agreed_fare: fare,
+        stops_fare_adjustment: stopsFareAdjustment,
+        waiting_fee_amount: 0,
         fare_amount: fare,
         passenger_count: occupantCount,
         payment_method: paymentMethod,
@@ -307,6 +378,70 @@ export default function BookingForm({
             </div>
           )}
         </div>
+
+        {/* Intermediate Stops (Riders can add up to 4 stops with automatic fare adjustment) */}
+        {stops.length > 0 && (
+          <div className="space-y-2 relative z-[25]">
+            {stops.map((stop, idx) => (
+              <div
+                key={stop.id}
+                className="relative flex items-center bg-amber-50/60 dark:bg-amber-950/20 border-2 border-amber-300/70 dark:border-amber-700/40 focus-within:border-amber-500 rounded-2xl shadow-xs"
+              >
+                <div className="w-full">
+                  <CustomSearchInput
+                    label={`Stop ${idx + 1} (Auto Fare Adjustment)`}
+                    placeholder={`Stop ${idx + 1}: Street, shop, or address`}
+                    value={stop.query}
+                    onChange={(val) =>
+                      setStops((prev) =>
+                        prev.map((item) => (item.id === stop.id ? { ...item, query: val } : item))
+                      )
+                    }
+                    hasRightAction={true}
+                    proximityCoords={realPickupCoords}
+                    onSelect={(feature) => {
+                      const coords = { lat: Number(feature.lat), lng: Number(feature.lon) };
+                      const formatted = formatSelectedPlaceLabel(feature);
+                      setStops((prev) =>
+                        prev.map((item) =>
+                          item.id === stop.id
+                            ? { ...item, query: formatted, lat: coords.lat, lng: coords.lng }
+                            : item
+                        )
+                      );
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveStopSlot(stop.id)}
+                  className="absolute right-2.5 md:right-3 text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-950/50 min-w-[40px] min-h-[40px] p-2 rounded-xl flex items-center justify-center z-10 active:scale-95 transition"
+                  title={`Remove Stop ${idx + 1}`}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={handleAddStopSlot}
+            disabled={stops.length >= 4}
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/50 hover:bg-amber-200/70 dark:hover:bg-amber-900/50 px-3 py-1.5 rounded-xl border border-amber-300/60 dark:border-amber-700/50 transition disabled:opacity-40"
+          >
+            <Plus size={14} />
+            <span>{stops.length === 0 ? 'Add a Stop (+Auto Fare)' : `Add Another Stop (${stops.length}/4)`}</span>
+          </button>
+          {resolvedStops.length > 0 && (
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+              {resolvedStops.length} {resolvedStops.length === 1 ? 'stop' : 'stops'} included
+              {stopsFareAdjustment !== 0 ? ` (${stopsFareAdjustment > 0 ? `+R${stopsFareAdjustment}` : `R${stopsFareAdjustment}`})` : ''}
+            </span>
+          )}
+        </div>
         
         {/* Destination Location Search + House/Building Detail (z-20 so dropdown sits above Leave Now) */}
         <div className="space-y-2 relative z-20">
@@ -374,6 +509,7 @@ export default function BookingForm({
               </div>
               <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 font-semibold">
                 {distanceKm.toFixed(1)} km {durationMinutes ? `• ~${durationMinutes} min drive` : ''} • {occupantCount === 1 ? 'Solo Saver Rate' : '2 Riders (+R4)'}
+                {resolvedStops.length > 0 ? ` • ${resolvedStops.length} ${resolvedStops.length === 1 ? 'Stop' : 'Stops'} (${stopsFareAdjustment >= 0 ? `+R${stopsFareAdjustment}` : `R${stopsFareAdjustment}`})` : ''}
               </p>
               {appliedTariff && (
                 <div className="mt-1.5 flex items-center gap-2 flex-wrap">

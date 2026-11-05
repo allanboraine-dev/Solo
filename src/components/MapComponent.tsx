@@ -48,6 +48,13 @@ interface MapProps {
   onRouteChange?: (details: { distanceKm: number; durationMinutes: number }) => void;
   isPickingOnMap?: 'pickup' | 'dropoff' | null;
   onMapClickLocation?: (lat: number, lng: number) => void;
+  stops?: {
+    id?: string;
+    lat: number;
+    lng: number;
+    address?: string;
+    completed?: boolean;
+  }[];
 }
 
 // Create custom DivIcons for location markers
@@ -129,6 +136,7 @@ const MapUpdater = ({
   driverLng, 
   tripStatus,
   focusedDriverCoords,
+  stops = [],
 }: any) => {
   const map = useMap();
   const prevFocusedRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -203,6 +211,7 @@ const MapUpdater = ({
     const hasValidDropoff = isValidCoord(dropoffLat, dropoffLng);
     const hasValidDriver = isValidCoord(driverLat, driverLng);
     const hasValidFocusedDriver = isValidCoord(focusedDriverCoords?.lat, focusedDriverCoords?.lng);
+    const validStops = Array.isArray(stops) ? stops.filter((s: any) => isValidCoord(s.lat, s.lng)) : [];
 
     // If focused driver was tapped, fly to driver only once when selected
     if (hasValidFocusedDriver) {
@@ -221,7 +230,8 @@ const MapUpdater = ({
       prevFocusedRef.current = null;
     }
 
-    const routeKey = `${pickupLat},${pickupLng}->${dropoffLat},${dropoffLng}`;
+    const stopsKey = validStops.map((s: any) => `${s.lat},${s.lng}`).join('|');
+    const routeKey = `${pickupLat},${pickupLng}->${stopsKey}->${dropoffLat},${dropoffLng}`;
     const isNewRoute = routeKey !== prevRouteKeyRef.current;
     const isNewStatus = tripStatus !== prevStatusRef.current;
 
@@ -238,6 +248,7 @@ const MapUpdater = ({
 
       if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
         const bounds = L.latLngBounds([driverLat, driverLng], [dropoffLat, dropoffLng]);
+        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
         return;
       }
@@ -248,13 +259,14 @@ const MapUpdater = ({
       }
     }
 
-    // 2. If pickup / dropoff route changed
+    // 2. If pickup / dropoff / stops route changed
     if (isNewRoute && (hasValidPickup || hasValidDropoff)) {
       prevRouteKeyRef.current = routeKey;
       userInteractedRef.current = false;
 
       if (hasValidPickup && hasValidDropoff) {
         const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
+        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
         return;
       } else if (hasValidPickup) {
@@ -270,6 +282,7 @@ const MapUpdater = ({
     if (!initialCenteredRef.current) {
       if (hasValidPickup && hasValidDropoff) {
         const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
+        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
         initialCenteredRef.current = true;
       } else if (hasValidPickup) {
@@ -292,7 +305,7 @@ const MapUpdater = ({
     if (hasValidDriver && !userInteractedRef.current && !tripStatus) {
       map.panTo([driverLat, driverLng], { animate: true, duration: 0.8 });
     }
-  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords]);
+  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords, JSON.stringify(stops)]);
 
   return null;
 };
@@ -379,6 +392,7 @@ const MapComponent = (props: MapProps) => {
     onRouteChange,
     isPickingOnMap,
     onMapClickLocation,
+    stops = [],
   } = props;
   
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
@@ -392,35 +406,43 @@ const MapComponent = (props: MapProps) => {
 
   // Dynamically calculate the active leg of the journey:
   // - If tripStatus === 'accepted' && driver location exists -> route from Driver to Pickup!
-  // - If tripStatus === 'in_progress' && driver location exists -> route from Driver to Dropoff!
-  // - Otherwise -> route from Pickup to Dropoff!
+  // - If tripStatus === 'in_progress' && driver location exists -> route from Driver through uncompleted stops to Dropoff!
+  // - Otherwise -> route from Pickup through Stops to Dropoff!
   useEffect(() => {
     let originLat: number | undefined;
     let originLng: number | undefined;
     let destLat: number | undefined;
     let destLng: number | undefined;
+    let waypoints: { lat: number; lng: number }[] = [];
 
     if (tripStatus === 'accepted' && effectiveAssignedLat && effectiveAssignedLng && pickupLat && pickupLng) {
       originLat = effectiveAssignedLat;
       originLng = effectiveAssignedLng;
       destLat = pickupLat;
       destLng = pickupLng;
+      waypoints = [];
     } else if (tripStatus === 'in_progress' && effectiveAssignedLat && effectiveAssignedLng && dropoffLat && dropoffLng) {
       originLat = effectiveAssignedLat;
       originLng = effectiveAssignedLng;
       destLat = dropoffLat;
       destLng = dropoffLng;
+      waypoints = stops
+        .filter((s) => !s.completed && typeof s.lat === 'number' && typeof s.lng === 'number')
+        .map((s) => ({ lat: s.lat, lng: s.lng }));
     } else if (pickupLat && pickupLng && dropoffLat && dropoffLng) {
       originLat = pickupLat;
       originLng = pickupLng;
       destLat = dropoffLat;
       destLng = dropoffLng;
+      waypoints = stops
+        .filter((s) => typeof s.lat === 'number' && typeof s.lng === 'number')
+        .map((s) => ({ lat: s.lat, lng: s.lng }));
     }
 
     if (originLat !== undefined && originLng !== undefined && destLat !== undefined && destLng !== undefined) {
       const getRoute = async () => {
         try {
-          const details = await getRouteDirections(originLng!, originLat!, destLng!, destLat!);
+          const details = await getRouteDirections(originLng!, originLat!, destLng!, destLat!, waypoints);
           if (details && details.coordinates.length > 0) {
             setRouteCoordinates(details.coordinates);
             if (typeof onRouteChange === 'function') {
@@ -438,7 +460,7 @@ const MapComponent = (props: MapProps) => {
     } else {
       setRouteCoordinates([]);
     }
-  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus]);
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus, JSON.stringify(stops)]);
 
   const [useOsmFallback, setUseOsmFallback] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -501,6 +523,7 @@ const MapComponent = (props: MapProps) => {
           driverLng={effectiveAssignedLng}
           tripStatus={tripStatus}
           focusedDriverCoords={focusedDriverCoords}
+          stops={stops}
         />
 
         <MapNavigationControls centerLat={centerLat} centerLng={centerLng} />
@@ -536,6 +559,27 @@ const MapComponent = (props: MapProps) => {
             </Popup>
           </Marker>
         )}
+
+        {/* Intermediate Stop markers */}
+        {stops.map((stop, idx) => {
+          if (typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return null;
+          const stopIcon = createCustomIcon(
+            stop.completed ? `✓ Stop ${idx + 1}` : `Stop ${idx + 1}`,
+            stop.completed ? '#10b981' : '#d97706',
+            '#ffffff',
+            false
+          );
+          return (
+            <Marker key={stop.id || `stop-${idx}`} position={[stop.lat, stop.lng]} icon={stopIcon} zIndexOffset={700}>
+              <Popup>
+                <div className="text-xs font-bold p-1">
+                  <div>Stop {idx + 1}</div>
+                  {stop.address && <div className="font-normal text-gray-600 mt-0.5">{stop.address}</div>}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Dropoff marker */}
         {dropoffLat && dropoffLng && (
@@ -665,4 +709,3 @@ const MapComponent = (props: MapProps) => {
 };
 
 export default MapComponent;
-

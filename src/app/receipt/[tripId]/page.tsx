@@ -15,7 +15,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import { calculateDistanceKm } from "@/utils/geo";
-import { calculateFare, getTimeOfDayTariff } from "@/utils/mapService";
+import { calculateFare, getTimeOfDayTariff, calculateMultiStopDistanceKm, type TripStop } from "@/utils/mapService";
 
 interface ReceiptTrip {
   id: string;
@@ -27,9 +27,12 @@ interface ReceiptTrip {
   prdpNumber: string;
   pickupLocation: string;
   dropoffLocation: string;
+  stops: TripStop[];
   distanceKm: number;
   baseFareZar: number;
   distanceFareZar: number;
+  stopsFareAdjustmentZar: number;
+  waitingFeeZar: number;
   commissionZar: number;
   totalFareZar: number;
   paymentMethod: string;
@@ -52,9 +55,12 @@ export default function TripReceiptPage() {
     prdpNumber: "PRDP-ZA-89102",
     pickupLocation: "Camps Bay Beach, Victoria Rd, Cape Town",
     dropoffLocation: "V&A Waterfront, Dock Rd, Cape Town",
+    stops: [],
     distanceKm: 6.2,
     baseFareZar: 10,
     distanceFareZar: 39,
+    stopsFareAdjustmentZar: 0,
+    waitingFeeZar: 0,
     commissionZar: 0,
     totalFareZar: 49,
     paymentMethod: "Speedpoint POS (Card)",
@@ -76,22 +82,35 @@ export default function TripReceiptPage() {
         const trips = JSON.parse(raw);
         const found = trips.find((t: any) => t.id === tripId);
         if (found) {
-          const dist = calculateDistanceKm(
-            found.pickup_lat,
-            found.pickup_lng,
-            found.dropoff_lat,
-            found.dropoff_lng
-          );
+          const stops: TripStop[] = Array.isArray(found.stops) ? found.stops : [];
+          const dist =
+            stops.length > 0
+              ? calculateMultiStopDistanceKm(
+                  { lat: found.pickup_lat, lng: found.pickup_lng },
+                  { lat: found.dropoff_lat, lng: found.dropoff_lng },
+                  stops
+                )
+              : calculateDistanceKm(
+                  found.pickup_lat,
+                  found.pickup_lng,
+                  found.dropoff_lat,
+                  found.dropoff_lng
+                );
           const total = found.fare_amount || calculateFare(dist);
-          const distanceCharge = Math.max(0, total - 10);
+          const stopsAdj = typeof found.stops_fare_adjustment === "number" ? found.stops_fare_adjustment : 0;
+          const waitingFee = typeof found.waiting_fee_amount === "number" ? found.waiting_fee_amount : 0;
+          const distanceCharge = Math.max(0, total - 10 - stopsAdj - waitingFee);
 
           setReceipt((prev) => ({
             ...prev,
             id: found.id,
             pickupLocation: found.pickup_location,
             dropoffLocation: found.dropoff_location,
+            stops,
             distanceKm: dist,
             distanceFareZar: distanceCharge,
+            stopsFareAdjustmentZar: stopsAdj,
+            waitingFeeZar: waitingFee,
             totalFareZar: total,
             paymentMethod: found.payment_method === 'cash' ? 'Cash' : 'Speedpoint POS (Card)',
             receiptNumber: `REC-ZA-${found.id.substring(0, 8).toUpperCase()}`,
@@ -183,6 +202,17 @@ export default function TripReceiptPage() {
                 <span className="font-medium text-zinc-900">{receipt.pickupLocation}</span>
               </div>
             </div>
+            {receipt.stops.map((stop, idx) => (
+              <div key={stop.id || idx} className="flex items-start gap-3 border-t border-zinc-200 pt-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 mt-1 shrink-0" />
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-600 block">
+                    Intermediate Stop {idx + 1} ({stop.addedBy === "driver" ? "Driver" : "Rider"})
+                  </span>
+                  <span className="font-medium text-zinc-900">{stop.address}</span>
+                </div>
+              </div>
+            ))}
             <div className="flex items-start gap-3 border-t border-zinc-200 pt-2.5">
               <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 shrink-0" />
               <div>
@@ -221,6 +251,28 @@ export default function TripReceiptPage() {
                 <td className="py-2.5 text-right text-zinc-500">R10.00 / km</td>
                 <td className="py-2.5 text-right font-medium">R{receipt.distanceFareZar.toFixed(2)}</td>
               </tr>
+              {receipt.stops.length > 0 && (
+                <tr>
+                  <td className="py-2.5 font-medium text-amber-800">
+                    Multi-Stop Route Adjustment ({receipt.stops.length} {receipt.stops.length === 1 ? "Stop" : "Stops"})
+                  </td>
+                  <td className="py-2.5 text-right text-zinc-500">R8.00 / stop + detour</td>
+                  <td className="py-2.5 text-right font-medium text-amber-800">
+                    {receipt.stopsFareAdjustmentZar >= 0 ? "+" : ""}R{receipt.stopsFareAdjustmentZar.toFixed(2)}
+                  </td>
+                </tr>
+              )}
+              {receipt.waitingFeeZar > 0 && (
+                <tr>
+                  <td className="py-2.5 font-medium text-red-700">
+                    Pickup Waiting Overtime Fee (&gt;2 min grace period)
+                  </td>
+                  <td className="py-2.5 text-right text-zinc-500">R2.00 / min</td>
+                  <td className="py-2.5 text-right font-medium text-red-700">
+                    +R{receipt.waitingFeeZar.toFixed(2)}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td className="py-2.5 font-medium text-zinc-800">
                   Time-of-Day Tariff
