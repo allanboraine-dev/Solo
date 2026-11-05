@@ -69,6 +69,7 @@ export default function DriverRegistration() {
   const [createdDriverId, setCreatedDriverId] = useState<string | null>(null)
   const [hasRegisteredAccount, setHasRegisteredAccount] = useState(false)
   const [isPaystackLoaded, setIsPaystackLoaded] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   // Purge any existing cached owner/driver session on mount so registration is 100% clean
   useEffect(() => {
@@ -473,6 +474,11 @@ export default function DriverRegistration() {
 
   // Handle Step 4 R1 Card Verification Test & 7-Day Free Trial Setup
   const handleTrialCardSetup = async () => {
+    if (!termsAccepted) {
+      setSubmitError('You must review and accept the SOLO Terms of Service and Privacy Policy before proceeding.')
+      return
+    }
+
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -891,11 +897,21 @@ export default function DriverRegistration() {
                   className="w-full p-3.5 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 focus:border-blue-500 rounded-xl transition-all outline-none text-sm"
                   placeholder="+27 82 123 4567"
                 />
+                <p className="text-[11px] text-gray-500 dark:text-zinc-400 text-center leading-normal pt-2">
+                  By continuing, you agree to SOLO&apos;s{' '}
+                  <Link href="/terms" target="_blank" className="text-blue-600 dark:text-blue-400 font-semibold underline underline-offset-2 hover:text-blue-700">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" target="_blank" className="text-blue-600 dark:text-blue-400 font-semibold underline underline-offset-2 hover:text-blue-700">
+                    Privacy Policy
+                  </Link>.
+                </p>
               </div>
               <button
                 type="submit"
                 disabled={isCheckingDuplicate}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl mt-6 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20 cursor-pointer"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold p-4 rounded-2xl mt-4 flex justify-center items-center gap-2 active:scale-95 transition shadow-lg shadow-blue-500/20 cursor-pointer"
               >
                 {isCheckingDuplicate ? 'Checking Availability...' : 'Continue to Vehicle & Payment Setup'} <ChevronRight size={18} />
               </button>
@@ -1266,6 +1282,39 @@ export default function DriverRegistration() {
                 </div>
               </div>
 
+              {/* Terms of Service & Independent Contractor Agreement Checkbox */}
+              <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/40 space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="w-5 h-5 mt-0.5 rounded border-gray-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed select-none">
+                    I have read and agree to SOLO&apos;s{' '}
+                    <Link
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 dark:text-emerald-400 font-bold underline underline-offset-2 hover:text-emerald-700"
+                    >
+                      Terms of Service
+                    </Link>{' '}
+                    and{' '}
+                    <Link
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 dark:text-emerald-400 font-bold underline underline-offset-2 hover:text-emerald-700"
+                    >
+                      Privacy Policy &amp; POPIA Statement
+                    </Link>
+                    . I confirm that I operate as an independent transport provider, will carry my own commercial passenger liability insurance, and accept that I am responsible for my own SARS tax filings.
+                  </span>
+                </label>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-4 mt-6">
                 <button 
@@ -1279,7 +1328,7 @@ export default function DriverRegistration() {
                 <button 
                   type="button" 
                   onClick={handleTrialCardSetup}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !termsAccepted}
                   className="w-2/3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold p-4 rounded-2xl flex justify-center items-center gap-2 transition disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95"
                 >
                   {isSubmitting ? (
@@ -1299,8 +1348,23 @@ export default function DriverRegistration() {
           )}
         </div>
         
-        <div className="text-center p-4 text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800">
-          Already registered? <Link href="/driver/login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Sign in to Driver Portal</Link>
+        <div className="text-center p-4 text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800 space-y-2">
+          <div>
+            Already registered? <Link href="/driver/login" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">Sign in to Driver Portal</Link>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-1 text-[11px] text-gray-400 dark:text-zinc-500">
+            <Link href="/terms" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Terms of Service
+            </Link>
+            <span>•</span>
+            <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Privacy Policy &amp; POPIA
+            </Link>
+            <span>•</span>
+            <Link href="/manual" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Operational SOP
+            </Link>
+          </div>
         </div>
       </div>
     </div>

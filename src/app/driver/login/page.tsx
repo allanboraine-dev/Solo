@@ -459,13 +459,23 @@ function DriverLoginForm() {
           >
             {isSubmitting ? 'Logging in...' : 'Log In'}
           </button>
+          <p className="text-[11px] text-gray-400 dark:text-zinc-500 text-center pt-1">
+            By signing in, you acknowledge SOLO&apos;s{' '}
+            <Link href="/terms" className="underline hover:text-blue-600 dark:hover:text-blue-400">Terms of Service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="underline hover:text-blue-600 dark:hover:text-blue-400">Privacy Policy</Link>.
+          </p>
         </form>
 
         <div className="text-center mt-6 space-y-2 text-xs text-gray-500 font-medium">
           <p>
             Don&apos;t have an account? <Link href="/driver/register" className="text-blue-600 dark:text-blue-400 font-bold">Register</Link>
           </p>
-          <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-gray-400 dark:text-zinc-500 border-t border-gray-100 dark:border-zinc-800">
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-[11px] text-gray-400 dark:text-zinc-500 border-t border-gray-100 dark:border-zinc-800">
+            <Link href="/terms" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
+              Terms of Service
+            </Link>
+            <span>•</span>
             <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 transition underline underline-offset-2">
               Privacy Policy &amp; POPIA
             </Link>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import {
   formatPhoneNumber,
@@ -518,8 +519,26 @@ export default function RiderAuthModal({ isOpen, onClose, onSuccess }: RiderAuth
             </form>
           )}
 
-          <p className="mt-6 text-center text-[11px] text-gray-400 dark:text-gray-500 leading-normal">
-            By verifying via WhatsApp, you agree to SOLO&apos;s Terms of Service and Privacy Policy. Zero platform commissions are baked into your rides.
+          <p className="mt-6 text-center text-[11px] text-gray-500 dark:text-zinc-400 leading-normal">
+            By verifying, you agree to SOLO&apos;s{' '}
+            <Link
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-600 dark:text-emerald-400 font-bold underline underline-offset-2 hover:text-emerald-700"
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-600 dark:text-emerald-400 font-bold underline underline-offset-2 hover:text-emerald-700"
+            >
+              Privacy Policy &amp; POPIA
+            </Link>
+            . Zero platform commissions are baked into your rides.
           </p>
         </div>
       </div>
