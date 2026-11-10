@@ -175,10 +175,18 @@ export default function RatingModal({
               >
                 Submit Rating
               </button>
+              <a
+                href={`/receipt/${trip.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline text-center py-1.5 inline-flex items-center justify-center gap-1 transition"
+              >
+                <span>View Official Trip Receipt / Tax Invoice</span>
+              </a>
               <button
                 type="button"
                 onClick={onSkip}
-                className="text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 py-2 transition-colors text-center"
+                className="text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 py-1 transition-colors text-center"
               >
                 Skip for now
               </button>

@@ -2598,7 +2598,18 @@ export default function DriverPage() {
                       <div key={trip.id} className="bg-gray-50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5 flex justify-between items-center gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-sm break-words">{trip.dropoff_location}</p>
-                          <p className="text-xs text-gray-500 mt-1">Completed</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-gray-500">Completed</p>
+                            <span className="text-gray-300 dark:text-zinc-700">&bull;</span>
+                            <a
+                              href={`/receipt/${trip.id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                            >
+                              View Tax Receipt
+                            </a>
+                          </div>
                         </div>
                         <span className="font-black text-green-600 dark:text-green-400 shrink-0">R{trip.fare_amount}</span>
                       </div>
