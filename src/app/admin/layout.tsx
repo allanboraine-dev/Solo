@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ChevronRight,
   Sparkles,
+  LifeBuoy,
 } from "lucide-react";
 import { getAdminSession, clearAdminSession, AdminSession } from "@/utils/adminAuth";
 
@@ -106,6 +107,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </Link>
 
                 <Link
+                  href="/admin/disputes"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
+                    pathname === "/admin/disputes"
+                      ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                  }`}
+                >
+                  <LifeBuoy size={15} />
+                  <span>Disputes & Tickets</span>
+                </Link>
+
+                <Link
                   href="/admin"
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${
                     pathname === "/admin"
@@ -163,7 +176,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="md:hidden flex items-center justify-around px-2 py-2 border-t border-zinc-800/80 bg-zinc-950/80 text-xs font-bold">
           <Link
             href="/admin/compliance"
-            className={`py-1.5 px-3 rounded-lg flex items-center gap-1 ${
+            className={`py-1.5 px-2.5 rounded-lg flex items-center gap-1 ${
               pathname === "/admin/compliance"
                 ? "bg-emerald-600 text-white"
                 : "text-zinc-400 hover:text-white"
@@ -173,8 +186,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span>Verification</span>
           </Link>
           <Link
+            href="/admin/disputes"
+            className={`py-1.5 px-2.5 rounded-lg flex items-center gap-1 ${
+              pathname === "/admin/disputes"
+                ? "bg-amber-600 text-white"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <LifeBuoy size={13} />
+            <span>Disputes</span>
+          </Link>
+          <Link
             href="/admin"
-            className={`py-1.5 px-3 rounded-lg flex items-center gap-1 ${
+            className={`py-1.5 px-2.5 rounded-lg flex items-center gap-1 ${
               pathname === "/admin"
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:text-white"
@@ -185,7 +209,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <Link
             href="/admin/simulator"
-            className={`py-1.5 px-3 rounded-lg flex items-center gap-1 ${
+            className={`py-1.5 px-2.5 rounded-lg flex items-center gap-1 ${
               pathname === "/admin/simulator"
                 ? "bg-zinc-800 text-white"
                 : "text-zinc-400 hover:text-white"

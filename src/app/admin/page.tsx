@@ -19,6 +19,7 @@ import {
   Trash2,
   KeyRound,
   UserPlus,
+  LifeBuoy,
 } from "lucide-react";
 import { DriverKycSummary } from "@/app/api/admin/drivers-kyc/route";
 import { isPlatformOwner } from "@/utils/owner";
@@ -224,8 +225,15 @@ export default function AdminOverviewDashboard() {
               className="py-3 px-5 bg-zinc-800/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white font-bold text-xs sm:text-sm rounded-2xl flex items-center gap-2 transition active:scale-98"
             >
               <FileCheck2 size={16} />
-              <span>Open KYC Center</span>
+              <span>KYC Center</span>
               <ArrowRight size={16} />
+            </Link>
+            <Link
+              href="/admin/disputes"
+              className="py-3 px-5 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 font-bold text-xs sm:text-sm rounded-2xl flex items-center gap-2 transition active:scale-98"
+            >
+              <LifeBuoy size={16} />
+              <span>Disputes Desk</span>
             </Link>
           </div>
         </div>

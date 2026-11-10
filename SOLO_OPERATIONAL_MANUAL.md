@@ -477,6 +477,20 @@ Background notifications adhere to the Web Push Protocol (RFC 8291 / RFC 8292) s
    - Passengers can open the Rider Help modal directly from the rider interface or from their trip receipt (`/receipt/[tripId]`).
    - Categorized self-service workflows for fare disputes, driver conduct feedback, SARS-compliant tax receipt downloads, and official WhatsApp Business support escalation (`https://wa.me/27...`).
 
+### 3.10 Manager Console: Dispute Resolution & Support Ticket Desk (`/admin/disputes`)
+The SOLO Manager Console features a centralized, real-time Dispute Resolution and Support Desk at `/admin/disputes`:
+1. **Real-Time Ticket Ingestion & Queue:**
+   - Ingests incoming tickets from the rider app (`RiderSupportModal`), the trip receipt portal (`/receipt/[tripId]`), and the public lost property portal (`/lost-phone`).
+   - Multi-metric KPI counters: Total Inquiries, Open & Action Needed, Fare Disputes, Lost Property, and Settled Disputes.
+2. **Comprehensive Dossier & Telematics Context:**
+   - Inspects the full passenger statement alongside trip ID, pickup/drop-off route coordinates, and fare in South African Rand (ZAR).
+   - Shows assigned driver name, phone number, and vehicle registration plate with direct link to digital trip receipts.
+   - Displays lost property specifications (device brand/model, color, protective case features, and vehicle seat location).
+3. **Direct Contact & Resolution Workflows:**
+   - Direct 1-click phone dial (`tel:`) and WhatsApp deep-links for contacting passengers, alternative emergency contacts, or drivers.
+   - Real-time **Re-Alert Driver Terminal** trigger to broadcast high-priority audio alerts to drivers for active lost property cases.
+   - In-console status lifecycle management (`open` $\rightarrow$ `investigating` $\rightarrow$ `driver_notified` $\rightarrow$ `resolved` $\rightarrow$ `closed`) and permanent manager resolution notes saved for statutory audit compliance.
+
 ---
 
 ## Section 11: B2B Fleet Partner Program, Vehicle Management & Shift Reconciliation

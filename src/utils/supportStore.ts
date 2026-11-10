@@ -202,6 +202,34 @@ export function updateSupportTicketStatus(
 }
 
 /**
+ * Updates status, manager resolution notes, and optional driver notes on an existing ticket
+ */
+export function updateSupportTicketResolution(
+  ticketIdOrCode: string,
+  newStatus: SupportTicketStatus,
+  resolutionNotes?: string,
+  driverNotes?: string
+): SupportTicket | null {
+  const tickets = getSupportTickets();
+  const ticket = tickets.find((t) => t.id === ticketIdOrCode || t.ticketCode === ticketIdOrCode);
+  if (!ticket) return null;
+
+  ticket.status = newStatus;
+  ticket.updatedAt = new Date().toISOString();
+  if (resolutionNotes !== undefined) {
+    ticket.resolutionNotes = resolutionNotes;
+  }
+  if (driverNotes !== undefined) {
+    ticket.driverNotes = driverNotes;
+  }
+  if (newStatus === 'resolved' || newStatus === 'closed') {
+    ticket.resolvedAt = new Date().toISOString();
+  }
+
+  return saveSupportTicket(ticket);
+}
+
+/**
  * Searches local and session trips to locate the matching ride for a lost phone report.
  * Matches on rider phone, email, or date/pickup keywords.
  */
