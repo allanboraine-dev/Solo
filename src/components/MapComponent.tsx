@@ -204,6 +204,10 @@ export const MapComponent: React.FC<MapProps> = ({
   const [useOsmFallback, setUseOsmFallback] = useState<boolean>(false);
   const [mapInitError, setMapInitError] = useState<boolean>(false);
 
+  // Theme tracking refs to strictly prevent redundant map.setStyle calls
+  const prevThemeRef = useRef<string | undefined>(undefined);
+  const prevFallbackRef = useRef<boolean>(false);
+
   // Markers references
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
   const dropoffMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -238,10 +242,10 @@ export const MapComponent: React.FC<MapProps> = ({
   const casingColor = tripStatus === 'accepted' ? '#064e3b' : '#1e3a8a';
 
   // -------------------------------------------------------------
-  // Route Layer Helper
+  // Route Layer Helper (safely modifies route GeoJSON without reloading styles)
   // -------------------------------------------------------------
   const updateRouteOnMap = useCallback((map: maplibregl.Map, coords: [number, number][], mainColor: string, casing: string) => {
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
 
     // Route coordinates come as [lat, lng] from mapService, convert to GeoJSON [lng, lat]
     const geojsonCoords = coords.map(([lat, lng]) => [lng, lat]);
@@ -265,7 +269,7 @@ export const MapComponent: React.FC<MapProps> = ({
       if (map.getLayer('solo-route-casing')) {
         map.setPaintProperty('solo-route-casing', 'line-color', casing);
       }
-    } else {
+    } else if (coords.length > 0) {
       try {
         map.addSource('solo-route-source', {
           type: 'geojson',
@@ -310,7 +314,7 @@ export const MapComponent: React.FC<MapProps> = ({
   }, []);
 
   // -------------------------------------------------------------
-  // Initialize Map
+  // Initialize Map (Mounts ONCE and stays active)
   // -------------------------------------------------------------
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -319,6 +323,8 @@ export const MapComponent: React.FC<MapProps> = ({
     setIs3DMode(initialPitch > 0);
 
     const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
+    prevThemeRef.current = isDark ? 'dark' : 'light';
+    prevFallbackRef.current = useOsmFallback;
 
     let map: maplibregl.Map;
     try {
@@ -370,24 +376,12 @@ export const MapComponent: React.FC<MapProps> = ({
       invalidateSize();
     });
 
-    // Handle tileerror or style load failure by falling back to openstreetmap.org
+    // Handle tileerror warnings gracefully without wiping the active map style
     map.on('error', (e) => {
-      const isTileOrStyleError =
-        e?.error?.message?.includes('style') ||
-        e?.error?.message?.includes('tile') ||
-        (e as any)?.status === 401 ||
-        (e as any)?.status === 403;
-
-      if (isTileOrStyleError && !useOsmFallback) {
+      const isFatalStyleError = e?.error?.message?.includes('Failed to load style');
+      if (isFatalStyleError && !useOsmFallback) {
         console.warn('Mapbox tileerror detected; switching seamlessly to openstreetmap.org fallback tiles.', e);
         setUseOsmFallback(true);
-        try {
-          if (map.isStyleLoaded()) {
-            map.setStyle(OSM_MAPLIBRE_STYLE);
-          }
-        } catch (styleErr) {
-          console.error('openstreetmap.org fallback style application error', styleErr);
-        }
       }
     });
 
@@ -456,22 +450,33 @@ export const MapComponent: React.FC<MapProps> = ({
   }, []);
 
   // -------------------------------------------------------------
-  // Theme updates (Dark/Light mode tile swapping)
+  // Theme updates (ONLY executed if resolved theme actually changed)
   // -------------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isMapLoadedRef.current) return;
 
+    const targetThemeStr = isDark ? 'dark' : 'light';
+
+    // Prevent redundant style wipes if the theme or fallback hasn't actually toggled
+    if (prevThemeRef.current === targetThemeStr && prevFallbackRef.current === useOsmFallback) {
+      return;
+    }
+
+    prevThemeRef.current = targetThemeStr;
+    prevFallbackRef.current = useOsmFallback;
+
     const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
     try {
       map.setStyle(styleConfig.style);
 
-      // When the new style finishes loading, re-add the route layers
-      map.once('style.load', () => {
+      // Once the new style data finishes attaching, restore any active route polyline
+      const handleStyleData = () => {
         if (routeCoordinates.length > 0) {
           updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
         }
-      });
+      };
+      map.once('styledata', handleStyleData);
     } catch (e) {
       console.warn('Notice updating map style:', e);
     }
@@ -546,18 +551,21 @@ export const MapComponent: React.FC<MapProps> = ({
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus, JSON.stringify(stops)]);
 
   // -------------------------------------------------------------
-  // Render Route on Map whenever routeCoordinates update
+  // Render Route on Map whenever routeCoordinates update (pure GeoJSON update)
   // -------------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (map.isStyleLoaded()) {
+    const handleUpdate = () => {
       updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
+    };
+
+    if (map.isStyleLoaded()) {
+      handleUpdate();
     } else {
-      map.once('load', () => {
-        updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
-      });
+      map.once('load', handleUpdate);
+      map.once('styledata', handleUpdate);
     }
   }, [routeCoordinates, polylineColor, casingColor, updateRouteOnMap]);
 
