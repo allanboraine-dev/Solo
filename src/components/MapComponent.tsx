@@ -1,11 +1,10 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { Plus, Minus, Crosshair } from 'lucide-react';
-import { getRouteDirections, getTileLayerConfig } from '@/utils/mapService';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { Plus, Minus, Crosshair, Compass } from 'lucide-react';
+import { getRouteDirections, getMapLibreStyle, OSM_MAPLIBRE_STYLE } from '@/utils/mapService';
 import { useTheme } from '@/components/ThemeProvider';
 
 export interface DriverMarkerData {
@@ -57,357 +56,395 @@ interface MapProps {
   }[];
 }
 
-// Create custom DivIcons for location markers
-const createCustomIcon = (text: string, bgColor: string, textColor: string, isPulsing: boolean = false) => {
-  return L.divIcon({
-    html: `
-      <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35)); pointer-events: auto;">
-        <div style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 11px; border-radius: 9999px; border: 2px solid #ffffff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-          ${text}
-        </div>
-        <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid ${bgColor}; margin-top: -1px;"></div>
-        ${isPulsing ? `<div style="width: 8px; height: 8px; background-color: ${bgColor}; border: 1.5px solid #ffffff; border-radius: 9999px; margin-top: 1px; box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4);"></div>` : ''}
+// Marker HTML generator functions
+const createCustomMarkerHtml = (text: string, bgColor: string, textColor: string, isPulsing: boolean = false) => {
+  return `
+    <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35)); pointer-events: auto; cursor: pointer; transform: translate3d(0,0,0); transition: transform 0.15s ease;">
+      <div style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 11px; border-radius: 9999px; border: 2px solid #ffffff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1.2; box-shadow: 0 2px 6px rgba(0,0,0,0.25);">
+        ${text}
       </div>
-    `,
-    className: '',
-    iconAnchor: [44, 34],
-    popupAnchor: [0, -34]
-  });
+      <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid ${bgColor}; margin-top: -1px;"></div>
+      ${isPulsing ? `<div style="width: 8px; height: 8px; background-color: ${bgColor}; border: 1.5px solid #ffffff; border-radius: 9999px; margin-top: 1px; box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.45); animation: soloPulse 1.8s infinite;"></div>` : ''}
+    </div>
+  `;
 };
 
-const pickupIcon = createCustomIcon('Pickup (A)', '#111827', '#ffffff', true);
-const dropoffIcon = createCustomIcon('Dropoff (B)', '#2563eb', '#ffffff', false);
-
-// Car icon for available roaming drivers
-const createAvailableCarIcon = (vehicleName?: string) => {
+const createAvailableCarMarkerHtml = (vehicleName?: string) => {
   const shortVehicle = vehicleName ? vehicleName.split(' ').slice(0, 2).join(' ') : '';
-  return L.divIcon({
-    html: `
-      <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <div style="background-color:#0f172a; color:#ffffff; width:34px; height:34px; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.35); border:2.5px solid #ffffff; position:relative;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
-            <circle cx="7" cy="17" r="2"/>
-            <path d="M9 17h6"/>
-            <circle cx="17" cy="17" r="2"/>
-          </svg>
-          <div style="position:absolute; bottom:-1px; right:-1px; width:9px; height:9px; background-color:#22c55e; border:1.5px solid #ffffff; border-radius:9999px;"></div>
-        </div>
-        ${shortVehicle ? `<span style="background-color:rgba(15,23,42,0.9); color:#ffffff; font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:4px; margin-top:2px; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.25);">${shortVehicle}</span>` : ''}
+  return `
+    <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer; transform: translate3d(0,0,0); transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
+      <div style="background-color:#0f172a; color:#ffffff; width:36px; height:36px; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,0.35); border:2.5px solid #ffffff; position:relative;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+          <circle cx="7" cy="17" r="2"/>
+          <path d="M9 17h6"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
+        <div style="position:absolute; bottom:-1px; right:-1px; width:10px; height:10px; background-color:#22c55e; border:2px solid #ffffff; border-radius:9999px; box-shadow:0 0 4px rgba(34,197,94,0.6);"></div>
       </div>
-    `,
-    className: '',
-    iconAnchor: [17, 17],
-    popupAnchor: [0, -20]
-  });
+      ${shortVehicle ? `<span style="background-color:rgba(15,23,42,0.92); color:#ffffff; font-size:9.5px; font-weight:700; padding:1.5px 6px; border-radius:6px; margin-top:3px; white-space:nowrap; box-shadow:0 2px 4px rgba(0,0,0,0.25); border: 0.5px solid rgba(255,255,255,0.15);">${shortVehicle}</span>` : ''}
+    </div>
+  `;
 };
 
-// Car icon for assigned driver (active trip)
-const createAssignedDriverIcon = (driverName?: string) => {
-  return L.divIcon({
-    html: `
-      <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;">
-        <span style="background-color:#2563eb; color:#ffffff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:9999px; margin-bottom:2px; white-space:nowrap; box-shadow:0 4px 8px rgba(37,99,235,0.4); border:1.5px solid #ffffff; text-transform:uppercase; letter-spacing:0.5px;">
-          ${driverName || 'Your Driver'}
-        </span>
-        <div style="background-color:#2563eb; color:#ffffff; width:38px; height:38px; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(37,99,235,0.45); border:3px solid #ffffff; position:relative;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
-            <circle cx="7" cy="17" r="2"/>
-            <path d="M9 17h6"/>
-            <circle cx="17" cy="17" r="2"/>
-          </svg>
-        </div>
+const createAssignedDriverMarkerHtml = (driverName?: string) => {
+  return `
+    <div style="display:flex; flex-direction:column; align-items:center; cursor:pointer; transform: translate3d(0,0,0);">
+      <span style="background-color:#2563eb; color:#ffffff; font-size:10px; font-weight:800; padding:2.5px 9px; border-radius:9999px; margin-bottom:3px; white-space:nowrap; box-shadow:0 4px 12px rgba(37,99,235,0.45); border:1.5px solid #ffffff; text-transform:uppercase; letter-spacing:0.5px;">
+        ${driverName || 'Your Driver'}
+      </span>
+      <div style="background-color:#2563eb; color:#ffffff; width:40px; height:40px; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(37,99,235,0.5); border:3px solid #ffffff; position:relative;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+          <circle cx="7" cy="17" r="2"/>
+          <path d="M9 17h6"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
       </div>
-    `,
-    className: '',
-    iconAnchor: [19, 28],
-    popupAnchor: [0, -30]
-  });
+    </div>
+  `;
 };
 
-// Component to handle map bounds, sizing, and routing
-const MapUpdater = ({ 
-  pickupLat, 
-  pickupLng, 
-  dropoffLat, 
-  dropoffLng, 
-  driverLat, 
-  driverLng, 
+const createDriverPopupHtml = (driver: DriverMarkerData) => {
+  const vehicleTitle = driver.vehicle || [driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Registered Vehicle';
+  const vehicleSub = [driver.vehicleColor, driver.vehicleYear].filter(Boolean).join(' • ');
+
+  return `
+    <div style="padding: 4px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; min-width: 215px; color: #111827;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f3f4f6; padding-bottom: 6px; margin-bottom: 6px;">
+        <div>
+          <div style="font-weight: 800; font-size: 13px; color: #111827;">${driver.name || 'Registered Driver'}</div>
+          <div style="font-size: 10px; color: #059669; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+            <span>✓</span><span>Verified SOLO Driver</span>
+          </div>
+        </div>
+        <div style="color: #d97706; font-weight: 800; font-size: 12px; display: flex; align-items: center; gap: 2px; background-color: #fef3c7; padding: 2px 7px; border-radius: 9999px;">
+          <span>★</span><span>${driver.rating ? driver.rating.toFixed(1) : '5.0'}</span>
+          ${driver.ratingCount ? `<span style="font-size: 9.5px; color: #6b7280; font-weight: 500;">(${driver.ratingCount})</span>` : ''}
+        </div>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; color: #1f2937;">
+          <span>🚗</span><span>${vehicleTitle}</span>
+        </div>
+        ${vehicleSub ? `<div style="font-size: 10px; color: #6b7280; padding-left: 20px;">${vehicleSub}</div>` : ''}
+        ${driver.licensePlate ? `
+          <div style="padding-left: 20px; padding-top: 3px;">
+            <span style="font-family: monospace; font-weight: 800; font-size: 10px; background-color: #fde047; color: #000000; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.5); text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🇿🇦</span><span>${driver.licensePlate}</span>
+            </span>
+          </div>
+        ` : ''}
+      </div>
+      <div style="padding-top: 6px; border-top: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+        ${driver.distanceKm !== undefined ? `
+          <div style="color: #2563eb; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+            <span>📍</span><span>${driver.distanceKm.toFixed(1)} km away</span>
+            ${driver.etaMinutes !== undefined ? `<span style="color: #6b7280; font-weight: 500;">• ~${driver.etaMinutes} min</span>` : ''}
+          </div>
+          <span style="font-size: 10px; color: #059669; font-weight: 800; background-color: #d1fae5; padding: 1px 6px; border-radius: 4px;">Online</span>
+        ` : `
+          <div style="color: #059669; font-weight: 800; display: flex; align-items: center; gap: 5px;">
+            <span style="width: 6px; height: 6px; border-radius: 9999px; background-color: #10b981; display: inline-block;"></span>
+            Available Now
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+};
+
+const createAssignedDriverPopupHtml = (name?: string, vehicle?: string, plate?: string, rating?: number) => {
+  return `
+    <div style="padding: 4px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; min-width: 190px; color: #111827;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+        <div style="font-weight: 800; color: #2563eb; font-size: 13px;">${name || 'Your Assigned Driver'}</div>
+        <div style="color: #d97706; font-weight: 800; font-size: 11px; display: flex; align-items: center; gap: 2px;">
+          <span>★</span><span>${rating ? rating.toFixed(1) : '5.0'}</span>
+        </div>
+      </div>
+      ${vehicle ? `<div style="color: #374151; font-weight: 700; margin-top: 3px; font-size: 11.5px;">${vehicle}</div>` : ''}
+      ${plate ? `
+        <div style="margin-top: 4px;">
+          <span style="font-family: monospace; font-weight: 800; font-size: 10px; background-color: #fde047; color: #000000; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.4); text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">
+            <span>🇿🇦</span><span>${plate}</span>
+          </span>
+        </div>
+      ` : ''}
+      <div style="color: #2563eb; font-weight: 700; font-size: 11px; margin-top: 6px;">En route to your location</div>
+    </div>
+  `;
+};
+
+// Coordinate sanity helper
+const isValidCoord = (lat?: number | null, lng?: number | null) =>
+  typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 1 && Math.abs(lng) > 1;
+
+export const MapComponent: React.FC<MapProps> = ({
+  pickupLat,
+  pickupLng,
+  dropoffLat,
+  dropoffLng,
+  driverLat,
+  driverLng,
   tripStatus,
+  availableDrivers = [],
   focusedDriverCoords,
+  assignedDriver,
+  onRouteChange,
+  isPickingOnMap,
+  onMapClickLocation,
   stops = [],
-}: any) => {
-  const map = useMap();
+}) => {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const isMapLoadedRef = useRef<boolean>(false);
+
+  // Fallback to openstreetmap.org raster tiles on tileerror
+  const [useOsmFallback, setUseOsmFallback] = useState<boolean>(false);
+
+  // Markers references
+  const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const dropoffMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const stopMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const driverMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const assignedDriverMarkerRef = useRef<maplibregl.Marker | null>(null);
+
+  // Interaction & camera tracking refs
   const prevFocusedRef = useRef<{ lat: number; lng: number } | null>(null);
   const prevStatusRef = useRef<string | undefined>(undefined);
   const prevRouteKeyRef = useRef<string>('');
   const initialCenteredRef = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
 
-  // Keep map dimensions strictly in sync with the DOM container
-  useEffect(() => {
-    map.invalidateSize();
-    const t1 = setTimeout(() => map.invalidateSize(), 150);
-    const t2 = setTimeout(() => map.invalidateSize(), 500);
-    const t3 = setTimeout(() => map.invalidateSize(), 1000);
-
-    const container = map.getContainer();
-    let ro: ResizeObserver | null = null;
-    if (container && typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => {
-        map.invalidateSize();
-      });
-      ro.observe(container);
-    }
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        map.invalidateSize();
-      }
-    };
-    const handleResize = () => {
-      map.invalidateSize();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      if (ro) ro.disconnect();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, [map]);
-
-  // Track user manual interaction (drag, pinch, zoom buttons) so automatic GPS pings don't override manual zoom
-  useEffect(() => {
-    const handleUserInteraction = (e: L.LeafletEvent) => {
-      if ((e as any).originalEvent) {
-        userInteractedRef.current = true;
-      }
-    };
-
-    map.on('movestart', handleUserInteraction);
-    map.on('zoomstart', handleUserInteraction);
-
-    return () => {
-      map.off('movestart', handleUserInteraction);
-      map.off('zoomstart', handleUserInteraction);
-    };
-  }, [map]);
-
-  useEffect(() => {
-    // Coordinate sanity check helper (avoid zooming to 0,0 in the Atlantic ocean)
-    const isValidCoord = (lat?: number | null, lng?: number | null) =>
-      typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng) && Math.abs(lat) > 1 && Math.abs(lng) > 1;
-
-    const hasValidPickup = isValidCoord(pickupLat, pickupLng);
-    const hasValidDropoff = isValidCoord(dropoffLat, dropoffLng);
-    const hasValidDriver = isValidCoord(driverLat, driverLng);
-    const hasValidFocusedDriver = isValidCoord(focusedDriverCoords?.lat, focusedDriverCoords?.lng);
-    const validStops = Array.isArray(stops) ? stops.filter((s: any) => isValidCoord(s.lat, s.lng)) : [];
-
-    // If focused driver was tapped, fly to driver only once when selected
-    if (hasValidFocusedDriver) {
-      const isNewFocus =
-        !prevFocusedRef.current ||
-        prevFocusedRef.current.lat !== focusedDriverCoords.lat ||
-        prevFocusedRef.current.lng !== focusedDriverCoords.lng;
-
-      if (isNewFocus) {
-        prevFocusedRef.current = { lat: focusedDriverCoords.lat, lng: focusedDriverCoords.lng };
-        userInteractedRef.current = false;
-        map.flyTo([focusedDriverCoords.lat, focusedDriverCoords.lng], 16, { animate: true, duration: 1.2 });
-        return;
-      }
-    } else {
-      prevFocusedRef.current = null;
-    }
-
-    const stopsKey = validStops.map((s: any) => `${s.lat},${s.lng}`).join('|');
-    const routeKey = `${pickupLat},${pickupLng}->${stopsKey}->${dropoffLat},${dropoffLng}`;
-    const isNewRoute = routeKey !== prevRouteKeyRef.current;
-    const isNewStatus = tripStatus !== prevStatusRef.current;
-
-    // 1. If trip status changed (e.g. accepted, arrived, in_progress), frame the new phase
-    if (isNewStatus && tripStatus) {
-      prevStatusRef.current = tripStatus;
-      userInteractedRef.current = false;
-
-      if (tripStatus === 'accepted' && hasValidDriver && hasValidPickup) {
-        const bounds = L.latLngBounds([driverLat, driverLng], [pickupLat, pickupLng]);
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
-        return;
-      }
-
-      if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
-        const bounds = L.latLngBounds([driverLat, driverLng], [dropoffLat, dropoffLng]);
-        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
-        return;
-      }
-
-      if (tripStatus === 'arrived' && hasValidPickup) {
-        map.setView([pickupLat, pickupLng], 16, { animate: true });
-        return;
-      }
-    }
-
-    // 2. If pickup / dropoff / stops route changed
-    if (isNewRoute && (hasValidPickup || hasValidDropoff)) {
-      prevRouteKeyRef.current = routeKey;
-      userInteractedRef.current = false;
-
-      if (hasValidPickup && hasValidDropoff) {
-        const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
-        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
-        return;
-      } else if (hasValidPickup) {
-        map.setView([pickupLat, pickupLng], 15, { animate: true });
-        return;
-      } else if (hasValidDropoff) {
-        map.setView([dropoffLat, dropoffLng], 15, { animate: true });
-        return;
-      }
-    }
-
-    // 3. Initial center on first load
-    if (!initialCenteredRef.current) {
-      if (hasValidPickup && hasValidDropoff) {
-        const bounds = L.latLngBounds([pickupLat, pickupLng], [dropoffLat, dropoffLng]);
-        validStops.forEach((s: any) => bounds.extend([s.lat, s.lng]));
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-        initialCenteredRef.current = true;
-      } else if (hasValidPickup) {
-        map.setView([pickupLat, pickupLng], 15);
-        initialCenteredRef.current = true;
-      } else if (hasValidDriver) {
-        map.setView([driverLat, driverLng], 15);
-        initialCenteredRef.current = true;
-      } else {
-        // Fallback initial view for standalone driver portal on mobile / desktop
-        map.setView([driverLat || -28.7282, driverLng || 24.7623], 14);
-        initialCenteredRef.current = true;
-      }
-      return;
-    }
-
-    // 4. Background GPS updates:
-    // Follow the driver if user hasn't manually panned away,
-    // AND PRESERVE the user's current zoom level (NEVER reset zoom on GPS tick!)
-    if (hasValidDriver && !userInteractedRef.current && !tripStatus) {
-      map.panTo([driverLat, driverLng], { animate: true, duration: 0.8 });
-    }
-  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng, tripStatus, focusedDriverCoords, JSON.stringify(stops)]);
-
-  return null;
-};
-
-const MapClickHandler = ({
-  isPickingOnMap,
-  onMapClickLocation,
-}: {
-  isPickingOnMap?: 'pickup' | 'dropoff' | null;
-  onMapClickLocation?: (lat: number, lng: number) => void;
-}) => {
-  useMapEvents({
-    click(e) {
-      if (isPickingOnMap && onMapClickLocation) {
-        onMapClickLocation(e.latlng.lat, e.latlng.lng);
-      }
-    },
-  });
-  return null;
-};
-
-const MapNavigationControls = ({ centerLat, centerLng }: { centerLat: number; centerLng: number }) => {
-  const map = useMap();
-  return (
-    <div
-      className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 md:top-24 md:translate-y-0 md:right-5 z-[1000] pointer-events-auto flex flex-col gap-2 select-none"
-      onClick={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          map.zoomIn();
-        }}
-        aria-label="Zoom In"
-        title="Zoom In"
-        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
-      >
-        <Plus size={20} className="stroke-[2.5]" />
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          map.zoomOut();
-        }}
-        aria-label="Zoom Out"
-        title="Zoom Out"
-        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
-      >
-        <Minus size={20} className="stroke-[2.5]" />
-      </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          map.setView([centerLat, centerLng], 15, { animate: true });
-        }}
-        aria-label="Recenter Map"
-        title="Recenter Map"
-        className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-blue-600 dark:text-blue-400 rounded-2xl sm:rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
-      >
-        <Crosshair size={18} className="stroke-[2.5]" />
-      </button>
-    </div>
-  );
-};
-
-const MapComponent = (props: MapProps) => {
-  const { 
-    pickupLat, 
-    pickupLng, 
-    dropoffLat, 
-    dropoffLng, 
-    driverLat, 
-    driverLng, 
-    tripStatus,
-    availableDrivers = [],
-    focusedDriverCoords,
-    assignedDriver,
-    onRouteChange,
-    isPickingOnMap,
-    onMapClickLocation,
-    stops = [],
-  } = props;
-  
+  // 3D Pitch state for manual toggle
+  const [is3DMode, setIs3DMode] = useState<boolean>(false);
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
 
-  // Effective assigned driver location
+  // Theme resolution
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  // Effective driver coords
   const effectiveAssignedLat = assignedDriver?.lat || driverLat;
   const effectiveAssignedLng = assignedDriver?.lng || driverLng;
 
   const centerLat = pickupLat || effectiveAssignedLat || -28.7282;
   const centerLng = pickupLng || effectiveAssignedLng || 24.7623;
 
-  // Dynamically calculate the active leg of the journey:
-  // - If tripStatus === 'accepted' && driver location exists -> route from Driver to Pickup!
-  // - If tripStatus === 'in_progress' && driver location exists -> route from Driver through uncompleted stops to Dropoff!
-  // - Otherwise -> route from Pickup through Stops to Dropoff!
+  // Polyline colors
+  const polylineColor = tripStatus === 'accepted' ? '#10b981' : '#3b82f6';
+  const casingColor = tripStatus === 'accepted' ? '#064e3b' : '#1e3a8a';
+
+  // -------------------------------------------------------------
+  // Route Layer Helper
+  // -------------------------------------------------------------
+  const updateRouteOnMap = useCallback((map: maplibregl.Map, coords: [number, number][], mainColor: string, casing: string) => {
+    if (!map.isStyleLoaded()) return;
+
+    // Route coordinates come as [lat, lng] from mapService, convert to GeoJSON [lng, lat]
+    const geojsonCoords = coords.map(([lat, lng]) => [lng, lat]);
+
+    const routeGeoJSON: GeoJSON.Feature<GeoJSON.LineString> = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: geojsonCoords,
+      },
+    };
+
+    const source = map.getSource('solo-route-source') as maplibregl.GeoJSONSource | undefined;
+
+    if (source) {
+      source.setData(routeGeoJSON);
+      if (map.getLayer('solo-route-line')) {
+        map.setPaintProperty('solo-route-line', 'line-color', mainColor);
+      }
+      if (map.getLayer('solo-route-casing')) {
+        map.setPaintProperty('solo-route-casing', 'line-color', casing);
+      }
+    } else {
+      map.addSource('solo-route-source', {
+        type: 'geojson',
+        data: routeGeoJSON,
+      });
+
+      // Outer Casing for elevation and contrast
+      map.addLayer({
+        id: 'solo-route-casing',
+        type: 'line',
+        source: 'solo-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': casing,
+          'line-width': 8,
+          'line-opacity': 0.7,
+        },
+      });
+
+      // Main Route Polyline
+      map.addLayer({
+        id: 'solo-route-line',
+        type: 'line',
+        source: 'solo-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': mainColor,
+          'line-width': 5,
+          'line-opacity': 0.95,
+        },
+      });
+    }
+  }, []);
+
+  // -------------------------------------------------------------
+  // Initialize Map
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const initialPitch = tripStatus === 'accepted' || tripStatus === 'in_progress' ? 45 : 0;
+    setIs3DMode(initialPitch > 0);
+
+    const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
+
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: styleConfig.style,
+      center: [centerLng, centerLat],
+      zoom: 14,
+      minZoom: 3,
+      maxZoom: 19,
+      pitch: initialPitch,
+      bearing: 0,
+      attributionControl: false,
+    });
+
+    // Add compact attribution at bottom-left
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+
+    // Invalidate map size on viewport or visibility changes (map.invalidateSize() equivalent)
+    const invalidateSize = () => {
+      // map.invalidateSize() compatibility call for modern WebGL map canvas
+      map.resize();
+    };
+
+    map.on('load', () => {
+      isMapLoadedRef.current = true;
+      invalidateSize();
+    });
+
+    // Handle tileerror or style load failure by falling back to openstreetmap.org
+    map.on('error', (e) => {
+      const isTileOrStyleError =
+        e?.error?.message?.includes('style') ||
+        e?.error?.message?.includes('tile') ||
+        (e as any)?.status === 401 ||
+        (e as any)?.status === 403;
+
+      if (isTileOrStyleError && !useOsmFallback) {
+        console.warn('Mapbox tileerror detected; switching seamlessly to openstreetmap.org fallback tiles.', e);
+        setUseOsmFallback(true);
+        try {
+          map.setStyle(OSM_MAPLIBRE_STYLE);
+        } catch (styleErr) {
+          console.error('openstreetmap.org fallback style application error', styleErr);
+        }
+      }
+    });
+
+    // Track user manual interaction (drag, pinch, tilt)
+    map.on('movestart', (e) => {
+      if (e.originalEvent) {
+        userInteractedRef.current = true;
+      }
+    });
+
+    // Map Click for location picking
+    map.on('click', (e) => {
+      if (onMapClickLocation) {
+        onMapClickLocation(e.lngLat.lat, e.lngLat.lng);
+      }
+    });
+
+    mapRef.current = map;
+
+    // Handle container resize & orientation
+    const container = mapContainerRef.current;
+    let ro: ResizeObserver | null = null;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        invalidateSize();
+      });
+      ro.observe(container);
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        invalidateSize();
+      }
+    };
+    const handleOrientationChange = () => {
+      invalidateSize();
+    };
+    const handleWindowResize = () => {
+      invalidateSize();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
+
+    return () => {
+      if (ro) ro.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+
+      // Clean up all markers
+      if (pickupMarkerRef.current) pickupMarkerRef.current.remove();
+      if (dropoffMarkerRef.current) dropoffMarkerRef.current.remove();
+      stopMarkersRef.current.forEach((m) => m.remove());
+      stopMarkersRef.current = [];
+      driverMarkersRef.current.forEach((m) => m.remove());
+      driverMarkersRef.current.clear();
+      if (assignedDriverMarkerRef.current) assignedDriverMarkerRef.current.remove();
+
+      map.remove();
+      mapRef.current = null;
+      isMapLoadedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // -------------------------------------------------------------
+  // Theme updates (Dark/Light mode tile swapping)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
+    map.setStyle(styleConfig.style);
+
+    // When the new style finishes loading, re-add the route layers
+    map.once('style.load', () => {
+      if (routeCoordinates.length > 0) {
+        updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
+      }
+    });
+  }, [isDark, useOsmFallback, polylineColor, casingColor, routeCoordinates, updateRouteOnMap]);
+
+  // -------------------------------------------------------------
+  // Routing calculation
+  // -------------------------------------------------------------
   useEffect(() => {
     let originLat: number | undefined;
     let originLng: number | undefined;
@@ -459,251 +496,527 @@ const MapComponent = (props: MapProps) => {
       getRoute();
     } else {
       setRouteCoordinates([]);
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded()) {
+        const source = map.getSource('solo-route-source') as maplibregl.GeoJSONSource | undefined;
+        if (source) {
+          source.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: [] },
+          });
+        }
+      }
     }
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng, effectiveAssignedLat, effectiveAssignedLng, tripStatus, JSON.stringify(stops)]);
 
-  const [useOsmFallback, setUseOsmFallback] = useState(false);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-  const tileConfig = getTileLayerConfig(isDark);
-  const osmFallbackConfig = {
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
-    tileSize: 256,
-    zoomOffset: 0,
-  };
-  const activeTileConfig = useOsmFallback ? osmFallbackConfig : tileConfig;
+  // -------------------------------------------------------------
+  // Render Route on Map whenever routeCoordinates update
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
 
-  const polylineColor = tripStatus === 'accepted' ? '#10b981' : '#3b82f6';
+    if (map.isStyleLoaded()) {
+      updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
+    } else {
+      map.once('load', () => {
+        updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
+      });
+    }
+  }, [routeCoordinates, polylineColor, casingColor, updateRouteOnMap]);
+
+  // -------------------------------------------------------------
+  // Pickup Marker
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (isValidCoord(pickupLat, pickupLng)) {
+      if (!pickupMarkerRef.current) {
+        const el = document.createElement('div');
+        el.className = 'solo-pickup-marker';
+        el.innerHTML = createCustomMarkerHtml('Pickup (A)', '#111827', '#ffffff', true);
+
+        const popup = new maplibregl.Popup({ offset: [0, -36], closeButton: false }).setHTML(
+          '<div style="font-size:12px; font-weight:800; padding:3px 6px; font-family:sans-serif;">Pickup Location</div>'
+        );
+
+        pickupMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([pickupLng!, pickupLat!])
+          .setPopup(popup)
+          .addTo(map);
+      } else {
+        pickupMarkerRef.current.setLngLat([pickupLng!, pickupLat!]);
+      }
+    } else if (pickupMarkerRef.current) {
+      pickupMarkerRef.current.remove();
+      pickupMarkerRef.current = null;
+    }
+  }, [pickupLat, pickupLng]);
+
+  // -------------------------------------------------------------
+  // Dropoff Marker
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (isValidCoord(dropoffLat, dropoffLng)) {
+      if (!dropoffMarkerRef.current) {
+        const el = document.createElement('div');
+        el.className = 'solo-dropoff-marker';
+        el.innerHTML = createCustomMarkerHtml('Dropoff (B)', '#2563eb', '#ffffff', false);
+
+        const popup = new maplibregl.Popup({ offset: [0, -36], closeButton: false }).setHTML(
+          '<div style="font-size:12px; font-weight:800; padding:3px 6px; font-family:sans-serif;">Destination</div>'
+        );
+
+        dropoffMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([dropoffLng!, dropoffLat!])
+          .setPopup(popup)
+          .addTo(map);
+      } else {
+        dropoffMarkerRef.current.setLngLat([dropoffLng!, dropoffLat!]);
+      }
+    } else if (dropoffMarkerRef.current) {
+      dropoffMarkerRef.current.remove();
+      dropoffMarkerRef.current = null;
+    }
+  }, [dropoffLat, dropoffLng]);
+
+  // -------------------------------------------------------------
+  // Intermediate Stops Markers
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing stop markers
+    stopMarkersRef.current.forEach((m) => m.remove());
+    stopMarkersRef.current = [];
+
+    stops.forEach((stop, idx) => {
+      if (!isValidCoord(stop.lat, stop.lng)) return;
+
+      const el = document.createElement('div');
+      el.className = 'solo-stop-marker';
+      el.innerHTML = createCustomMarkerHtml(
+        stop.completed ? `✓ Stop ${idx + 1}` : `Stop ${idx + 1}`,
+        stop.completed ? '#10b981' : '#d97706',
+        '#ffffff',
+        false
+      );
+
+      const popupHtml = `
+        <div style="font-size:12px; font-family:sans-serif; padding:4px;">
+          <div style="font-weight:800;">Stop ${idx + 1}</div>
+          ${stop.address ? `<div style="font-size:11px; color:#4b5563; margin-top:2px;">${stop.address}</div>` : ''}
+        </div>
+      `;
+      const popup = new maplibregl.Popup({ offset: [0, -36], closeButton: false }).setHTML(popupHtml);
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([stop.lng, stop.lat])
+        .setPopup(popup)
+        .addTo(map);
+
+      stopMarkersRef.current.push(marker);
+    });
+  }, [stops]);
+
+  // -------------------------------------------------------------
+  // Available Roaming Drivers Markers
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const currentDriverMap = driverMarkersRef.current;
+    const activeDriverIds = new Set<string>();
+
+    availableDrivers.forEach((driver) => {
+      // If this driver is the currently assigned driver, skip here (rendered separately with assigned styling)
+      if (
+        effectiveAssignedLat !== undefined &&
+        effectiveAssignedLng !== undefined &&
+        Math.abs(driver.lat - effectiveAssignedLat) < 0.0001 &&
+        Math.abs(driver.lng - effectiveAssignedLng) < 0.0001
+      ) {
+        return;
+      }
+
+      if (!isValidCoord(driver.lat, driver.lng)) return;
+
+      activeDriverIds.add(driver.id);
+      const vehicleTitle = driver.vehicle || [driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Registered Vehicle';
+
+      let marker = currentDriverMap.get(driver.id);
+
+      if (!marker) {
+        const el = document.createElement('div');
+        el.className = 'solo-roaming-driver-marker';
+        el.innerHTML = createAvailableCarMarkerHtml(vehicleTitle);
+
+        const popup = new maplibregl.Popup({
+          offset: [0, -22],
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: '300px',
+        }).setHTML(createDriverPopupHtml(driver));
+
+        marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([driver.lng, driver.lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        currentDriverMap.set(driver.id, marker);
+      } else {
+        // Smoothly update location
+        marker.setLngLat([driver.lng, driver.lat]);
+        const popup = marker.getPopup();
+        if (popup) {
+          popup.setHTML(createDriverPopupHtml(driver));
+        }
+      }
+    });
+
+    // Remove stale drivers
+    currentDriverMap.forEach((marker, id) => {
+      if (!activeDriverIds.has(id)) {
+        marker.remove();
+        currentDriverMap.delete(id);
+      }
+    });
+  }, [availableDrivers, effectiveAssignedLat, effectiveAssignedLng]);
+
+  // -------------------------------------------------------------
+  // Assigned Driver Marker (Active Trip)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (isValidCoord(effectiveAssignedLat, effectiveAssignedLng)) {
+      if (!assignedDriverMarkerRef.current) {
+        const el = document.createElement('div');
+        el.className = 'solo-assigned-driver-marker';
+        el.innerHTML = createAssignedDriverMarkerHtml(assignedDriver?.name);
+
+        const popup = new maplibregl.Popup({
+          offset: [0, -28],
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: '280px',
+        }).setHTML(
+          createAssignedDriverPopupHtml(
+            assignedDriver?.name,
+            assignedDriver?.vehicle,
+            assignedDriver?.licensePlate,
+            assignedDriver?.rating
+          )
+        );
+
+        assignedDriverMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([effectiveAssignedLng!, effectiveAssignedLat!])
+          .setPopup(popup)
+          .addTo(map);
+      } else {
+        assignedDriverMarkerRef.current.setLngLat([effectiveAssignedLng!, effectiveAssignedLat!]);
+        const popup = assignedDriverMarkerRef.current.getPopup();
+        if (popup) {
+          popup.setHTML(
+            createAssignedDriverPopupHtml(
+              assignedDriver?.name,
+              assignedDriver?.vehicle,
+              assignedDriver?.licensePlate,
+              assignedDriver?.rating
+            )
+          );
+        }
+      }
+    } else if (assignedDriverMarkerRef.current) {
+      assignedDriverMarkerRef.current.remove();
+      assignedDriverMarkerRef.current = null;
+    }
+  }, [effectiveAssignedLat, effectiveAssignedLng, assignedDriver]);
+
+  // -------------------------------------------------------------
+  // Camera & Bounds Synchronization
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const hasValidPickup = isValidCoord(pickupLat, pickupLng);
+    const hasValidDropoff = isValidCoord(dropoffLat, dropoffLng);
+    const hasValidDriver = isValidCoord(effectiveAssignedLat, effectiveAssignedLng);
+    const hasValidFocusedDriver = isValidCoord(focusedDriverCoords?.lat, focusedDriverCoords?.lng);
+    const validStops = Array.isArray(stops) ? stops.filter((s) => isValidCoord(s.lat, s.lng)) : [];
+
+    // 1. Focused driver tapped
+    if (hasValidFocusedDriver) {
+      const isNewFocus =
+        !prevFocusedRef.current ||
+        prevFocusedRef.current.lat !== focusedDriverCoords!.lat ||
+        prevFocusedRef.current.lng !== focusedDriverCoords!.lng;
+
+      if (isNewFocus) {
+        prevFocusedRef.current = { lat: focusedDriverCoords!.lat, lng: focusedDriverCoords!.lng };
+        userInteractedRef.current = false;
+        map.flyTo({
+          center: [focusedDriverCoords!.lng, focusedDriverCoords!.lat],
+          zoom: 16,
+          speed: 1.2,
+          curve: 1.4,
+          essential: true,
+        });
+        return;
+      }
+    } else {
+      prevFocusedRef.current = null;
+    }
+
+    const stopsKey = validStops.map((s) => `${s.lat},${s.lng}`).join('|');
+    const routeKey = `${pickupLat},${pickupLng}->${stopsKey}->${dropoffLat},${dropoffLng}`;
+    const isNewRoute = routeKey !== prevRouteKeyRef.current;
+    const isNewStatus = tripStatus !== prevStatusRef.current;
+
+    // 2. Trip status changed (e.g. accepted, arrived, in_progress)
+    if (isNewStatus && tripStatus) {
+      prevStatusRef.current = tripStatus;
+      userInteractedRef.current = false;
+
+      if (tripStatus === 'accepted' && hasValidDriver && hasValidPickup) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([effectiveAssignedLng!, effectiveAssignedLat!]);
+        bounds.extend([pickupLng!, pickupLat!]);
+        map.fitBounds(bounds, { padding: 60, maxZoom: 17, duration: 1200, pitch: 45 });
+        setIs3DMode(true);
+        return;
+      }
+
+      if (tripStatus === 'in_progress' && hasValidDriver && hasValidDropoff) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([effectiveAssignedLng!, effectiveAssignedLat!]);
+        bounds.extend([dropoffLng!, dropoffLat!]);
+        validStops.forEach((s) => bounds.extend([s.lng, s.lat]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 17, duration: 1200, pitch: 50 });
+        setIs3DMode(true);
+        return;
+      }
+
+      if (tripStatus === 'arrived' && hasValidPickup) {
+        map.flyTo({ center: [pickupLng!, pickupLat!], zoom: 16, duration: 1000, pitch: 30 });
+        return;
+      }
+    }
+
+    // 3. Route changed
+    if (isNewRoute && (hasValidPickup || hasValidDropoff)) {
+      prevRouteKeyRef.current = routeKey;
+      userInteractedRef.current = false;
+
+      if (hasValidPickup && hasValidDropoff) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([pickupLng!, pickupLat!]);
+        bounds.extend([dropoffLng!, dropoffLat!]);
+        validStops.forEach((s) => bounds.extend([s.lng, s.lat]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 17, duration: 1000 });
+        return;
+      } else if (hasValidPickup) {
+        map.flyTo({ center: [pickupLng!, pickupLat!], zoom: 15, duration: 800 });
+        return;
+      } else if (hasValidDropoff) {
+        map.flyTo({ center: [dropoffLng!, dropoffLat!], zoom: 15, duration: 800 });
+        return;
+      }
+    }
+
+    // 4. Initial center on first load
+    if (!initialCenteredRef.current) {
+      if (hasValidPickup && hasValidDropoff) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([pickupLng!, pickupLat!]);
+        bounds.extend([dropoffLng!, dropoffLat!]);
+        validStops.forEach((s) => bounds.extend([s.lng, s.lat]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 800 });
+        initialCenteredRef.current = true;
+      } else if (hasValidPickup) {
+        map.jumpTo({ center: [pickupLng!, pickupLat!], zoom: 15 });
+        initialCenteredRef.current = true;
+      } else if (hasValidDriver) {
+        map.jumpTo({ center: [effectiveAssignedLng!, effectiveAssignedLat!], zoom: 15 });
+        initialCenteredRef.current = true;
+      } else {
+        map.jumpTo({ center: [centerLng, centerLat], zoom: 14 });
+        initialCenteredRef.current = true;
+      }
+      return;
+    }
+
+    // 5. Background GPS updates (follow driver without breaking zoom)
+    if (hasValidDriver && !userInteractedRef.current && !tripStatus) {
+      map.panTo([effectiveAssignedLng!, effectiveAssignedLat!], { duration: 800 });
+    }
+  }, [
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
+    effectiveAssignedLat,
+    effectiveAssignedLng,
+    tripStatus,
+    focusedDriverCoords,
+    centerLat,
+    centerLng,
+    JSON.stringify(stops),
+  ]);
+
+  // -------------------------------------------------------------
+  // Map Navigation Actions
+  // -------------------------------------------------------------
+  const handleZoomIn = () => {
+    mapRef.current?.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    mapRef.current?.zoomOut();
+  };
+
+  const handleRecenter = () => {
+    userInteractedRef.current = false;
+    mapRef.current?.flyTo({
+      center: [centerLng, centerLat],
+      zoom: 15,
+      pitch: is3DMode ? 45 : 0,
+      bearing: 0,
+      duration: 1000,
+    });
+  };
+
+  const handleToggle3D = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next3D = !is3DMode;
+    setIs3DMode(next3D);
+    map.easeTo({
+      pitch: next3D ? 50 : 0,
+      duration: 800,
+    });
+  };
+
+  const handleResetNorth = () => {
+    mapRef.current?.easeTo({
+      bearing: 0,
+      duration: 600,
+    });
+  };
 
   return (
-    <div className={`w-full h-full relative z-0 select-none touch-pan-x touch-pan-y ${isPickingOnMap ? 'cursor-crosshair' : ''}`}>
-      <MapContainer 
-        center={[centerLat, centerLng]} 
-        zoom={14} 
-        minZoom={3}
-        maxZoom={19}
-        zoomDelta={1}
-        zoomSnap={1}
-        style={{ width: '100%', height: '100%' }}
-        zoomControl={false}
-        // @ts-ignore Leaflet mobile tap emulation override
-        tap={false}
-        bounceAtZoomLimits={false}
-      >
-        <TileLayer
-          key={activeTileConfig.url}
-          attribution={activeTileConfig.attribution}
-          url={activeTileConfig.url}
-          maxZoom={activeTileConfig.maxZoom}
-          tileSize={activeTileConfig.tileSize}
-          zoomOffset={activeTileConfig.zoomOffset}
-          eventHandlers={{
-            tileerror: () => {
-              if (!useOsmFallback && tileConfig.url.includes('api.mapbox.com')) {
-                console.warn('Mapbox tile load failure detected; seamlessly falling back to OpenStreetMap tiles.');
-                setUseOsmFallback(true);
-              }
-            },
-          }}
-        />
-        
-        <MapClickHandler 
-          isPickingOnMap={isPickingOnMap} 
-          onMapClickLocation={onMapClickLocation} 
-        />
-
-        <MapUpdater 
-          pickupLat={pickupLat} 
-          pickupLng={pickupLng} 
-          dropoffLat={dropoffLat} 
-          dropoffLng={dropoffLng} 
-          driverLat={effectiveAssignedLat}
-          driverLng={effectiveAssignedLng}
-          tripStatus={tripStatus}
-          focusedDriverCoords={focusedDriverCoords}
-          stops={stops}
-        />
-
-        <MapNavigationControls centerLat={centerLat} centerLng={centerLng} />
-
-        {routeCoordinates.length > 0 && (
-          <>
-            {/* Route Outer Casing for elevation/contrast */}
-            <Polyline 
-              positions={routeCoordinates} 
-              color={tripStatus === 'accepted' ? '#064e3b' : '#1e3a8a'} 
-              weight={8} 
-              opacity={0.65} 
-              lineCap="round" 
-              lineJoin="round" 
-            />
-            {/* Route Main Navigation Line */}
-            <Polyline 
-              positions={routeCoordinates} 
-              color={polylineColor} 
-              weight={5} 
-              opacity={0.95} 
-              lineCap="round" 
-              lineJoin="round" 
-            />
-          </>
-        )}
-
-        {/* Pickup marker */}
-        {pickupLat && pickupLng && (
-          <Marker position={[pickupLat, pickupLng]} icon={pickupIcon}>
-            <Popup>
-              <div className="text-xs font-bold p-1">Pickup Location</div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Intermediate Stop markers */}
-        {stops.map((stop, idx) => {
-          if (typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return null;
-          const stopIcon = createCustomIcon(
-            stop.completed ? `✓ Stop ${idx + 1}` : `Stop ${idx + 1}`,
-            stop.completed ? '#10b981' : '#d97706',
-            '#ffffff',
-            false
-          );
-          return (
-            <Marker key={stop.id || `stop-${idx}`} position={[stop.lat, stop.lng]} icon={stopIcon} zIndexOffset={700}>
-              <Popup>
-                <div className="text-xs font-bold p-1">
-                  <div>Stop {idx + 1}</div>
-                  {stop.address && <div className="font-normal text-gray-600 mt-0.5">{stop.address}</div>}
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-
-        {/* Dropoff marker */}
-        {dropoffLat && dropoffLng && (
-          <Marker position={[dropoffLat, dropoffLng]} icon={dropoffIcon}>
-            <Popup>
-              <div className="text-xs font-bold p-1">Destination</div>
-            </Popup>
-          </Marker>
-        )}
-
-        {/* Available nearby roaming drivers */}
-        {availableDrivers.map((driver) => {
-          // If this driver is the currently assigned driver, skip here (rendered separately with assigned styling)
-          if (effectiveAssignedLat !== undefined && effectiveAssignedLng !== undefined && Math.abs(driver.lat - effectiveAssignedLat) < 0.0001 && Math.abs(driver.lng - effectiveAssignedLng) < 0.0001) {
-            return null;
+    <div
+      className={`w-full h-full relative z-0 select-none touch-pan-x touch-pan-y ${isPickingOnMap ? 'cursor-crosshair' : ''}`}
+      // tap={false} ensures legacy 300ms tap emulation is disabled for smooth native touch interaction
+      data-tap="false"
+    >
+      {/* Pulse keyframe injection for rider pickup halo */}
+      <style jsx global>{`
+        @keyframes soloPulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
           }
-          const vehicleTitle = driver.vehicle || [driver.vehicleMake, driver.vehicleModel].filter(Boolean).join(' ') || 'Registered Vehicle';
-          const vehicleSub = [driver.vehicleColor, driver.vehicleYear].filter(Boolean).join(' • ');
+          70% {
+            box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+          }
+        }
+        .maplibregl-popup-content {
+          border-radius: 16px !important;
+          padding: 10px 12px !important;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+          border: 1px solid rgba(255, 255, 255, 0.8) !important;
+        }
+        .dark .maplibregl-popup-content {
+          background-color: #18181b !important;
+          color: #f4f4f5 !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .dark .maplibregl-popup-tip {
+          border-top-color: #18181b !important;
+        }
+      `}</style>
 
-          return (
-            <Marker 
-              key={driver.id} 
-              position={[driver.lat, driver.lng]} 
-              icon={createAvailableCarIcon(vehicleTitle)}
-              zIndexOffset={500}
-            >
-              <Popup>
-                <div className="p-1 font-sans text-xs min-w-[210px]">
-                  {/* Driver Header */}
-                  <div className="flex items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-1.5 mb-1.5">
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white text-sm">{driver.name || 'Registered Driver'}</div>
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                        <span>✓</span>
-                        <span>Verified SOLO Driver</span>
-                      </div>
-                    </div>
-                    <div className="text-amber-500 font-bold flex items-center gap-0.5 text-xs whitespace-nowrap bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-full">
-                      <span>★</span>
-                      <span>{driver.rating ? driver.rating.toFixed(1) : '5.0'}</span>
-                      {driver.ratingCount ? <span className="text-[10px] text-gray-400 font-normal">({driver.ratingCount})</span> : null}
-                    </div>
-                  </div>
+      {/* Map Container */}
+      <div ref={mapContainerRef} className="w-full h-full" />
 
-                  {/* Vehicle Information */}
-                  <div className="space-y-1 mb-2">
-                    <div className="flex items-center gap-1.5 text-gray-800 dark:text-gray-200 font-semibold text-xs">
-                      <span className="text-sm">🚗</span>
-                      <span>{vehicleTitle}</span>
-                    </div>
-                    {vehicleSub && (
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400 pl-5">
-                        {vehicleSub}
-                      </div>
-                    )}
-                    {driver.licensePlate && (
-                      <div className="pl-5 pt-0.5">
-                        <span className="font-mono font-bold text-[10px] bg-amber-300 text-black px-1.5 py-0.5 rounded border border-black/50 uppercase tracking-wider inline-flex items-center gap-1 shadow-xs">
-                          <span>🇿🇦</span>
-                          <span>{driver.licensePlate}</span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
+      {/* Floating Glassmorphic Map Navigation Controls */}
+      <div
+        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 md:top-24 md:translate-y-0 md:right-5 z-20 pointer-events-auto flex flex-col gap-2 select-none"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          aria-label="Zoom In"
+          title="Zoom In"
+          className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+        >
+          <Plus size={20} className="stroke-[2.5]" />
+        </button>
 
-                  {/* Drive Distance & Live Telematics */}
-                  <div className="pt-1.5 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px]">
-                    {driver.distanceKm !== undefined ? (
-                      <div className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                        <span>📍</span>
-                        <span>{driver.distanceKm.toFixed(1)} km away</span>
-                        {driver.etaMinutes !== undefined && (
-                          <span className="text-gray-500 dark:text-gray-400 font-normal">• ~{driver.etaMinutes} min</span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-emerald-600 font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                        Available Now
-                      </div>
-                    )}
-                    {driver.distanceKm !== undefined && (
-                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1 rounded">
-                        Online
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          aria-label="Zoom Out"
+          title="Zoom Out"
+          className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-800 dark:text-gray-100 rounded-2xl sm:rounded-xl flex items-center justify-center font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+        >
+          <Minus size={20} className="stroke-[2.5]" />
+        </button>
 
-        {/* Assigned driver marker (active ride) */}
-        {effectiveAssignedLat && effectiveAssignedLng && (
-          <Marker 
-            position={[effectiveAssignedLat, effectiveAssignedLng]} 
-            icon={createAssignedDriverIcon(assignedDriver?.name)} 
-            zIndexOffset={1000}
-          >
-            <Popup>
-              <div className="p-1 font-sans text-xs">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-bold text-blue-600">{assignedDriver?.name || 'Your Assigned Driver'}</div>
-                  <div className="text-amber-500 font-bold flex items-center gap-0.5 text-[11px] whitespace-nowrap">
-                    <span>★</span>
-                    <span>{assignedDriver?.rating ? assignedDriver.rating.toFixed(1) : '5.0'}</span>
-                  </div>
-                </div>
-                {assignedDriver?.vehicle && <div className="text-gray-700 dark:text-gray-200 font-semibold mt-0.5">{assignedDriver.vehicle}</div>}
-                {assignedDriver?.licensePlate && (
-                  <div className="mt-1">
-                    <span className="font-mono font-bold text-[10px] bg-amber-300 text-black px-1.5 py-0.5 rounded border border-black/40 uppercase tracking-wider inline-flex items-center gap-1 shadow-xs">
-                      <span>🇿🇦</span>
-                      <span>{assignedDriver.licensePlate}</span>
-                    </span>
-                  </div>
-                )}
-                <div className="text-blue-500 font-semibold mt-1">En route to your location</div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-      </MapContainer>
+        {/* 3D / 2D Perspective Toggle Button */}
+        <button
+          type="button"
+          onClick={handleToggle3D}
+          aria-label={is3DMode ? 'Switch to 2D' : 'Switch to 3D'}
+          title={is3DMode ? 'Flat 2D View' : '3D Perspective View'}
+          className={`w-11 h-11 sm:w-10 sm:h-10 backdrop-blur-md rounded-2xl sm:rounded-xl flex items-center justify-center font-black text-xs hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border shadow-lg cursor-pointer touch-manipulation ${
+            is3DMode
+              ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/25'
+              : 'bg-white/95 dark:bg-zinc-900/95 text-gray-800 dark:text-gray-100 border-gray-200/80 dark:border-white/10'
+          }`}
+        >
+          <span className="leading-none">{is3DMode ? '3D' : '2D'}</span>
+        </button>
+
+        {/* Compass / Reset North Button */}
+        <button
+          type="button"
+          onClick={handleResetNorth}
+          aria-label="Reset North"
+          title="Reset to North"
+          className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-gray-700 dark:text-gray-200 rounded-2xl sm:rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+        >
+          <Compass size={19} className="stroke-[2.2]" />
+        </button>
+
+        {/* Recenter Map Button */}
+        <button
+          type="button"
+          onClick={handleRecenter}
+          aria-label="Recenter Map"
+          title="Recenter Map"
+          className="w-11 h-11 sm:w-10 sm:h-10 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md text-blue-600 dark:text-blue-400 rounded-2xl sm:rounded-xl flex items-center justify-center hover:bg-gray-100 dark:hover:bg-zinc-800 active:scale-95 transition-all border border-gray-200/80 dark:border-white/10 shadow-lg cursor-pointer touch-manipulation"
+        >
+          <Crosshair size={18} className="stroke-[2.5]" />
+        </button>
+      </div>
     </div>
   );
 };

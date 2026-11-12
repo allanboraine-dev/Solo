@@ -11,7 +11,7 @@ const withPWA = withPWAInit({
     runtimeCaching: [
       // 1. Mapbox Navigation & OpenStreetMap tiles
       {
-        urlPattern: /^https:\/\/((?:[a-c]\.)?tile\.openstreetmap\.org|api\.mapbox\.com)\/.*/i,
+        urlPattern: /^https:\/\/((?:[a-c]\.)?tile\.openstreetmap\.org|api\.mapbox\.com|.*\.tiles\.mapbox\.com)\/.*/i,
         handler: "CacheFirst",
         options: {
           cacheName: "map-tiles-cache-v2",
@@ -85,7 +85,7 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=(self)' },
-          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://api.mapbox.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.osm.org https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://api.paystack.co https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' https://checkout.paystack.com https://js.paystack.co; object-src 'none'; base-uri 'self'; form-action 'self'" },
+          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://api.mapbox.com https://*.tiles.mapbox.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.tile.osm.org https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com https://api.paystack.co https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' https://checkout.paystack.com https://js.paystack.co; object-src 'none'; base-uri 'self'; form-action 'self'" },
         ],
       },
     ];

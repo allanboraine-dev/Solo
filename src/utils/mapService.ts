@@ -3328,3 +3328,52 @@ export function getTileLayerConfig(isDark: boolean = false) {
     zoomOffset: 0,
   };
 }
+
+/**
+ * Fallback OpenStreetMap raster style specification for MapLibre GL
+ */
+export const OSM_MAPLIBRE_STYLE = {
+  version: 8 as const,
+  sources: {
+    'osm-tiles': {
+      type: 'raster' as const,
+      tiles: [
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'osm-tiles-layer',
+      type: 'raster' as const,
+      source: 'osm-tiles',
+      minzoom: 0,
+      maxzoom: 19,
+    },
+  ],
+};
+
+/**
+ * Returns a MapLibre GL style specification for use with maplibre-gl.
+ * Uses Mapbox vector styles when a token is available, otherwise falls back to
+ * OpenStreetMap raster tiles served through a MapLibre-compatible raster style spec.
+ */
+export function getMapLibreStyle(isDark: boolean = false): { style: any; isMapbox: boolean } {
+  if (MAPBOX_TOKEN) {
+    const styleId = isDark ? 'navigation-night-v1' : 'navigation-day-v1';
+    return {
+      style: `https://api.mapbox.com/styles/v1/mapbox/${styleId}?access_token=${MAPBOX_TOKEN}`,
+      isMapbox: true,
+    };
+  }
+
+  return {
+    style: OSM_MAPLIBRE_STYLE,
+    isMapbox: false,
+  };
+}
+
