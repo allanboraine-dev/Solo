@@ -202,6 +202,7 @@ export const MapComponent: React.FC<MapProps> = ({
 
   // Fallback to openstreetmap.org raster tiles on tileerror
   const [useOsmFallback, setUseOsmFallback] = useState<boolean>(false);
+  const [mapInitError, setMapInitError] = useState<boolean>(false);
 
   // Markers references
   const pickupMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -240,7 +241,7 @@ export const MapComponent: React.FC<MapProps> = ({
   // Route Layer Helper
   // -------------------------------------------------------------
   const updateRouteOnMap = useCallback((map: maplibregl.Map, coords: [number, number][], mainColor: string, casing: string) => {
-    if (!map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     // Route coordinates come as [lat, lng] from mapService, convert to GeoJSON [lng, lat]
     const geojsonCoords = coords.map(([lat, lng]) => [lng, lat]);
@@ -265,42 +266,46 @@ export const MapComponent: React.FC<MapProps> = ({
         map.setPaintProperty('solo-route-casing', 'line-color', casing);
       }
     } else {
-      map.addSource('solo-route-source', {
-        type: 'geojson',
-        data: routeGeoJSON,
-      });
+      try {
+        map.addSource('solo-route-source', {
+          type: 'geojson',
+          data: routeGeoJSON,
+        });
 
-      // Outer Casing for elevation and contrast
-      map.addLayer({
-        id: 'solo-route-casing',
-        type: 'line',
-        source: 'solo-route-source',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-        },
-        paint: {
-          'line-color': casing,
-          'line-width': 8,
-          'line-opacity': 0.7,
-        },
-      });
+        // Outer Casing for elevation and contrast
+        map.addLayer({
+          id: 'solo-route-casing',
+          type: 'line',
+          source: 'solo-route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': casing,
+            'line-width': 8,
+            'line-opacity': 0.7,
+          },
+        });
 
-      // Main Route Polyline
-      map.addLayer({
-        id: 'solo-route-line',
-        type: 'line',
-        source: 'solo-route-source',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round',
-        },
-        paint: {
-          'line-color': mainColor,
-          'line-width': 5,
-          'line-opacity': 0.95,
-        },
-      });
+        // Main Route Polyline
+        map.addLayer({
+          id: 'solo-route-line',
+          type: 'line',
+          source: 'solo-route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': mainColor,
+            'line-width': 5,
+            'line-opacity': 0.95,
+          },
+        });
+      } catch (err) {
+        console.warn('Notice adding route layers to map:', err);
+      }
     }
   }, []);
 
@@ -315,17 +320,39 @@ export const MapComponent: React.FC<MapProps> = ({
 
     const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: styleConfig.style,
-      center: [centerLng, centerLat],
-      zoom: 14,
-      minZoom: 3,
-      maxZoom: 19,
-      pitch: initialPitch,
-      bearing: 0,
-      attributionControl: false,
-    });
+    let map: maplibregl.Map;
+    try {
+      map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: styleConfig.style,
+        center: [centerLng, centerLat],
+        zoom: 14,
+        minZoom: 3,
+        maxZoom: 19,
+        pitch: initialPitch,
+        bearing: 0,
+        attributionControl: false,
+      });
+    } catch (primaryErr) {
+      console.warn('MapLibre primary initialization notice, attempting OSM fallback:', primaryErr);
+      try {
+        map = new maplibregl.Map({
+          container: mapContainerRef.current,
+          style: OSM_MAPLIBRE_STYLE,
+          center: [centerLng, centerLat],
+          zoom: 14,
+          minZoom: 3,
+          maxZoom: 19,
+          pitch: 0,
+          bearing: 0,
+          attributionControl: false,
+        });
+      } catch (fallbackErr) {
+        console.error('Fatal: Failed to initialize WebGL map:', fallbackErr);
+        setMapInitError(true);
+        return;
+      }
+    }
 
     // Add compact attribution at bottom-left
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
@@ -333,7 +360,9 @@ export const MapComponent: React.FC<MapProps> = ({
     // Invalidate map size on viewport or visibility changes (map.invalidateSize() equivalent)
     const invalidateSize = () => {
       // map.invalidateSize() compatibility call for modern WebGL map canvas
-      map.resize();
+      if (map) {
+        map.resize();
+      }
     };
 
     map.on('load', () => {
@@ -353,7 +382,9 @@ export const MapComponent: React.FC<MapProps> = ({
         console.warn('Mapbox tileerror detected; switching seamlessly to openstreetmap.org fallback tiles.', e);
         setUseOsmFallback(true);
         try {
-          map.setStyle(OSM_MAPLIBRE_STYLE);
+          if (map.isStyleLoaded()) {
+            map.setStyle(OSM_MAPLIBRE_STYLE);
+          }
         } catch (styleErr) {
           console.error('openstreetmap.org fallback style application error', styleErr);
         }
@@ -429,17 +460,21 @@ export const MapComponent: React.FC<MapProps> = ({
   // -------------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !isMapLoadedRef.current) return;
 
     const styleConfig = useOsmFallback ? { style: OSM_MAPLIBRE_STYLE, isMapbox: false } : getMapLibreStyle(isDark);
-    map.setStyle(styleConfig.style);
+    try {
+      map.setStyle(styleConfig.style);
 
-    // When the new style finishes loading, re-add the route layers
-    map.once('style.load', () => {
-      if (routeCoordinates.length > 0) {
-        updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
-      }
-    });
+      // When the new style finishes loading, re-add the route layers
+      map.once('style.load', () => {
+        if (routeCoordinates.length > 0) {
+          updateRouteOnMap(map, routeCoordinates, polylineColor, casingColor);
+        }
+      });
+    } catch (e) {
+      console.warn('Notice updating map style:', e);
+    }
   }, [isDark, useOsmFallback, polylineColor, casingColor, routeCoordinates, updateRouteOnMap]);
 
   // -------------------------------------------------------------
@@ -919,38 +954,61 @@ export const MapComponent: React.FC<MapProps> = ({
       className={`w-full h-full relative z-0 select-none touch-pan-x touch-pan-y ${isPickingOnMap ? 'cursor-crosshair' : ''}`}
       // tap={false} ensures legacy 300ms tap emulation is disabled for smooth native touch interaction
       data-tap="false"
+      style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
     >
-      {/* Pulse keyframe injection for rider pickup halo */}
-      <style jsx global>{`
-        @keyframes soloPulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
-          }
-          70% {
-            box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
-          }
-        }
-        .maplibregl-popup-content {
-          border-radius: 16px !important;
-          padding: 10px 12px !important;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-          border: 1px solid rgba(255, 255, 255, 0.8) !important;
-        }
-        .dark .maplibregl-popup-content {
-          background-color: #18181b !important;
-          color: #f4f4f5 !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-        .dark .maplibregl-popup-tip {
-          border-top-color: #18181b !important;
-        }
-      `}</style>
+      {/* Pulse keyframe injection and popup styling */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes soloPulse {
+              0% {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6);
+              }
+              70% {
+                box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+              }
+              100% {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+              }
+            }
+            .maplibregl-popup-content {
+              border-radius: 16px !important;
+              padding: 10px 12px !important;
+              box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+              border: 1px solid rgba(255, 255, 255, 0.8) !important;
+            }
+            .dark .maplibregl-popup-content {
+              background-color: #18181b !important;
+              color: #f4f4f5 !important;
+              border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            }
+            .dark .maplibregl-popup-tip {
+              border-top-color: #18181b !important;
+            }
+          `,
+        }}
+      />
 
       {/* Map Container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      <div
+        ref={mapContainerRef}
+        className="w-full h-full"
+        style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
+      />
+
+      {/* Fallback recovery overlay if WebGL fails on unsupported hardware */}
+      {mapInitError && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-gray-100 dark:bg-zinc-900 text-gray-700 dark:text-gray-200 p-6 text-center">
+          <p className="font-bold text-sm mb-3">Map display encountered a hardware acceleration error.</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md"
+          >
+            Reload Map
+          </button>
+        </div>
+      )}
 
       {/* Floating Glassmorphic Map Navigation Controls */}
       <div
