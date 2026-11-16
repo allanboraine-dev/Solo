@@ -27,6 +27,7 @@ import {
   updateSupportTicketResolution,
   dispatchLostItemDriverAlert,
   buildOfficialSupportWhatsAppUrl,
+  OFFICIAL_SUPPORT_PHONE_DISPLAY,
   generateTicketCode,
   type SupportTicket,
   type SupportCategory,
@@ -960,7 +961,7 @@ export default function AdminDisputesPage() {
                 {/* WhatsApp Support Deep Link & Escalation */}
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-zinc-800/80">
                   <span className="text-[11px] text-zinc-500">
-                    Need further investigation? Escalate directly via SOLO Support WhatsApp:
+                    Need further investigation? Escalate directly via SOLO Support WhatsApp ({OFFICIAL_SUPPORT_PHONE_DISPLAY}):
                   </span>
                   <a
                     href={buildOfficialSupportWhatsAppUrl({

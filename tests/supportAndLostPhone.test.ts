@@ -106,7 +106,7 @@ describe('SOLO Rider Support & Lost Property Recovery Suite', () => {
       summary: 'Left gold iPhone in back seat. Alternative phone: 083 456 7890',
     });
 
-    assert.ok(url.startsWith('https://wa.me/'), 'URL must target official wa.me endpoint');
+    assert.ok(url.startsWith('https://wa.me/27705523978?text='), 'URL must target official SOLO WhatsApp support number +27705523978');
     assert.ok(url.includes('SOLO-LOST-12345'), 'URL must encode ticket code in text');
     assert.ok(url.includes('Bongani+Zungu') || url.includes('Bongani%20Zungu'), 'URL must encode rider name');
     assert.ok(url.includes('NC+492-104') || url.includes('NC%20492-104'), 'URL must encode vehicle plate');

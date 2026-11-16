@@ -28,6 +28,7 @@ import {
   saveSupportTicket,
   dispatchLostItemDriverAlert,
   buildOfficialSupportWhatsAppUrl,
+  OFFICIAL_SUPPORT_PHONE_DISPLAY,
   generateTicketCode,
   type SupportTicket,
   type SupportCategory,
@@ -554,6 +555,10 @@ export default function RiderSupportModal({
               </div>
 
               <div className="p-4 bg-gray-50 dark:bg-zinc-800/60 rounded-2xl border border-gray-200 dark:border-zinc-700 text-left max-w-sm mx-auto text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">WhatsApp Desk:</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{OFFICIAL_SUPPORT_PHONE_DISPLAY}</strong>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Response Time:</span>
                   <strong className="text-emerald-600 dark:text-emerald-400">Typically under 10 minutes</strong>

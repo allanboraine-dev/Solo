@@ -478,6 +478,7 @@ Discovery Bank     679000        10 digits        Paystack NUBAN / EFT
 ```
 
 ### Statutory Regulatory Contacts & Emergency Hotlines
+- **SOLO Official WhatsApp Support:** `+27 70 552 3978` (`https://wa.me/27705523978`)
 - **South African Police Service (SAPS Flying Squad):** `10111`
 - **National Emergency Ambulance & Fire:** `10177`
 - **Cellular Emergency SOS (Nationwide from any mobile phone):** `112`

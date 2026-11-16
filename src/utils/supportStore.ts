@@ -104,7 +104,8 @@ export interface SupportTicket {
 }
 
 const SUPPORT_TICKETS_STORAGE_KEY = 'solo_support_tickets';
-const OFFICIAL_SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SOLO_SUPPORT_WHATSAPP || '27820007656';
+export const OFFICIAL_SUPPORT_WHATSAPP = (process.env.NEXT_PUBLIC_SOLO_SUPPORT_WHATSAPP || '27705523978').replace(/[^\d]/g, '');
+export const OFFICIAL_SUPPORT_PHONE_DISPLAY = '+27 70 552 3978';
 
 /**
  * Generates human-friendly ticket codes (e.g. SOLO-LOST-49210 or SOLO-SPT-18302)

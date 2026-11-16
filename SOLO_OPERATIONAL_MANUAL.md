@@ -475,7 +475,7 @@ Background notifications adhere to the Web Push Protocol (RFC 8291 / RFC 8292) s
    - Drivers can immediately tap "Call Passenger" or "WhatsApp" to communicate directly with the passenger's alternative contact number without platform intermediary delay.
 3. **In-App Rider Help & Resolution Hub:**
    - Passengers can open the Rider Help modal directly from the rider interface or from their trip receipt (`/receipt/[tripId]`).
-   - Categorized self-service workflows for fare disputes, driver conduct feedback, SARS-compliant tax receipt downloads, and official WhatsApp Business support escalation (`https://wa.me/27...`).
+   - Categorized self-service workflows for fare disputes, driver conduct feedback, SARS-compliant tax receipt downloads, and official WhatsApp Business support escalation (`https://wa.me/27705523978` / `+27 70 552 3978`).
 
 ### 3.10 Manager Console: Dispute Resolution & Support Ticket Desk (`/admin/disputes`)
 The SOLO Manager Console features a centralized, real-time Dispute Resolution and Support Desk at `/admin/disputes`:
@@ -548,6 +548,7 @@ Discovery Bank     679000        10 digits        Paystack NUBAN / EFT
 ```
 
 ### Statutory Regulatory Contacts & Emergency Hotlines
+- **SOLO Official WhatsApp Support:** `+27 70 552 3978` (`https://wa.me/27705523978`)
 - **South African Police Service (SAPS Flying Squad):** `10111`
 - **National Emergency Ambulance & Fire:** `10177`
 - **Cellular Emergency SOS (Nationwide from any mobile phone):** `112`

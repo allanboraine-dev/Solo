@@ -26,6 +26,7 @@ import {
   dispatchLostItemDriverAlert,
   findMatchingTripForLostPhone,
   buildOfficialSupportWhatsAppUrl,
+  OFFICIAL_SUPPORT_PHONE_DISPLAY,
   type SupportTicket,
 } from "@/utils/supportStore";
 
@@ -535,7 +536,7 @@ export default function LostPhonePage() {
               <div className="p-3 bg-gray-50 dark:bg-zinc-800/60 rounded-xl text-xs text-gray-700 dark:text-zinc-300 flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0">2</span>
                 <span>
-                  The driver or our support desk will call or WhatsApp your alternative number:{" "}
+                  The driver or our support desk ({OFFICIAL_SUPPORT_PHONE_DISPLAY}) will call or WhatsApp your alternative number:{" "}
                   <strong>{resultTicket.alternativeContactPhone}</strong>.
                 </span>
               </div>
