@@ -37,12 +37,21 @@ export default function Home() {
               />
             </div>
           </div>
+          <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-gradient-to-r from-blue-500/10 via-teal-500/10 to-emerald-500/10 border border-blue-500/25 dark:border-blue-400/30 text-blue-900 dark:text-blue-200 text-xs sm:text-sm font-bold shadow-sm">
+            <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
+            <span>Dispatch and Booking tool for Licensed Operators</span>
+          </div>
           <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold tracking-tighter leading-tight">
             Move Freely <br className="hidden sm:block"/> with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">SOLO</span>
           </h1>
-          <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto font-medium px-2">
-            The Zero-Commission E-Hailing Platform built for South Africa.
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto font-medium px-2">
+              The Zero-Commission E-Hailing Platform built for South Africa.
+            </p>
+            <p className="text-base sm:text-lg text-blue-600 dark:text-blue-400 font-bold max-w-2xl mx-auto px-2">
+              Dispatch and Booking tool for Licensed Operators
+            </p>
+          </div>
           
           <div className="flex flex-wrap justify-center gap-2.5 sm:gap-3 pt-2 sm:pt-4 text-sm sm:text-base font-bold text-gray-800 dark:text-gray-200">
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-blue-200/80 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 shadow-sm">
@@ -50,6 +59,9 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm">
               <ShieldCheck size={18} className="text-green-500 shrink-0"/> Verified Drivers
+            </div>
+            <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-purple-200/80 dark:border-purple-500/30 text-purple-800 dark:text-purple-300 shadow-sm">
+              <Building2 size={18} className="text-purple-500 shrink-0"/> Dispatch &amp; Booking for Licensed Operators
             </div>
             <div className="flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md px-4 sm:px-5 py-2.5 rounded-full border border-gray-200/80 dark:border-white/10 shadow-sm">
               <Map size={18} className="text-blue-500 shrink-0"/> Real-time Tracking
@@ -193,9 +205,9 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5 sm:mb-3 tracking-tight">Driver Portal</h2>
+              <h2 className="text-2xl sm:text-3xl font-extrabold mb-2.5 sm:mb-3 tracking-tight">Driver &amp; Operator Portal</h2>
               <p className="text-gray-700 dark:text-gray-300 text-base sm:text-lg leading-relaxed font-normal">
-                Keep 100% of your rider fares paid directly via your required in-car <strong>Speedpoint machine</strong> or <strong>Cash</strong>. For drivers only: 14-day free trial, then a flat R499/pm SaaS fee (zero trip commissions).
+                Dispatch and Booking tool for Licensed Operators. Keep 100% of your rider fares paid directly via your required in-car <strong>Speedpoint machine</strong> or <strong>Cash</strong>. For drivers and operators: 14-day free trial, then a flat R499/pm SaaS fee (zero trip commissions).
               </p>
 
               <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40 text-xs sm:text-sm text-emerald-900 dark:text-emerald-200 flex items-start gap-2.5">

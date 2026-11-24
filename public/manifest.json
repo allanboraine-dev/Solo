@@ -2,7 +2,7 @@
   "id": "/",
   "name": "SOLO | Zero-Commission E-Hailing",
   "short_name": "SOLO",
-  "description": "Zero-Commission E-Hailing platform connecting South African riders and verified drivers directly.",
+  "description": "Dispatch and Booking tool for Licensed Operators. Zero-Commission E-Hailing platform connecting South African riders and verified drivers directly.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

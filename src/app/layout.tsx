@@ -17,8 +17,10 @@ export const metadata: Metadata = {
     default: "SOLO | Zero-Commission E-Hailing Platform",
     template: "%s | SOLO",
   },
-  description: "Zero-Commission E-Hailing Platform built for South Africa. Connecting riders directly with verified drivers with 100% fare retention.",
+  description: "Dispatch and Booking tool for Licensed Operators. Zero-Commission E-Hailing Platform built for South Africa. Connecting riders directly with verified drivers with 100% fare retention.",
   keywords: [
+    "dispatch and booking tool",
+    "licensed operators",
     "e-hailing",
     "South Africa",
     "zero commission",
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "SOLO | Zero-Commission E-Hailing Platform",
-    description: "South Africa's first true zero-commission mobility platform. Drivers keep 100% of their fare. Riders pay fair, transparent rates.",
+    description: "Dispatch and Booking tool for Licensed Operators. South Africa's first true zero-commission mobility platform. Drivers keep 100% of their fare. Riders pay fair, transparent rates.",
     url: "https://solo-lemon.vercel.app",
     siteName: "SOLO",
     locale: "en_ZA",
@@ -53,7 +55,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "SOLO | Zero-Commission E-Hailing Platform",
-    description: "South Africa's first true zero-commission mobility platform. Drivers keep 100% of their fare.",
+    description: "Dispatch and Booking tool for Licensed Operators. South Africa's first true zero-commission mobility platform.",
     images: ["/icon-512.png"],
   },
   manifest: "/manifest.json",
